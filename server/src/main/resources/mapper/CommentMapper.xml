@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//myBatis//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bjutzxq.server.mapper.CommentMapper">
+    
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.Comment">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="project_id" property="projectId"/>
+        <result column="parent_id" property="parentId"/>
+        <result column="content" property="content"/>
+        <result column="like_count" property="likeCount"/>
+        <result column="reply_count" property="replyCount"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+        <result column="status" property="status"/>
+    </resultMap>
+    
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, user_id, project_id, parent_id, content, like_count, reply_count, created_at, updated_at, status
+    </sql>
+
+    <!-- 新增评论 -->
+    <insert id="insert" parameterType="com.bjutzxq.pojo.Comment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO comment (
+            user_id,
+            project_id,
+            parent_id,
+            content,
+            like_count,
+            reply_count,
+            created_at,
+            updated_at,
+            status
+        ) VALUES (
+            #{userId},
+            #{projectId},
+            #{parentId},
+            #{content},
+            0,
+            0,
+            NOW(),
+            NOW(),
+            1
+        )
+    </insert>
+    
+    <!-- 根据 ID 查询评论 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM comment
+        WHERE id = #{id}
+    </select>
+    
+    <!-- 根据项目 ID 查询评论列表（分页） -->
+    <select id="selectByProjectId" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM comment
+        WHERE project_id = #{projectId} AND status = #{status}
+        ORDER BY created_at DESC
+    </select>
+    
+    <!-- 根据父评论 ID 查询回复列表 -->
+    <select id="selectReplies" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM comment
+        WHERE parent_id = #{parentId} AND status = 1
+        ORDER BY created_at ASC
+    </select>
+    
+    <!-- 更新评论信息 -->
+    <update id="updateById" parameterType="com.bjutzxq.pojo.Comment">
+        <set>
+            <if test="content != null">content = #{content},</if>
+            <if test="likeCount != null">like_count = #{likeCount},</if>
+            <if test="replyCount != null">reply_count = #{replyCount},</if>
+            <if test="status != null">status = #{status},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 删除评论 -->
+    <delete id="deleteById" parameterType="java.lang.Integer">
+        DELETE FROM comment WHERE id = #{id}
+    </delete>
+    
+    <!-- 统计项目评论数 -->
+    <select id="countByProjectId" resultType="int">
+        SELECT COUNT(*) 
+        FROM comment
+        WHERE project_id = #{projectId} AND status = 1
+    </select>
+    
+    <!-- 统计评论总数 -->
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM comment
+    </select>
+    
+    <!-- 根据用户 ID 删除所有评论 -->
+    <delete id="deleteByUserId">
+        DELETE FROM comment
+        WHERE user_id = #{userId}
+    </delete>
+    
+</mapper>

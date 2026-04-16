@@ -1,0 +1,83 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+
+spring:
+  application:
+    name: bjut-zxq-server
+  
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/bjut_zxq?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: root
+    password:
+    # TODO: 数据库密码不应明文存储,应使用环境变量或加密配置
+      
+    # HikariCP 连接池配置
+    hikari:
+      # 最小空闲连接数
+      minimum-idle: 5
+      # 最大连接池大小
+      maximum-pool-size: 20
+      # 连接超时时间(毫秒)
+      connection-timeout: 30000
+      # 空闲连接最大存活时间(毫秒)
+      idle-timeout: 600000
+      # 连接最大生命周期(毫秒)
+      max-lifetime: 1800000
+      # 连接测试查询
+      connection-test-query: SELECT 1
+      # 连接池名称
+      pool-name: BjutZxqHikariCP
+      # 自动提交
+      auto-commit: true
+      # 泄漏检测阈值(毫秒),0表示禁用
+      leak-detection-threshold: 60000
+  
+  jackson:
+    date-format: yyyy-MM-dd HH:mm:ss
+    time-zone: Asia/Shanghai
+  
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.bjutzxq.pojo
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+# 日志配置
+logging:
+  level:
+    com.bjutzxq: debug
+    com.bjutzxq.server.mapper: debug
+  file:
+    name: logs/bjut-zxq.log
+  logback:
+    rolling policy:
+      max-file-size: 10MB
+      max-history: 30
+# 待办
+aliyun:
+  oss:
+    endpoint: oss-cn-beijing.aliyuncs.com # 你的 OSS 地域节点
+    access-key-id: ${OSS_ACCESS_KEY_ID}           # 你的 AccessKey ID
+    access-key-secret: ${OSS_ACCESS_KEY_SECRET}                 # 你的 AccessKey Secret
+    bucket-name: bjut-zxq                  # 你的 Bucket 名称
+    file-host: projects                    # 文件在 Bucket 中的前缀目录
+    # TODO: OSS 密钥不应明文存储，应使用环境变量或配置中心
+    
+    # CDN 加速配置(可选)
+    cdn:
+      enabled: false                        # 是否启用 CDN 加速
+      domain: ""                            # CDN 加速域名,为空则使用 OSS 默认域名
+      # 如需启用 CDN:
+      # 1. 在阿里云 CDN 控制台添加域名,源站选择 OSS
+      # 2. 配置域名 CNAME 解析到 CDN 提供的地址
+      # 3. 将 enabled 改为 true,并填写 CDN 域名
+      # 示例: domain: https://cdn.yourdomain.com

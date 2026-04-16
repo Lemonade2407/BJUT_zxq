@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bjutzxq.server.mapper.ProjectTagMapper">
+    
+    <!-- 插入项目标签关联 -->
+    <insert id="insert">
+        INSERT INTO project_tag (project_id, tag_id)
+        VALUES (#{projectId}, #{tagId})
+    </insert>
+    
+    <!-- 批量插入项目标签关联 -->
+    <insert id="batchInsert">
+        INSERT INTO project_tag (project_id, tag_id) VALUES
+        <foreach collection="tagIds" item="tagId" separator=",">
+            (#{projectId}, #{tagId})
+        </foreach>
+    </insert>
+    
+    <!-- 删除项目的指定标签 -->
+    <delete id="deleteByProjectIdAndTagId">
+        DELETE FROM project_tag 
+        WHERE project_id = #{projectId} AND tag_id = #{tagId}
+    </delete>
+    
+    <!-- 删除项目的所有标签 -->
+    <delete id="deleteByProjectId">
+        DELETE FROM project_tag WHERE project_id = #{projectId}
+    </delete>
+    
+    <!-- 查询项目的标签 ID 列表 -->
+    <select id="selectTagIdsByProjectId" resultType="java.lang.Integer">
+        SELECT tag_id FROM project_tag WHERE project_id = #{projectId}
+    </select>
+    
+    <!-- 查询包含指定标签的项目 ID 列表 -->
+    <select id="selectProjectIdsByTagId" resultType="java.lang.Integer">
+        SELECT project_id FROM project_tag WHERE tag_id = #{tagId}
+    </select>
+</mapper>

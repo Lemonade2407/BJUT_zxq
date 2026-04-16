@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//myBatis//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bjutzxq.server.mapper.ProjectMapper">
+    
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.Project">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="description" property="description"/>
+        <result column="owner_id" property="ownerId"/>
+        <result column="visibility" property="visibility"/>
+        <result column="star_count" property="starCount"/>
+        <result column="watch_count" property="watchCount"/>
+        <result column="file_count" property="fileCount"/>
+        <result column="download_count" property="downloadCount"/>
+        <result column="view_count" property="viewCount"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, name, description, owner_id, visibility, star_count, watch_count, file_count, download_count, view_count, created_at, updated_at
+    </sql>
+
+    <!-- 新增项目 -->
+    <insert id="insert" parameterType="com.bjutzxq.pojo.Project" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO project (
+            name,
+            description,
+            owner_id,
+            visibility,
+            file_count,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{name},
+            #{description},
+            #{ownerId},
+            #{visibility},
+            #{fileCount},
+            NOW(),
+            NOW()
+        )
+    </insert>
+    <!-- 更新项目 -->
+    <update id="updateById" parameterType="com.bjutzxq.pojo.Project">
+        UPDATE project
+        <set>
+            <if test="name != null">name = #{name},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="ownerId != null">owner_id = #{ownerId},</if>
+            <if test="visibility != null">visibility = #{visibility},</if>
+            <if test="fileCount != null">file_count = #{fileCount},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除项目 -->
+    <delete id="deleteById" parameterType="com.bjutzxq.pojo.Project">
+        DELETE FROM project
+        WHERE id = #{id}
+    </delete>
+
+    <!-- 根据 ID 查询项目 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM project
+        WHERE id = #{id}
+    </select>
+    
+    <!-- 根据名称查询项目 -->
+    <select id="selectByName" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM project
+        WHERE name LIKE CONCAT('%', #{name}, '%')
+    </select>
+    
+    <!-- 根据用户 ID 查询项目 -->
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM project
+        WHERE owner_id = #{userId}
+    </select>
+    
+    <!-- 统计项目总数 -->
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM project
+    </select>
+    
+    <!-- 根据用户 ID 删除所有项目 -->
+    <delete id="deleteByUserId">
+        DELETE FROM project
+        WHERE owner_id = #{userId}
+    </delete>
+    
+
+    <!-- 根据标签 ID 查询项目 -->
+    <select id="selectByTagId" resultMap="BaseResultMap">
+        SELECT DISTINCT p.*
+        FROM project p
+        INNER JOIN project_tag pt ON p.id = pt.project_id
+        WHERE pt.tag_id = #{tagId}
+        ORDER BY p.created_at DESC
+    </select>
+    
+    <!-- 查询所有公开项目 -->
+    <select id="selectPublicProjects" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM project
+        WHERE visibility = 1
+        ORDER BY created_at DESC
+    </select>
+    
+    <!-- 获取热门项目（按浏览量排序） -->
+    <select id="selectTrendingProjects" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM project
+        WHERE visibility = 1
+        ORDER BY view_count DESC, star_count DESC
+        LIMIT #{limit}
+    </select>
+    
+    <!-- 增加项目浏览量 -->
+    <update id="incrementViewCount">
+        UPDATE project
+        SET view_count = COALESCE(view_count, 0) + 1,
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 增加项目下载次数 -->
+    <update id="incrementDownloadCount">
+        UPDATE project
+        SET download_count = COALESCE(download_count, 0) + 1,
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 增加项目点赞数 -->
+    <update id="incrementStarCount">
+        UPDATE project
+        SET star_count = COALESCE(star_count, 0) + 1,
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 减少项目点赞数 -->
+    <update id="decrementStarCount">
+        UPDATE project
+        SET star_count = GREATEST(COALESCE(star_count, 0) - 1, 0),
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 增加项目关注数 -->
+    <update id="incrementWatchCount">
+        UPDATE project
+        SET watch_count = COALESCE(watch_count, 0) + 1,
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 减少项目关注数 -->
+    <update id="decrementWatchCount">
+        UPDATE project
+        SET watch_count = GREATEST(COALESCE(watch_count, 0) - 1, 0),
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 根据用户 ID 查询项目 ID 列表 -->
+    <select id="selectProjectIdsByUserId" resultType="java.lang.Integer">
+        SELECT id
+        FROM project
+        WHERE owner_id = #{userId}
+    </select>
+    
+</mapper>

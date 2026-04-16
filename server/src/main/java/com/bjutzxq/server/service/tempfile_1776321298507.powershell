@@ -1,0 +1,4 @@
+# Windows PowerShell
+ssh root@你的服务器IP
+
+# 首次连接会提示保存密钥,输入 yes

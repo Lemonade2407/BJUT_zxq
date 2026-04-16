@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bjutzxq.server.mapper.TagMapper">
+    
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.Tag">
+        <id column="id" property="id"/>
+        <result column="name" property="name"/>
+        <result column="color" property="color"/>
+        <result column="usage_count" property="usageCount"/>
+    </resultMap>
+    
+    <!-- 插入标签 -->
+    <insert id="insert" parameterType="com.bjutzxq.pojo.Tag" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO tag (name, color, usage_count)
+        VALUES (#{name}, #{color}, #{usageCount})
+    </insert>
+    
+    <!-- 删除标签 -->
+    <delete id="deleteById">
+        DELETE FROM tag WHERE id = #{id}
+    </delete>
+    
+    <!-- 更新标签 -->
+    <update id="update" parameterType="com.bjutzxq.pojo.Tag">
+        UPDATE tag
+        <set>
+            <if test="name != null and name != ''">
+                name = #{name},
+            </if>
+            <if test="color != null and color != ''">
+                color = #{color},
+            </if>
+            <if test="usageCount != null">
+                usage_count = #{usageCount},
+            </if>
+        </set>
+        WHERE id = #{id}
+    </update>
+    
+    <!-- 根据 ID 查询标签 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT * FROM tag WHERE id = #{id}
+    </select>
+    
+    <!-- 查询所有标签 -->
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT * FROM tag ORDER BY usage_count DESC, id ASC
+    </select>
+    
+    <!-- 根据名称查询标签（模糊查询） -->
+    <select id="selectByName" resultMap="BaseResultMap">
+        SELECT * FROM tag WHERE name LIKE CONCAT('%', #{name}, '%') ORDER BY usage_count DESC, id ASC
+    </select>
+    
+    <!-- 检查标签名称是否存在（排除自身） -->
+    <select id="countByNameExcludeId" resultType="int">
+        SELECT COUNT(*) FROM tag 
+        WHERE name = #{name} AND id != #{excludeId}
+    </select>
+    
+    <!-- 增加标签使用次数 -->
+    <update id="incrementUsageCount">
+        UPDATE tag SET usage_count = usage_count + 1 WHERE id = #{id}
+    </update>
+    
+    <!-- 减少标签使用次数 -->
+    <update id="decrementUsageCount">
+        UPDATE tag SET usage_count = GREATEST(usage_count - 1, 0) WHERE id = #{id}
+    </update>
+    
+    <!-- 查询热门标签 -->
+    <select id="selectHotTags" resultMap="BaseResultMap">
+        SELECT * FROM tag ORDER BY usage_count DESC LIMIT #{limit}
+    </select>
+</mapper>

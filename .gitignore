@@ -1,0 +1,35 @@
+**/target/
+.idea
+.vscode
+*.iml
+*.class
+*Test.java
+**/test/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+logs/
+*.log
+
+# Docker
+docker-compose.override.yml
+
+# Node
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# SSL certificates
+ssl/*.pem
+ssl/*.key
+ssl/*.crt

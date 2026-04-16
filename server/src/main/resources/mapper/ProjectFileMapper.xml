@@ -1,0 +1,139 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//myBatis//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bjutzxq.server.mapper.ProjectFileMapper">
+    
+    <!-- 结果映射 -->
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.ProjectFile">
+        <id column="id" property="id"/>
+        <result column="project_id" property="projectId"/>
+        <result column="file_name" property="fileName"/>
+        <result column="file_path" property="filePath"/>
+        <result column="file_size" property="fileSize"/>
+        <result column="file_type" property="fileType"/>
+        <result column="storage_url" property="storageUrl"/>
+        <result column="content" property="content"/>
+        <result column="is_dir" property="isDir"/>
+        <result column="parent_id" property="parentId"/>
+        <result column="uploader_id" property="uploaderId"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+    
+    <!-- 基础列 -->
+    <sql id="Base_Column_List">
+        id, project_id, file_name, file_path, file_size, file_type, storage_url, content, is_dir, parent_id, uploader_id, created_at, updated_at
+    </sql>
+
+    <!-- 新增文件 -->
+    <insert id="insert" parameterType="com.bjutzxq.pojo.ProjectFile" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO project_file (
+            project_id,
+            file_name,
+            file_path,
+            file_size,
+            file_type,
+            storage_url,
+            content,
+            is_dir,
+            parent_id,
+            uploader_id,
+            created_at,
+            updated_at
+        ) VALUES (
+            #{projectId},
+            #{fileName},
+            #{filePath},
+            #{fileSize},
+            #{fileType},
+            #{storageUrl},
+            #{content},
+            #{isDir},
+            #{parentId},
+            #{uploaderId},
+            NOW(),
+            NOW()
+        )
+    </insert>
+    
+    <!-- 更新文件 -->
+    <update id="updateById" parameterType="com.bjutzxq.pojo.ProjectFile">
+        <set>
+            <if test="fileName != null">file_name = #{fileName},</if>
+            <if test="filePath != null">file_path = #{filePath},</if>
+            <if test="fileSize != null">file_size = #{fileSize},</if>
+            <if test="fileType != null">file_type = #{fileType},</if>
+            <if test="storageUrl != null">storage_url = #{storageUrl},</if>
+            <if test="content != null">content = #{content},</if>
+            <if test="isDir != null">is_dir = #{isDir},</if>
+            <if test="parentId != null">parent_id = #{parentId},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <!-- 删除文件 -->
+    <delete id="deleteById" parameterType="com.bjutzxq.pojo.ProjectFile">
+        DELETE FROM project_file WHERE id = #{id}
+    </delete>
+
+    <!-- 根据 ID 查询文件 -->
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM project_file
+        WHERE id = #{id}
+    </select>
+    
+    <!-- 根据项目 ID 和父目录 ID 查询文件列表 -->
+    <select id="selectByProjectIdAndParentId" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM project_file
+        WHERE project_id = #{projectId}
+        <if test="parentId == null">
+            AND parent_id IS NULL
+        </if>
+        <if test="parentId != null">
+            AND parent_id = #{parentId}
+        </if>
+        ORDER BY is_dir DESC, created_at ASC
+    </select>
+    
+    <!-- 根据项目 ID 查询所有文件 -->
+    <select id="selectByProjectId" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM project_file
+        WHERE project_id = #{projectId}
+        ORDER BY file_path, is_dir DESC, file_name
+    </select>
+    
+    <!-- 根据路径查询文件 -->
+    <select id="selectByPath" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM project_file
+        WHERE project_id = #{projectId}
+        AND file_path = #{filePath}
+        AND file_name = #{fileName}
+        LIMIT 1
+    </select>
+    
+    <!-- 统计项目文件数量 -->
+    <select id="countByProjectId" resultType="int">
+        SELECT COUNT(*) 
+        FROM project_file
+        WHERE project_id = #{projectId}
+        AND is_dir = 0
+    </select>
+    
+    <!-- 根据上传者 ID 查询文件列表 -->
+    <select id="selectByUploaderId" resultMap="BaseResultMap">
+        SELECT 
+            <include refid="Base_Column_List"/>
+        FROM project_file
+        WHERE uploader_id = #{uploaderId}
+        ORDER BY created_at DESC
+    </select>
+    
+</mapper>
