@@ -85,7 +85,7 @@ onMounted(() => {
   <header class="app-header">
     <div class="header-container">
       <div class="header-left">
-        <img src="/北京工业大学-logo.svg" alt="北京工业大学校徽" class="app-logo" />
+        <img src="/bjut-logo.svg" alt="北京工业大学校徽" class="app-logo" />
         <!-- 导航菜单 -->
         <nav class="header-nav">
           <a 
@@ -119,7 +119,7 @@ onMounted(() => {
         </div>
         <div class="user-info">
           <img
-            :src="userInfo.avatar || '/北京工业大学-logo.svg'"
+            :src="userInfo.avatar || '/bjut-logo.svg'"
             alt="User avatar"
             class="user-avatar"
             @click="handleAvatarClick"

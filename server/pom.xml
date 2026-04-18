@@ -97,6 +97,23 @@
 
     <build>
         <plugins>
+            <!-- Spring Boot Maven 插件(打包可执行 JAR) -->
+            <plugin>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
+                <version>3.2.0</version>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>repackage</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <mainClass>com.bjutzxq.server.ServerApplication</mainClass>
+                </configuration>
+            </plugin>
+            
             <!-- Maven 编译器插件 -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
