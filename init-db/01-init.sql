@@ -6,7 +6,7 @@
 
 CREATE DATABASE IF NOT EXISTS bjut_zxq 
 DEFAULT CHARACTER SET utf8mb4 
-DEFAULT COLLATE utf8mb4_unicode_ci;
+DEFAULT COLLATE utf8mb4_0900_ai_ci;
 
 USE bjut_zxq;
 
@@ -21,7 +21,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   `email` VARCHAR(100) COMMENT '邮箱',
   `avatar` VARCHAR(255) COMMENT '头像URL',
   `phone` VARCHAR(20) COMMENT '手机号',
-  `sex` TINYINT DEFAULT 0 COMMENT '性别: 0-未知, 1-男, 2-女',
+  `sex` VARCHAR(10) DEFAULT 'U' COMMENT '性别: U-未知, M-男, F-女',
   `bio` TEXT COMMENT '个人简介',
   `role` VARCHAR(20) DEFAULT 'USER' COMMENT '角色: USER, ADMIN',
   `status` TINYINT DEFAULT 1 COMMENT '状态: 0-禁用, 1-正常',
@@ -30,7 +30,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   INDEX idx_username (`username`),
   INDEX idx_email (`email`),
   INDEX idx_student_id (`student_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='用户表';
+) ENGINE=InnoDB COMMENT='用户表';
 
 -- ===========================================
 -- 项目表
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS `project` (
   INDEX idx_owner_id (`owner_id`),
   INDEX idx_visibility (`visibility`),
   INDEX idx_name (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='项目表';
+) ENGINE=InnoDB COMMENT='项目表';
 
 -- ===========================================
 -- 标签表
@@ -63,7 +63,7 @@ CREATE TABLE IF NOT EXISTS `tag` (
   `color` VARCHAR(20) DEFAULT '#409EFF' COMMENT '标签颜色',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   INDEX idx_name (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='标签表';
+) ENGINE=InnoDB COMMENT='标签表';
 
 -- ===========================================
 -- 项目-标签关联表
@@ -78,7 +78,7 @@ CREATE TABLE IF NOT EXISTS `project_tag` (
   UNIQUE KEY uk_project_tag (`project_id`, `tag_id`),
   INDEX idx_project_id (`project_id`),
   INDEX idx_tag_id (`tag_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='项目-标签关联表';
+) ENGINE=InnoDB COMMENT='项目-标签关联表';
 
 -- ===========================================
 -- 项目文件表
@@ -102,7 +102,7 @@ CREATE TABLE IF NOT EXISTS `project_file` (
   INDEX idx_project_id (`project_id`),
   INDEX idx_parent_id (`parent_id`),
   INDEX idx_uploader_id (`uploader_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='项目文件表';
+) ENGINE=InnoDB COMMENT='项目文件表';
 
 -- ===========================================
 -- 评论表
@@ -124,7 +124,7 @@ CREATE TABLE IF NOT EXISTS `comment` (
   INDEX idx_user_id (`user_id`),
   INDEX idx_project_id (`project_id`),
   INDEX idx_parent_id (`parent_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='评论表';
+) ENGINE=InnoDB COMMENT='评论表';
 
 -- ===========================================
 -- 收藏表
@@ -139,7 +139,7 @@ CREATE TABLE IF NOT EXISTS `star` (
   UNIQUE KEY uk_user_project (`user_id`, `project_id`),
   INDEX idx_user_id (`user_id`),
   INDEX idx_project_id (`project_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='收藏表';
+) ENGINE=InnoDB COMMENT='收藏表';
 
 -- ===========================================
 -- 关注表
@@ -155,7 +155,7 @@ CREATE TABLE IF NOT EXISTS `watch` (
   UNIQUE KEY uk_user_project (`user_id`, `project_id`),
   INDEX idx_user_id (`user_id`),
   INDEX idx_project_id (`project_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='关注表';
+) ENGINE=InnoDB COMMENT='关注表';
 
 -- ===========================================
 -- 通知表
@@ -174,7 +174,7 @@ CREATE TABLE IF NOT EXISTS `notification` (
   FOREIGN KEY (`project_id`) REFERENCES `project`(`id`) ON DELETE SET NULL,
   INDEX idx_user_id (`user_id`),
   INDEX idx_is_read (`is_read`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='通知表';
+) ENGINE=InnoDB COMMENT='通知表';
 
 -- ===========================================
 -- 下载日志表
@@ -192,7 +192,7 @@ CREATE TABLE IF NOT EXISTS `download_log` (
   INDEX idx_user_id (`user_id`),
   INDEX idx_project_id (`project_id`),
   INDEX idx_created_at (`created_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='下载日志表';
+) ENGINE=InnoDB COMMENT='下载日志表';
 
 -- ===========================================
 -- 分类表
@@ -204,7 +204,7 @@ CREATE TABLE IF NOT EXISTS `category` (
   `sort_order` INT DEFAULT 0 COMMENT '排序',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   INDEX idx_name (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci COMMENT='分类表';
+) ENGINE=InnoDB COMMENT='分类表';
 
 -- ===========================================
 -- 插入初始数据
