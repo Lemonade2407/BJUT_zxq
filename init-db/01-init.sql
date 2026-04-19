@@ -17,7 +17,7 @@ CREATE TABLE IF NOT EXISTS `user` (
   `password` VARCHAR(255) NOT NULL COMMENT '密码(BCrypt加密)',
   `student_id` VARCHAR(20) COMMENT '学号',
   `email` VARCHAR(100) COMMENT '邮箱',
-  `avatar` VARCHAR(255) COMMENT '头像URL',
+  `avatar` TEXT COMMENT '头像URL或Base64数据',
   `phone` VARCHAR(20) COMMENT '手机号',
   `sex` VARCHAR(10) DEFAULT 'U' COMMENT '性别: U-未知, M-男, F-女',
   `bio` TEXT COMMENT '个人简介',

@@ -46,6 +46,16 @@ public class OssUtil {
      * @return 文件的访问 URL
      */
     public String upload(MultipartFile file) throws IOException {
+        return upload(file, null);
+    }
+
+    /**
+     * 上传文件到 OSS(指定目录)
+     * @param file 上传的文件
+     * @param directory 自定义目录(如 "avatars", "projects")
+     * @return 文件的访问 URL
+     */
+    public String upload(MultipartFile file, String directory) throws IOException {
         // 创建 OSSClient 实例
         OSS ossClient = null;
         try {
@@ -65,10 +75,19 @@ public class OssUtil {
             
             String suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
             
-            // 生成唯一文件名: projects/2026/04/15/uuid.jpg
+            // 生成唯一文件名
             String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
             String fileName = UUID.randomUUID().toString().replace("-", "") + suffix;
-            String objectName = fileHost + "/" + datePath + "/" + fileName;
+            
+            // 根据目录参数决定存储路径
+            String objectName;
+            if (directory != null && !directory.trim().isEmpty()) {
+                // 自定义目录: avatars/2026/04/19/uuid.jpg
+                objectName = directory + "/" + datePath + "/" + fileName;
+            } else {
+                // 默认目录: projects/2026/04/19/uuid.jpg
+                objectName = fileHost + "/" + datePath + "/" + fileName;
+            }
 
             log.info("开始上传文件到 OSS: {}, 大小: {} bytes", objectName, file.getSize());
             

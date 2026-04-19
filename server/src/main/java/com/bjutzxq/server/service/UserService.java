@@ -562,8 +562,8 @@ public class UserService {
                 }
             }
             
-            // 6. 上传新头像到 OSS
-            String avatarUrl = ossUtil.upload(file);
+            // 6. 上传新头像到 OSS (使用 avatars 目录)
+            String avatarUrl = ossUtil.upload(file, "avatars");
             log.info("头像上传成功: {}", avatarUrl);
             
             // 7. 更新用户头像
