@@ -1,10 +1,10 @@
 <script setup>
-import { ref, reactive, inject, onMounted } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { register } from '@/api/auth'
 import { getCaptcha, checkPasswordStrength } from '@/api/captcha'
 
-// 注入全局状态管理
-const changePage = inject('changePage')
+const router = useRouter()
 
 // 表单数据
 const registerForm = reactive({
@@ -244,7 +244,7 @@ const handleRegister = async () => {
       // TODO: 考虑添加邮箱验证步骤，而非直接跳转
       // 2秒后跳转到登录页
       setTimeout(() => {
-        changePage('login')
+        router.push('/login')
       }, 2000)
     }
   } catch (error) {
@@ -282,7 +282,7 @@ onMounted(() => {
 
 // 切换到登录页面
 const goToLogin = () => {
-  changePage('login')
+  router.push('/login')
 }
 
 // 获取密码强度颜色
