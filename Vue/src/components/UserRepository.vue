@@ -163,7 +163,6 @@ onMounted(() => {
       <div v-else class="empty-state">
         <span class="empty-icon">📭</span>
         <p class="empty-text">暂无项目</p>
-        <!-- TODO: 添加创建项目的路由 -->
         <button class="create-project-btn" @click="$router.push('/create-project')">
           创建新项目
         </button>
@@ -259,49 +258,6 @@ onMounted(() => {
   margin: 0;
 }
 
-/* 标签页 */
-.tabs-container {
-  background-color: #ffffff;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  padding: 12px;
-  margin-bottom: 24px;
-  box-shadow: 0 2px 4px rgba(0, 51, 102, 0.05);
-}
-
-.tabs {
-  display: flex;
-  gap: 8px;
-}
-
-.tab-btn {
-  padding: 8px 16px;
-  background-color: transparent;
-  border: none;
-  border-radius: 4px;
-  color: #666666;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.tab-btn:hover {
-  background-color: #f5f5f5;
-}
-
-.tab-btn.active {
-  background-color: #0059b3;
-  color: #ffffff;
-}
-
-.tab-count {
-  font-size: 12px;
-  opacity: 0.8;
-}
-
 /* 加载状态 */
 .loading-state {
   display: flex;
@@ -356,10 +312,6 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   margin-bottom: 12px;
-}
-
-.project-icon {
-  font-size: 24px;
 }
 
 .project-name {
@@ -495,13 +447,6 @@ onMounted(() => {
   color: #ffffff;
 }
 
-.page-btn.active {
-  background-color: #0059b3;
-  border-color: #0059b3;
-  color: #ffffff;
-  font-weight: 600;
-}
-
 .page-btn:disabled {
   background-color: #f5f5f5;
   color: #cccccc;
@@ -518,10 +463,6 @@ onMounted(() => {
   .user-info-header {
     flex-direction: column;
     text-align: center;
-  }
-
-  .tabs {
-    flex-wrap: wrap;
   }
 
   .project-grid {

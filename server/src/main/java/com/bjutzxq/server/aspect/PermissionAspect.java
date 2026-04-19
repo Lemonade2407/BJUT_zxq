@@ -1,5 +1,6 @@
 package com.bjutzxq.server.aspect;
 
+import com.bjutzxq.common.Constants;
 import com.bjutzxq.common.Role;
 import com.bjutzxq.pojo.User;
 import com.bjutzxq.server.annotation.RequireRole;
@@ -78,7 +79,7 @@ public class PermissionAspect {
         }
         
         // 检查用户状态
-        if (user.getStatus() != 1) {
+        if (!Constants.User.STATUS_NORMAL.equals(user.getStatus())) {
             log.warn("权限验证失败：用户已被禁用，ID: {}", userId);
             throw new RuntimeException("账号已被禁用");
         }

@@ -1,5 +1,4 @@
 package com.bjutzxq.server.service;
-
 import com.bjutzxq.common.Constants;
 import com.bjutzxq.common.Role;
 import com.bjutzxq.pojo.ProjectFile;
@@ -97,6 +96,10 @@ public class UserService {
         if (user.getRole() == null) {
             user.setRole(Role.USER);
         }
+        // 设置默认头像
+        if (user.getAvatar() == null || user.getAvatar().trim().isEmpty()) {
+            user.setAvatar("/bjut-logo.svg");
+        }
         
         // 7. 插入用户
         userMapper.insert(user);
@@ -184,7 +187,7 @@ public class UserService {
         }
         
         // 检查用户状态
-        if (user.getStatus() != Constants.User.STATUS_NORMAL) {
+        if (!Constants.User.STATUS_NORMAL.equals(user.getStatus())) {
             log.warn("账号已被禁用：{}", username);
             throw new RuntimeException("账号已被禁用");
         }
@@ -442,12 +445,12 @@ public class UserService {
             
             for (ProjectFile file : userFiles) {
                 // 跳过目录
-                if (file.getIsDir() != null && file.getIsDir() == 1) {
+                if (file.getIsDir() != null && Constants.File.TYPE_DIRECTORY.equals(file.getIsDir())) {
                     continue;
                 }
                 
                 // 根据存储类型清理
-                if (file.getStorageType() != null && file.getStorageType() == 2) {
+                if (file.getStorageType() != null && Integer.valueOf(2).equals(file.getStorageType())) {
                     // OSS 存储
                     if (file.getStorageUrl() != null && file.getStorageUrl().startsWith("http")) {
                         try {
@@ -511,5 +514,70 @@ public class UserService {
         log.info("统计信息：用户={}, 项目={}, 评论={}", userCount, projectCount, commentCount);
         
         return stats;
+    }
+    
+    /**
+     * 上传用户头像
+     * @param userId 用户 ID
+     * @param file 头像文件
+     * @return 头像 URL
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public String uploadAvatar(Integer userId, org.springframework.web.multipart.MultipartFile file) {
+        log.info("开始上传头像，用户 ID: {}", userId);
+        
+        // 1. 验证用户存在
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        
+        // 2. 验证文件
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("请选择要上传的头像文件");
+        }
+        
+        // 3. 验证文件类型（只允许图片）
+        String contentType = file.getContentType();
+        if (contentType == null || !contentType.startsWith("image/")) {
+            throw new IllegalArgumentException("只能上传图片文件");
+        }
+        
+        // 4. 验证文件大小（最大 5MB）
+        long maxSize = 5 * 1024 * 1024; // 5MB
+        if (file.getSize() > maxSize) {
+            throw new IllegalArgumentException("头像文件大小不能超过 5MB");
+        }
+        
+        try {
+            // 5. 删除旧头像（如果不是默认头像）
+            String oldAvatar = user.getAvatar();
+            if (oldAvatar != null && !oldAvatar.equals("/bjut-logo.svg") && !oldAvatar.trim().isEmpty()) {
+                try {
+                    ossUtil.delete(oldAvatar);
+                    log.info("已删除旧头像: {}", oldAvatar);
+                } catch (Exception e) {
+                    log.warn("删除旧头像失败: {}, 错误: {}", oldAvatar, e.getMessage());
+                    // 不抛出异常，继续上传新头像
+                }
+            }
+            
+            // 6. 上传新头像到 OSS
+            String avatarUrl = ossUtil.upload(file);
+            log.info("头像上传成功: {}", avatarUrl);
+            
+            // 7. 更新用户头像
+            user.setAvatar(avatarUrl);
+            userMapper.update(user);
+            
+            log.info("用户头像更新成功，用户 ID: {}", userId);
+            return avatarUrl;
+            
+        } catch (IllegalArgumentException e) {
+            throw e;
+        } catch (Exception e) {
+            log.error("头像上传失败: {}", e.getMessage(), e);
+            throw new RuntimeException("头像上传失败: " + e.getMessage());
+        }
     }
 }

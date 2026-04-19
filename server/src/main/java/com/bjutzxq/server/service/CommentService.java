@@ -1,5 +1,6 @@
 package com.bjutzxq.server.service;
 
+import com.bjutzxq.common.Constants;
 import com.bjutzxq.common.NotificationType;
 import com.bjutzxq.pojo.Comment;
 import com.github.pagehelper.PageHelper;
@@ -52,7 +53,7 @@ public class CommentService {
         // 2. 如果是回复，检查父评论是否存在
         if (parentId != null) {
             Comment parent = commentMapper.selectById(parentId);
-            if (parent == null || parent.getStatus() == 0) {
+            if (parent == null || Constants.Comment.STATUS_DELETED.equals(parent.getStatus())) {
                 throw new RuntimeException("父评论不存在或已被删除");
             }
             

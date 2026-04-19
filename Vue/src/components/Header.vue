@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { logout as logoutApi } from '@/api/auth'
 import { toast } from '@/utils/toast'
@@ -45,7 +45,7 @@ const handleLogout = async () => {
       // 使用 tokenManager 清除认证信息
       tokenManager.removeToken()
       // 跳转到登录页
-      router.push('/login')
+      await router.push('/login')
     }
   }
 }
@@ -132,8 +132,27 @@ onMounted(() => {
             title="点击查看个人中心"
           >{{ userInfo.username || '用户' }}</span>
           <button @click="handleLogout" class="logout-btn" title="退出登录">
-            <p>退出登录</p>
+            退出登录
           </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 退出确认对话框 -->
+    <div v-if="showLogoutModal" class="modal-overlay" @click.self="cancelLogout">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h3>确认退出</h3>
+          <button @click="cancelLogout" class="close-btn">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-icon">👋</div>
+          <p class="modal-message">确定要退出登录吗？</p>
+          <p class="modal-hint">退出后需要重新登录才能访问</p>
+        </div>
+        <div class="modal-footer">
+          <button @click="cancelLogout" class="modal-btn cancel-btn">取消</button>
+          <button @click="confirmLogout" class="modal-btn confirm-btn">确认退出</button>
         </div>
       </div>
     </div>
@@ -202,10 +221,6 @@ onMounted(() => {
   background-color: rgba(255, 255, 255, 0.15);
 }
 
-.nav-item.active {
-  background-color: rgba(255, 255, 255, 0.2);
-}
-
 .nav-emoji {
   font-size: 16px;
   display: inline-block;
@@ -252,31 +267,6 @@ onMounted(() => {
 .search-input:focus {
   border-color: #ffffff;
   box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
-}
-
-.search-shortcut {
-  position: absolute;
-  right: 8px;
-  background-color: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.4);
-  border-radius: 4px;
-  padding: 2px 6px;
-  font-size: 12px;
-  color: #ffffff;
-  pointer-events: none;
-}
-
-.header-icon-link {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 4px;
-  border-radius: 6px;
-  transition: background-color 0.2s;
-}
-
-.header-icon-link:hover {
-  background-color: rgba(255, 255, 255, 0.15);
 }
 
 .header-icon-link svg {
@@ -327,6 +317,150 @@ onMounted(() => {
 
 .logout-btn:hover {
   background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* 退出确认对话框 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.2s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 51, 102, 0.3);
+  max-width: 400px;
+  width: 90%;
+  animation: slideIn 0.3s ease-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  border-bottom: 1px solid #e8e8e8;
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #003366;
+}
+
+.close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #999999;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.close-btn:hover {
+  background-color: #f5f5f5;
+  color: #333333;
+}
+
+.modal-body {
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.modal-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.modal-message {
+  font-size: 16px;
+  color: #333333;
+  margin: 0 0 8px 0;
+  font-weight: 500;
+}
+
+.modal-hint {
+  font-size: 14px;
+  color: #999999;
+  margin: 0;
+}
+
+.modal-footer {
+  display: flex;
+  gap: 12px;
+  padding: 16px 24px 24px;
+  justify-content: flex-end;
+}
+
+.modal-btn {
+  padding: 10px 24px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 100px;
+}
+
+.cancel-btn {
+  background-color: #f5f5f5;
+  color: #666666;
+}
+
+.cancel-btn:hover {
+  background-color: #e8e8e8;
+  color: #333333;
+}
+
+.confirm-btn {
+  background: linear-gradient(135deg, #ff4d4f 0%, #ff7875 100%);
+  color: #ffffff;
+  box-shadow: 0 2px 4px rgba(255, 77, 79, 0.2);
+}
+
+.confirm-btn:hover {
+  background: linear-gradient(135deg, #ff7875 0%, #ffa39e 100%);
+  box-shadow: 0 4px 8px rgba(255, 77, 79, 0.3);
+  transform: translateY(-1px);
+}
+
+.confirm-btn:active {
+  transform: translateY(0);
 }
 
 @media (max-width: 768px) {

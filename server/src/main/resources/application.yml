@@ -70,7 +70,6 @@ aliyun:
     access-key-secret: ${OSS_ACCESS_KEY_SECRET}                 # 你的 AccessKey Secret
     bucket-name: bjut-zxq                  # 你的 Bucket 名称
     file-host: projects                    # 文件在 Bucket 中的前缀目录
-    # TODO: OSS 密钥不应明文存储，应使用环境变量或配置中心
     
     # CDN 加速配置(可选)
     cdn:

@@ -4,9 +4,7 @@
 -- 此脚本会在 MySQL 容器首次启动时自动执行
 -- 如果已有数据,不会重复创建
 
-CREATE DATABASE IF NOT EXISTS bjut_zxq 
-DEFAULT CHARACTER SET utf8mb4 
-DEFAULT COLLATE utf8mb4_0900_ai_ci;
+CREATE DATABASE IF NOT EXISTS bjut_zxq;
 
 USE bjut_zxq;
 

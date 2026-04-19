@@ -203,7 +203,7 @@ public class ProjectFileController {
                 return ResponseEntity.notFound().build();
             }
             
-            if (file.getIsDir() == 1) {
+            if (Constants.File.TYPE_DIRECTORY.equals(file.getIsDir())) {
                 return ResponseEntity.badRequest().body(null);
             }
             

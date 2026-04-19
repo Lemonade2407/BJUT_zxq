@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getCurrentUser, updateProfile, changePassword } from '@/api/auth'
 import { toast } from '@/utils/toast'
-import { error as logError, log } from '@/utils/logger'
+import { error as logError} from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 
 const router = useRouter()
@@ -178,11 +178,32 @@ const handleAvatarUpload = async (event) => {
     // TODO: 调用后端 API 上传头像到 OSS
     // TODO: 添加图片压缩功能，减少上传流量
     // TODO: 添加图片裁剪功能
-    // 暂时使用本地预览
+    // 暂时使用本地预览并保存到后端
     const reader = new FileReader()
-    reader.onload = (e) => {
-      userInfo.value.avatar = e.target.result
-      toast.success('头像更新成功')
+    reader.onload = async (e) => {
+      const avatarUrl = e.target.result
+      userInfo.value.avatar = avatarUrl
+      
+      // 立即调用后端 API 保存头像
+      try {
+        const response = await updateProfile({
+          avatar: avatarUrl
+        })
+        if (response.code === 200) {
+          toast.success('头像更新成功')
+          // 使用 tokenManager 更新本地存储
+          tokenManager.saveUserInfo(userInfo.value)
+        } else {
+          toast.error(response.message || '头像更新失败')
+          // 如果保存失败，恢复原头像
+          loadUserInfo()
+        }
+      } catch (error) {
+        logError('保存头像失败:', error)
+        toast.error('头像更新失败，请稍后重试')
+        // 如果保存失败，恢复原头像
+        loadUserInfo()
+      }
     }
     reader.readAsDataURL(file)
   } catch (error) {

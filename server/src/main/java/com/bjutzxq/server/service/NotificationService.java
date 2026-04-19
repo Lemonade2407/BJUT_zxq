@@ -1,5 +1,6 @@
 package com.bjutzxq.server.service;
 
+import com.bjutzxq.common.Constants;
 import com.bjutzxq.pojo.Notification;
 import com.bjutzxq.pojo.User;
 import com.bjutzxq.server.mapper.NotificationMapper;
@@ -240,7 +241,7 @@ public class NotificationService {
         }
         
         // 如果已经是已读状态，直接返回
-        if (notification.getIsRead() != null && notification.getIsRead() == 1) {
+        if (notification.getIsRead() != null && Constants.Notification.READ_READ.equals(notification.getIsRead())) {
             log.debug("通知已是已读状态，ID: {}", notificationId);
             return;
         }

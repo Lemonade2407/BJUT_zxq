@@ -8,9 +8,11 @@ import com.bjutzxq.server.service.UserService;
 import com.bjutzxq.server.util.CaptchaUtil;
 import com.bjutzxq.server.util.JwtUtil;
 import com.bjutzxq.server.util.RegistrationRateLimiter;
+import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -310,6 +312,50 @@ public class AuthController {
         } catch (Exception e) {
             log.error("修改密码失败：{}", e.getMessage());
             return Result.error(e.getMessage());
+        }
+    }
+    
+    /**
+     * 上传用户头像
+     * POST /api/auth/avatar/upload
+     */
+    @PostMapping("/avatar/upload")
+    public Result<String> uploadAvatar(
+            HttpServletRequest request,
+            @RequestParam("file") MultipartFile file) {
+        
+        log.info("收到头像上传请求");
+        
+        try {
+            // 1. 获取当前用户 ID
+            String authorization = request.getHeader("Authorization");
+            if (authorization == null || authorization.trim().isEmpty()) {
+                return Result.error(401, "请先登录");
+            }
+            
+            String token = authorization;
+            if (token.startsWith("Bearer ")) {
+                token = token.substring(7);
+            }
+            
+            if (!JwtUtil.validateToken(token)) {
+                return Result.error(401, "Token 无效或已过期");
+            }
+            
+            Integer userId = JwtUtil.getUserIdFromToken(token);
+            
+            // 2. 调用服务层上传头像
+            String avatarUrl = userService.uploadAvatar(userId, file);
+            
+            log.info("头像上传成功，用户 ID: {}, URL: {}", userId, avatarUrl);
+            return Result.success("头像上传成功", avatarUrl);
+            
+        } catch (IllegalArgumentException e) {
+            log.warn("头像上传失败：{}", e.getMessage());
+            return Result.error(400, e.getMessage());
+        } catch (Exception e) {
+            log.error("头像上传失败：{}", e.getMessage(), e);
+            return Result.error(500, "头像上传失败：" + e.getMessage());
         }
     }
 }

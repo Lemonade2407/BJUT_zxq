@@ -1,5 +1,6 @@
 package com.bjutzxq.server.service;
 
+import com.bjutzxq.common.Constants;
 import com.bjutzxq.pojo.ProjectFile;
 import com.bjutzxq.pojo.User;
 import com.bjutzxq.server.mapper.ProjectFileMapper;
@@ -235,7 +236,7 @@ public class ProjectFileService {
         }
         
         // 2. 如果是目录，不能移动到自身或子目录中（防止循环引用）
-        if (file.getIsDir() == 1) {
+        if (Constants.File.TYPE_DIRECTORY.equals(file.getIsDir())) {
             checkCircularReference(fileId, targetParentId);
         }
         
@@ -268,7 +269,7 @@ public class ProjectFileService {
      */
     public java.nio.file.Path getPhysicalFilePath(Integer fileId) {
         ProjectFile file = projectFileMapper.selectById(fileId);
-        if (file == null || file.getIsDir() == 1) {
+        if (file == null || Constants.File.TYPE_DIRECTORY.equals(file.getIsDir())) {
             return null;
         }
 
@@ -292,7 +293,7 @@ public class ProjectFileService {
         }
         
         // 递归检查上级目录是否包含当前目录
-        while (parent != null && parent.getIsDir() == 1) {
+        while (parent != null && Constants.File.TYPE_DIRECTORY.equals(parent.getIsDir())) {
             if (parent.getId().equals(fileId)) {
                 throw new RuntimeException("不能将目录移动到其子目录中");
             }
@@ -314,7 +315,7 @@ public class ProjectFileService {
         }
         
         // 如果是目录，不能读取内容
-        if (file.getIsDir() == 1) {
+        if (Constants.File.TYPE_DIRECTORY.equals(file.getIsDir())) {
             throw new IllegalArgumentException("目录没有内容");
         }
         
@@ -355,7 +356,7 @@ public class ProjectFileService {
         }
         
         // 2. 如果是目录，先删除子文件和子目录
-        if (file.getIsDir() == 1) {
+        if (Constants.File.TYPE_DIRECTORY.equals(file.getIsDir())) {
             List<ProjectFile> children = projectFileMapper.selectByProjectIdAndParentId(file.getProjectId(), id);
             for (ProjectFile child : children) {
                 deleteFile(child.getId(), userId);
@@ -363,7 +364,7 @@ public class ProjectFileService {
         }
         
         // 3. 删除物理文件（如果是文件）
-        if (file.getIsDir() == 0 && file.getStorageUrl() != null) {
+        if (Constants.File.TYPE_FILE.equals(file.getIsDir()) && file.getStorageUrl() != null) {
             try {
                 String physicalPath = UPLOAD_DIR + file.getProjectId() + "/" + 
                                      new File(file.getStorageUrl()).getName();
@@ -430,7 +431,7 @@ public class ProjectFileService {
         }
         
         ProjectFile parent = projectFileMapper.selectById(parentId);
-        if (parent != null && parent.getIsDir() == 1) {
+        if (parent != null && Constants.File.TYPE_DIRECTORY.equals(parent.getIsDir())) {
             // 先构建上级路径
             buildPathRecursive(parent.getParentId(), pathBuilder);
             // 添加当前目录名
@@ -497,7 +498,7 @@ public class ProjectFileService {
             String displayPath = buildFilePath(currentDirId);
             ProjectFile existing = projectFileMapper.selectByPath(projectId, displayPath, dirName.trim());
 
-            if (existing != null && existing.getIsDir() == 1) {
+            if (existing != null && Constants.File.TYPE_DIRECTORY.equals(existing.getIsDir())) {
                 // 目录已存在，使用现有目录
                 currentDirId = existing.getId();
                 log.debug("目录已存在：{}, ID: {}", dirName, currentDirId);

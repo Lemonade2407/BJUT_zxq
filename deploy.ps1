@@ -1,6 +1,7 @@
 # ===========================================
 # BJUT-ZXQ Windows 一键部署脚本
 # 功能：本地构建前端 + 上传到服务器 + 远程部署
+# 支持 Git 分支管理（test/main）
 # ===========================================
 
 # 服务器配置
@@ -16,9 +17,11 @@ Write-Host ""
 Write-Host "请选择部署模式:" -ForegroundColor Blue
 Write-Host "  1) 完整部署 (构建前端 + 上传 + 远程部署)" -ForegroundColor Cyan
 Write-Host "  2) 仅上传并重启 (不重新构建)" -ForegroundColor Cyan
+Write-Host "  3) 测试分支部署 (切换到 test 分支)" -ForegroundColor Cyan
+Write-Host "  4) 生产分支部署 (切换到 main 分支)" -ForegroundColor Cyan
 Write-Host "  0) 退出" -ForegroundColor Cyan
 Write-Host ""
-$choice = Read-Host "请输入选项 (0-2, 默认1)"
+$choice = Read-Host "请输入选项 (0-4, 默认1)"
 
 if ($choice -eq "0") {
     Write-Host "再见!" -ForegroundColor Gray
@@ -84,11 +87,29 @@ unzip -o /opt/deploy.zip
 chmod +x deploy.sh
 ./deploy.sh 2
 "@
-} else {
+} elseif ($choice -eq "2") {
     # 仅重启：不解压，直接重启
     $remoteScript = @"
 cd $REMOTE_PATH
 docker compose restart
+"@
+} elseif ($choice -eq "3") {
+    # 测试分支部署
+    $remoteScript = @"
+cd $REMOTE_PATH
+rm -rf *
+unzip -o /opt/deploy.zip
+chmod +x deploy.sh
+./deploy.sh 6
+"@
+} elseif ($choice -eq "4") {
+    # 生产分支部署
+    $remoteScript = @"
+cd $REMOTE_PATH
+rm -rf *
+unzip -o /opt/deploy.zip
+chmod +x deploy.sh
+./deploy.sh 7
 "@
 }
 
