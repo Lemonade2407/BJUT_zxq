@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.*;
  */
 @Slf4j
 @RestController
-@RequestMapping("/projects/{projectId}")
+@RequestMapping("/watch")
 public class WatchController {
     @Autowired
     private WatchService watchService;
@@ -46,9 +46,9 @@ public class WatchController {
     
     /**
      * 关注项目
-     * POST /api/projects/{projectId}/watch
+     * POST /api/watch/{projectId}
      */
-    @PostMapping("/watch")
+    @PostMapping("/{projectId}")
     public Result<Object> watchProject(
             HttpServletRequest request,
             @PathVariable Integer projectId,
@@ -77,9 +77,9 @@ public class WatchController {
     
     /**
      * 取消关注项目
-     * DELETE /api/projects/{projectId}/watch
+     * DELETE /api/watch/{projectId}
      */
-    @DeleteMapping("/watch")
+    @DeleteMapping("/{projectId}")
     public Result<Object> unwatchProject(
             HttpServletRequest request,
             @PathVariable Integer projectId) {
@@ -99,6 +99,32 @@ public class WatchController {
         } catch (Exception e) {
             log.error("取消关注失败：{}", e.getMessage());
             return Result.error(500, "取消关注失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取用户关注的项目列表
+     * GET /api/watch/my
+     */
+    @GetMapping("/my")
+    public Result<java.util.List<com.bjutzxq.pojo.Project>> getMyWatchedProjects(
+            HttpServletRequest request) {
+        
+        log.info("获取用户关注的项目列表");
+        
+        try {
+            // 1. 获取当前用户 ID
+            Integer userId = getCurrentUserId(request);
+            
+            // 2. 获取关注的项目列表
+            java.util.List<com.bjutzxq.pojo.Project> projects = watchService.getUserWatchedProjects(userId);
+            
+            log.info("返回 {} 个关注的项目", projects.size());
+            return Result.success("获取成功", projects);
+            
+        } catch (Exception e) {
+            log.error("获取关注列表失败：{}", e.getMessage());
+            return Result.error(500, "获取失败：" + e.getMessage());
         }
     }
     

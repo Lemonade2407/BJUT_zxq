@@ -10,8 +10,6 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
       MYSQL_DATABASE: bjut_zxq
       TZ: Asia/Shanghai
-    ports:
-      - "3306:3306"  # 暴露端口,允许远程连接(生产环境建议限制 IP)
     volumes:
       - mysql_data:/var/lib/mysql
       - ./init-db:/docker-entrypoint-initdb.d

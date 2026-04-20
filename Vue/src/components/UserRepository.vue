@@ -86,6 +86,7 @@ const loadUserProjects = async () => {
     })
     
     if (res.code === 200 && res.data) {
+      // 后端已按更新时间降序排列，直接使用
       allProjects.value = res.data
       log('加载完成，项目数量:', allProjects.value.length)
     } else {
@@ -119,7 +120,7 @@ onMounted(() => {
             <p class="page-description">管理你的项目和代码仓库</p>
           </div>
           <button class="create-project-btn" @click="$router.push('/create-project')">
-            ➕ 新增项目
+            新增项目
           </button>
         </div>
       </div>
@@ -163,9 +164,6 @@ onMounted(() => {
       <div v-else class="empty-state">
         <span class="empty-icon">📭</span>
         <p class="empty-text">暂无项目</p>
-        <button class="create-project-btn" @click="$router.push('/create-project')">
-          创建新项目
-        </button>
       </div>
 
       <!-- 分页控件 -->

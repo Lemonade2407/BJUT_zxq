@@ -118,7 +118,7 @@ export function unstarProject(projectId) {
 // 收藏项目（关注）
 export function watchProject(projectId, notificationType = 1) {
   return request({
-    url: `/projects/${projectId}/watch`,
+    url: `/watch/${projectId}`,
     method: 'post',
     data: {
       notificationType
@@ -129,8 +129,16 @@ export function watchProject(projectId, notificationType = 1) {
 // 取消收藏（取消关注）
 export function unwatchProject(projectId) {
   return request({
-    url: `/projects/${projectId}/watch`,
+    url: `/watch/${projectId}`,
     method: 'delete'
+  })
+}
+
+// 获取用户收藏的项目列表
+export function getMyWatchedProjects() {
+  return request({
+    url: '/watch/my',
+    method: 'get'
   })
 }
 
@@ -147,30 +155,43 @@ export function getTrendingProjects(params = {}) {
 
 // 下载项目（打包为 ZIP）
 export function downloadProject(projectId) {
-  // 使用原生 fetch 处理文件下载
-  const token = localStorage.getItem('token')
-  const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
-  
-  return fetch(`${baseUrl}/projects/${projectId}/download`, {
-    method: 'GET',
-    headers: {
-      'Authorization': token ? `Bearer ${token}` : ''
+  // 使用 tokenManager 获取 Token
+  import('@/utils/tokenManager').then(({ default: tokenManager }) => {
+    const token = tokenManager.getToken()
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+    
+    console.log('开始下载项目，ID:', projectId)
+    console.log('请求URL:', `${baseUrl}/projects/${projectId}/download`)
+    console.log('Token存在:', !!token)
+    
+    if (!token) {
+      console.error('未登录，请先登录')
+      throw new Error('未登录')
     }
-  }).then(response => {
-    if (!response.ok) {
-      throw new Error('下载失败')
-    }
-    return response.blob()
-  }).then(blob => {
-    // 创建下载链接
-    const url = window.URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `project_${projectId}.zip`
-    document.body.appendChild(link)
-    link.click()
-    document.body.removeChild(link)
-    window.URL.revokeObjectURL(url)
+    
+    const url = `${baseUrl}/projects/${projectId}/download`
+    
+    return fetch(url, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      }
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      return response.blob()
+    }).then(blob => {
+      const downloadUrl = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = downloadUrl
+      link.download = `project_${projectId}.zip`
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(downloadUrl)
+      console.log('下载成功')
+    })
   })
 }
 
@@ -188,12 +209,13 @@ export function uploadFile(projectId, file, parentId = null) {
     data: formData,
     headers: {
       'Content-Type': 'multipart/form-data'
-    }
+    },
+    timeout: 60000 // 文件上传超时时间设置为60秒
   })
 }
 
 // 批量上传文件
-export function uploadFiles(projectId, files, parentId = null) {
+export function uploadFiles(projectId, files, parentId = null, onProgress = null) {
   const formData = new FormData()
   // 添加多个文件
   files.forEach(file => {
@@ -209,6 +231,54 @@ export function uploadFiles(projectId, files, parentId = null) {
     data: formData,
     headers: {
       'Content-Type': 'multipart/form-data'
-    }
+    },
+    timeout: 300000, // 文件上传超时时间设置为5分钟（300秒）
+    onUploadProgress: onProgress ? (progressEvent) => {
+      const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+      onProgress(percentCompleted)
+    } : undefined
+  })
+}
+
+// 覆盖上传文件（先删除再上传）
+export function overwriteUploadFiles(projectId, files, parentId = null, onProgress = null) {
+  const formData = new FormData()
+  // 添加多个文件
+  files.forEach(file => {
+    formData.append('files', file)
+  })
+  if (parentId !== null) {
+    formData.append('parentId', parentId)
+  }
+  
+  return request({
+    url: `/projects/${projectId}/files/overwrite-upload`,
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    },
+    timeout: 300000, // 文件上传超时时间设置为5分钟（300秒）
+    onUploadProgress: onProgress ? (progressEvent) => {
+      const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+      onProgress(percentCompleted)
+    } : undefined
+  })
+}
+
+// 获取项目文件列表
+export function getProjectFiles(projectId, parentId = null) {
+  return request({
+    url: `/projects/${projectId}/files`,
+    method: 'get',
+    params: parentId !== null ? { parentId } : {}
+  })
+}
+
+// 获取项目的所有文件（用于构建完整的树形结构）
+export function getAllProjectFiles(projectId) {
+  return request({
+    url: `/projects/${projectId}/files/all`,
+    method: 'get'
   })
 }

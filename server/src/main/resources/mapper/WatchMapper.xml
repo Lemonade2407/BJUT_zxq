@@ -52,4 +52,12 @@
         WHERE project_id = #{projectId}
     </select>
     
+    <!-- 查询用户关注的所有项目 ID 列表 -->
+    <select id="selectProjectIdsByUserId" resultType="java.lang.Integer">
+        SELECT project_id 
+        FROM watch
+        WHERE user_id = #{userId}
+        ORDER BY created_at DESC
+    </select>
+    
 </mapper>

@@ -41,4 +41,11 @@ public interface WatchMapper {
      * @return 关注数
      */
     int countByProjectId(@Param("projectId") Integer projectId);
+    
+    /**
+     * 查询用户关注的所有项目 ID 列表
+     * @param userId 用户 ID
+     * @return 项目 ID 列表
+     */
+    java.util.List<Integer> selectProjectIdsByUserId(@Param("userId") Integer userId);
 }

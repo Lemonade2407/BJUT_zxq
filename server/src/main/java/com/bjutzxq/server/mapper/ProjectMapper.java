@@ -132,5 +132,12 @@ public interface ProjectMapper {
      * @return 项目 ID 列表
      */
     List<Integer> selectProjectIdsByUserId(@Param("userId") Integer userId);
+    
+    /**
+     * 根据项目 ID 列表批量查询项目
+     * @param projectIds 项目 ID 列表
+     * @return 项目列表
+     */
+    List<Project> selectByIds(@Param("projectIds") List<Integer> projectIds);
 
 }

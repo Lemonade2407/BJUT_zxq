@@ -9,10 +9,10 @@ spring:
   
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/bjut_zxq?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://60.205.210.11:3306/bjut_zxq?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
     username: root
-    password:
-    # TODO: 数据库密码不应明文存储,应使用环境变量或加密配置
+    password: BJUT-zxq2026
+    # TODO: 生产环境数据库密码应使用环境变量或加密配置
       
     # HikariCP 连接池配置
     hikari:
@@ -42,7 +42,7 @@ spring:
   servlet:
     multipart:
       max-file-size: 100MB
-      max-request-size: 100MB
+      max-request-size: 500MB  # 批量上传支持最大500MB
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml

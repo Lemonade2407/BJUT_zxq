@@ -2,8 +2,10 @@ package com.bjutzxq.server.service;
 
 import com.bjutzxq.common.NotificationType;
 import com.bjutzxq.pojo.Project;
+import com.bjutzxq.pojo.Tag;
 import com.bjutzxq.pojo.Watch;
 import com.bjutzxq.server.mapper.ProjectMapper;
+import com.bjutzxq.server.mapper.UserMapper;
 import com.bjutzxq.server.mapper.WatchMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,6 +23,12 @@ public class WatchService {
     
     @Autowired
     private ProjectMapper projectMapper;
+    
+    @Autowired
+    private UserMapper userMapper;
+    
+    @Autowired
+    private ProjectTagService projectTagService;
     
     @Autowired
     private NotificationService notificationService;
@@ -112,5 +120,49 @@ public class WatchService {
      */
     public Integer getWatchCount(Integer projectId) {
         return watchMapper.countByProjectId(projectId);
+    }
+    
+    /**
+     * 获取用户关注的项目列表
+     * @param userId 用户 ID
+     * @return 项目列表
+     */
+    public java.util.List<Project> getUserWatchedProjects(Integer userId) {
+        log.info("获取用户关注的项目列表，用户 ID: {}", userId);
+        
+        // 1. 获取用户关注的所有项目 ID
+        java.util.List<Integer> projectIds = watchMapper.selectProjectIdsByUserId(userId);
+        
+        if (projectIds == null || projectIds.isEmpty()) {
+            log.info("用户没有关注任何项目");
+            return new java.util.ArrayList<>();
+        }
+        
+        // 2. 批量查询项目信息（一次查询，避免 N+1 问题）
+        java.util.List<Project> projects = projectMapper.selectByIds(projectIds);
+        
+        // 3. 为每个项目加载标签和作者信息
+        for (Project project : projects) {
+            // 加载标签
+            java.util.List<Tag> tags = projectTagService.getProjectTags(project.getId());
+            project.setTags(tags);
+            
+            // 设置别名字段
+            project.setLikes(project.getStarCount() != null ? project.getStarCount() : 0);
+            project.setFavorites(project.getWatchCount() != null ? project.getWatchCount() : 0);
+            
+            // 加载作者名称
+            if (project.getOwnerId() != null) {
+                com.bjutzxq.pojo.User owner = userMapper.selectById(project.getOwnerId());
+                if (owner != null) {
+                    project.setAuthor(owner.getUsername());
+                } else {
+                    project.setAuthor("未知用户");
+                }
+            }
+        }
+        
+        log.info("找到 {} 个关注的项目", projects.size());
+        return projects;
     }
 }

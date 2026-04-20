@@ -82,4 +82,11 @@ public interface ProjectFileMapper {
      * @return 文件列表
      */
     List<ProjectFile> selectByUploaderId(@Param("uploaderId") Integer uploaderId);
+    
+    /**
+     * 删除项目的所有文件（用于覆盖上传）
+     * @param projectId 项目 ID
+     * @return 影响行数
+     */
+    int deleteByProjectId(@Param("projectId") Integer projectId);
 }

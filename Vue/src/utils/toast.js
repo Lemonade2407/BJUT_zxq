@@ -44,5 +44,13 @@ export const toast = {
     if (toastRef) {
       toastRef.show(message, 'info', duration)
     }
+  },
+  confirm: (message, title = '确认', callback) => {
+    // 使用浏览器原生 confirm
+    const result = window.confirm(`${title}\n\n${message}`)
+    if (callback && typeof callback === 'function') {
+      callback(result)
+    }
+    return Promise.resolve(result)
   }
 }

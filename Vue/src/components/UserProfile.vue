@@ -3,7 +3,7 @@ import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getCurrentUser, updateProfile, changePassword, uploadAvatar } from '@/api/auth'
 import { toast } from '@/utils/toast'
-import { error as logError, info as logInfo} from '@/utils/logger'
+import { error as logError } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 
 const router = useRouter()
@@ -189,7 +189,7 @@ const handleAvatarUpload = async (event) => {
       tokenManager.saveUserInfo(userInfo.value)
       
       toast.success('头像更新成功')
-      logInfo('头像上传成功:', response.data)
+      console.info('头像上传成功:', response.data)
     } else {
       toast.error(response.message || '头像更新失败')
       logError('头像上传失败:', response.message)

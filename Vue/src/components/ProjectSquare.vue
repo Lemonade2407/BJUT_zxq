@@ -25,7 +25,14 @@ const fetchProjects = async () => {
     })
     
     if (response.code === 200 && response.data) {
-      allProjects.value = response.data.map(project => ({
+      // 按更新时间由新到旧排序
+      const sortedData = response.data.sort((a, b) => {
+        const timeA = new Date(a.updatedAt || a.createdAt).getTime()
+        const timeB = new Date(b.updatedAt || b.createdAt).getTime()
+        return timeB - timeA // 降序排列
+      })
+      
+      allProjects.value = sortedData.map(project => ({
         id: project.id,
         name: project.name,
         description: project.description || '暂无描述',
@@ -125,6 +132,11 @@ const changePage = (page) => {
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 }
+
+// 打开项目详情
+const handleProjectClick = (project) => {
+  window.location.href = `/project/${project.id}`
+}
 </script>
 
 <template>
@@ -136,61 +148,36 @@ const changePage = (page) => {
         <p class="page-description">探索优秀项目，发现创新灵感</p>
       </div>
 
-      <!-- 项目列表 -->
-      <div class="project-list" v-if="allProjects.length > 0 && !isLoading">
+      <!-- 项目网格 -->
+      <div v-if="projects.length > 0" class="project-grid">
         <div 
           v-for="project in projects" 
           :key="project.id" 
-          class="project-item"
+          class="project-card"
+          @click="handleProjectClick(project)"
         >
-          <div class="project-info">
-            <div class="project-header">
-              <a href="#" class="project-name">{{ project.name }}</a>
-            </div>
-            
-            <p class="project-description">{{ project.description }}</p>
-            
-            <div class="project-tags">
-              <span 
-                v-for="(tag, index) in project.tags" 
-                :key="index"
-                class="tech-tag"
-              >
-                {{ tag }}
+          <div class="project-card-header">
+            <span class="project-name">{{ project.name }}</span>
+          </div>
+          <p class="project-description">{{ project.description }}</p>
+          <div class="project-tags">
+            <span 
+              v-for="(tag, index) in project.tags" 
+              :key="index"
+              class="tech-tag"
+            >
+              {{ tag }}
+            </span>
+          </div>
+          <div class="project-footer">
+            <div class="project-stats">
+              <span class="stat">
+                ❤️ {{ formatNumber(project.likes) }}
+              </span>
+              <span class="stat">
+                ⭐ {{ formatNumber(project.favorites) }}
               </span>
             </div>
-            
-            <div class="project-meta">
-              <div class="author-info">
-                <span class="author-avatar">{{ project.avatar }}</span>
-                <span class="author-name">{{ project.author }}</span>
-              </div>
-              
-              <div class="project-stats">
-                <span class="stat-item update-time">
-                  {{ project.updatedAt }}
-                </span>
-              </div>
-            </div>
-          </div>
-          
-          <div class="project-actions">
-            <button 
-              :class="['action-btn', 'like-btn', { active: project.isLiked }]"
-              @click="handleLikeProject(project)"
-              :title="project.isLiked ? '取消点赞' : '点赞'"
-            >
-              <span class="icon">{{ project.isLiked ? '❤️' : '🤍' }}</span>
-              <span class="count">{{ formatNumber(project.likes) }}</span>
-            </button>
-            <button 
-              :class="['action-btn', 'favorite-btn', { active: project.isFavorited }]"
-              @click="handleFavoriteProject(project)"
-              :title="project.isFavorited ? '取消收藏' : '收藏'"
-            >
-              <span class="icon">{{ project.isFavorited ? '⭐' : '☆' }}</span>
-              <span class="count">{{ formatNumber(project.favorites) }}</span>
-            </button>
           </div>
         </div>
       </div>
@@ -352,54 +339,42 @@ const changePage = (page) => {
   box-shadow: 0 0 0 3px rgba(0, 89, 179, 0.1);
 }
 
-/* 项目列表 */
-.project-list {
-  display: flex;
-  flex-direction: column;
+/* 项目网格 */
+.project-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 16px;
+  margin-bottom: 24px;
 }
 
 /* 项目卡片 */
-.project-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+.project-card {
   background-color: #ffffff;
   border: 1px solid #d9d9d9;
   border-radius: 6px;
   padding: 16px;
+  cursor: pointer;
   transition: all 0.2s;
   box-shadow: 0 2px 4px rgba(0, 51, 102, 0.05);
 }
 
-.project-item:hover {
+.project-card:hover {
   border-color: #0059b3;
   box-shadow: 0 4px 12px rgba(0, 51, 102, 0.15);
+  transform: translateY(-2px);
 }
 
-.project-info {
-  flex: 1;
-  margin-right: 16px;
-}
-
-.project-header {
+.project-card-header {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  margin-bottom: 8px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .project-name {
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
   color: #0059b3;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-
-.project-name:hover {
-  color: #003366;
-  text-decoration: underline;
 }
 
 .project-description {
@@ -407,6 +382,11 @@ const changePage = (page) => {
   color: #666666;
   line-height: 1.6;
   margin-bottom: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
 }
 
 .project-tags {
@@ -425,98 +405,22 @@ const changePage = (page) => {
   font-weight: 500;
 }
 
-.project-meta {
+.project-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
-}
-
-.author-info {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.author-avatar {
-  font-size: 20px;
-}
-
-.author-name {
-  font-size: 13px;
-  color: #666666;
+  padding-top: 12px;
+  border-top: 1px solid #f0f0f0;
 }
 
 .project-stats {
   display: flex;
-  align-items: center;
-  gap: 16px;
+  gap: 12px;
 }
 
-.stat-item {
+.stat {
   font-size: 13px;
   color: #666666;
-  cursor: pointer;
-  transition: color 0.2s;
-}
-
-.stat-item:hover {
-  color: #0059b3;
-}
-
-.update-time {
-  color: #999999;
-  font-size: 12px;
-}
-
-/* 操作按钮 */
-.project-actions {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.action-btn {
-  padding: 8px 16px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 13px;
-  cursor: pointer;
-  transition: all 0.2s;
-  background-color: #ffffff;
-  white-space: nowrap;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.like-btn {
-  color: #e91e63;
-  border-color: #e91e63;
-}
-
-.like-btn:hover,
-.like-btn.active {
-  background-color: #e91e63;
-  color: #ffffff;
-}
-
-.favorite-btn {
-  color: #f9ab00;
-  border-color: #f9ab00;
-}
-
-.favorite-btn:hover,
-.favorite-btn.active {
-  background-color: #f9ab00;
-  color: #ffffff;
-}
-
-.action-btn .icon {
-  font-size: 16px;
-}
-
-.action-btn .count {
-  font-weight: 500;
 }
 
 /* 分页控件 */
@@ -729,5 +633,16 @@ const changePage = (page) => {
   font-size: 16px;
   color: #666666;
   margin: 0;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+  .page-title {
+    font-size: 24px;
+  }
+  
+  .project-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -39,6 +39,12 @@ public class ProjectService {
     
     @Autowired
     private com.bjutzxq.server.mapper.WatchMapper watchMapper;
+    
+    @Autowired
+    private com.bjutzxq.server.mapper.ProjectFileMapper projectFileMapper;
+    
+    @Autowired
+    private com.bjutzxq.server.util.OssUtil ossUtil;
 
     /**
      * 新增项目
@@ -381,39 +387,103 @@ public class ProjectService {
     public Path packageProjectToZip(Integer projectId, String projectName) {
         log.info("开始打包项目，项目 ID: {}, 项目名称: {}", projectId, projectName);
         
-        // TODO: 优化 ZIP 打包性能，支持大项目异步处理
-        // TODO: 添加 ZIP 文件大小限制
-        // TODO: 清理过期的临时 ZIP 文件
-        
         try {
-            // 创建临时目录
+            // 1. 创建临时目录
             String tempDir = System.getProperty("java.io.tmpdir") + "/project_downloads/";
             File dir = new File(tempDir);
             if (!dir.exists()) {
                 dir.mkdirs();
             }
             
-            // 生成 ZIP 文件路径
+            // 2. 生成 ZIP 文件路径
             String zipFileName = projectName + "_" + projectId + "_" + System.currentTimeMillis() + ".zip";
             Path zipPath = Paths.get(tempDir, zipFileName);
             
-            // 创建 ZIP 文件
+            // 3. 获取项目的所有文件
+            List<com.bjutzxq.pojo.ProjectFile> projectFiles = projectFileMapper.selectByProjectId(projectId);
+            
+            if (projectFiles == null || projectFiles.isEmpty()) {
+                log.warn("项目没有文件，创建空 ZIP");
+                // 创建一个空的 ZIP 文件
+                try (FileOutputStream fos = new FileOutputStream(zipPath.toFile());
+                     ZipOutputStream zos = new ZipOutputStream(fos)) {
+                    // 空 ZIP
+                }
+                return zipPath;
+            }
+            
+            log.info("找到 {} 个文件，开始打包...", projectFiles.size());
+            
+            // 统计目录和文件数量
+            long dirCount = projectFiles.stream().filter(f -> f.getIsDir() != null && f.getIsDir() == 1).count();
+            long fileCount = projectFiles.stream().filter(f -> f.getIsDir() == null || f.getIsDir() == 0).count();
+            long withUrlCount = projectFiles.stream().filter(f -> f.getStorageUrl() != null && !f.getStorageUrl().trim().isEmpty()).count();
+            
+            log.info("统计: 总数={}, 目录={}, 文件={}, 有URL={}", 
+                projectFiles.size(), dirCount, fileCount, withUrlCount);
+            
+            // 打印前5个非目录文件的详情
+            int printed = 0;
+            for (com.bjutzxq.pojo.ProjectFile f : projectFiles) {
+                if ((f.getIsDir() == null || f.getIsDir() == 0) && printed < 5) {
+                    log.info("示例文件 {}: name={}, storageUrl={}, filePath={}", 
+                        printed+1, f.getFileName(), f.getStorageUrl(), f.getFilePath());
+                    printed++;
+                }
+            }
+            
+            // 4. 创建 ZIP 文件
             try (FileOutputStream fos = new FileOutputStream(zipPath.toFile());
                  ZipOutputStream zos = new ZipOutputStream(fos)) {
                 
-                // TODO: 从数据库或 Git 仓库获取项目文件列表
-                // 目前先创建一个简单的 README 文件作为示例
-                String readmeContent = "# " + projectName + "\n\n" +
-                                      "这是一个从 BJUT-ZXQ 平台下载的项目。\n\n" +
-                                      "项目 ID: " + projectId + "\n" +
-                                      "下载时间: " + java.time.LocalDateTime.now() + "\n";
+                int successCount = 0;
+                int failCount = 0;
+                int skipDirCount = 0;
+                int skipNoUrlCount = 0;
                 
-                ZipEntry entry = new ZipEntry("README.md");
-                zos.putNextEntry(entry);
-                zos.write(readmeContent.getBytes("UTF-8"));
-                zos.closeEntry();
+                for (com.bjutzxq.pojo.ProjectFile file : projectFiles) {
+                    // 跳过目录
+                    if (file.getIsDir() != null && file.getIsDir() == 1) {
+                        skipDirCount++;
+                        continue;
+                    }
+                    
+                    // 跳过没有存储 URL 的文件
+                    if (file.getStorageUrl() == null || file.getStorageUrl().trim().isEmpty()) {
+                        log.warn("文件没有存储 URL，跳过: {}", file.getFileName());
+                        skipNoUrlCount++;
+                        continue;
+                    }
+                    
+                    try {
+                        // 构建文件在 ZIP 中的路径
+                        String entryPath = file.getFilePath();
+                        if (entryPath != null && !entryPath.trim().isEmpty()) {
+                            entryPath = entryPath + "/" + file.getFileName();
+                        } else {
+                            entryPath = file.getFileName();
+                        }
+                        
+                        log.debug("打包文件: {}", entryPath);
+                        
+                        // 从 OSS 下载文件内容
+                        byte[] fileContent = ossUtil.download(file.getStorageUrl());
+                        
+                        // 添加到 ZIP
+                        ZipEntry entry = new ZipEntry(entryPath);
+                        zos.putNextEntry(entry);
+                        zos.write(fileContent);
+                        zos.closeEntry();
+                        
+                        successCount++;
+                    } catch (Exception e) {
+                        log.error("打包文件失败: {}, 错误: {}", file.getFileName(), e.getMessage());
+                        failCount++;
+                    }
+                }
                 
-                log.info("项目打包成功，ZIP 文件路径: {}", zipPath);
+                log.info("项目打包完成，成功: {}, 失败: {}, ZIP 文件: {}", 
+                    successCount, failCount, zipPath);
                 return zipPath;
             }
         } catch (IOException e) {

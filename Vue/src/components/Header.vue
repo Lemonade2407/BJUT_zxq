@@ -53,11 +53,13 @@ const handleLogout = async () => {
 // 处理搜索
 const handleSearch = () => {
   if (searchQuery.value.trim()) {
-    log('搜索:', searchQuery.value)
-    // TODO: 实现真实的搜索功能，跳转到搜索结果页
-    // TODO: 添加搜索历史记录
-    // TODO: 添加热门搜索推荐
-    toast.info(`搜索功能开发中... 搜索内容: ${searchQuery.value}`)
+    // 跳转到搜索结果页，通过 query 参数传递关键词
+    router.push({
+      path: '/search',
+      query: { keyword: searchQuery.value.trim() }
+    })
+    // 清空搜索框
+    searchQuery.value = ''
   }
 }
 
@@ -134,25 +136,6 @@ onMounted(() => {
           <button @click="handleLogout" class="logout-btn" title="退出登录">
             退出登录
           </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 退出确认对话框 -->
-    <div v-if="showLogoutModal" class="modal-overlay" @click.self="cancelLogout">
-      <div class="modal-content">
-        <div class="modal-header">
-          <h3>确认退出</h3>
-          <button @click="cancelLogout" class="close-btn">&times;</button>
-        </div>
-        <div class="modal-body">
-          <div class="modal-icon">👋</div>
-          <p class="modal-message">确定要退出登录吗？</p>
-          <p class="modal-hint">退出后需要重新登录才能访问</p>
-        </div>
-        <div class="modal-footer">
-          <button @click="cancelLogout" class="modal-btn cancel-btn">取消</button>
-          <button @click="confirmLogout" class="modal-btn confirm-btn">确认退出</button>
         </div>
       </div>
     </div>

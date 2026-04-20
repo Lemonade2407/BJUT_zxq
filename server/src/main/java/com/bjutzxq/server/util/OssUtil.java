@@ -2,12 +2,15 @@ package com.bjutzxq.server.util;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
+import com.aliyun.oss.model.OSSObject;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -73,7 +76,15 @@ public class OssUtil {
                 throw new IOException("文件大小不能超过 100MB");
             }
             
-            String suffix = originalFilename.substring(originalFilename.lastIndexOf("."));
+            // 获取文件扩展名（处理无扩展名的情况）
+            String suffix = "";
+            int lastDotIndex = originalFilename.lastIndexOf(".");
+            if (lastDotIndex > 0 && lastDotIndex < originalFilename.length() - 1) {
+                // 有有效的扩展名
+                suffix = originalFilename.substring(lastDotIndex);
+            } else {
+                log.warn("文件 '{}' 没有扩展名，将使用空后缀", originalFilename);
+            }
             
             // 生成唯一文件名
             String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
@@ -174,5 +185,55 @@ public class OssUtil {
         }
         
         return null;
+    }
+
+    /**
+     * 从 OSS 下载文件内容
+     * @param fileUrl 文件的完整 URL
+     * @return 文件内容的字节数组
+     * @throws IOException 下载失败时抛出
+     */
+    public byte[] download(String fileUrl) throws IOException {
+        if (fileUrl == null || fileUrl.trim().isEmpty()) {
+            throw new IOException("文件 URL 不能为空");
+        }
+        
+        OSS ossClient = null;
+        try {
+            ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
+            
+            // 从 URL 中提取 ObjectName
+            String objectName = extractObjectName(fileUrl);
+            if (objectName == null || objectName.isEmpty()) {
+                throw new IOException("无法解析 ObjectName: " + fileUrl);
+            }
+            
+            log.debug("开始从 OSS 下载文件: {}", objectName);
+            
+            // 获取 OSS 对象
+            OSSObject ossObject = ossClient.getObject(bucketName, objectName);
+            
+            // 读取文件内容
+            try (InputStream inputStream = ossObject.getObjectContent();
+                 ByteArrayOutputStream outputStream = new ByteArrayOutputStream()) {
+                
+                byte[] buffer = new byte[4096];
+                int bytesRead;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    outputStream.write(buffer, 0, bytesRead);
+                }
+                
+                byte[] content = outputStream.toByteArray();
+                log.debug("文件下载成功，大小: {} bytes", content.length);
+                return content;
+            }
+        } catch (Exception e) {
+            log.error("从 OSS 下载文件失败: {}, 错误: {}", fileUrl, e.getMessage());
+            throw new IOException("OSS 下载失败: " + e.getMessage(), e);
+        } finally {
+            if (ossClient != null) {
+                ossClient.shutdown();
+            }
+        }
     }
 }

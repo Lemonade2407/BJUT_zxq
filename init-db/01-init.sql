@@ -193,18 +193,6 @@ CREATE TABLE IF NOT EXISTS `download_log` (
 ) ENGINE=InnoDB COMMENT='下载日志表';
 
 -- ===========================================
--- 分类表
--- ===========================================
-CREATE TABLE IF NOT EXISTS `category` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '分类ID',
-  `name` VARCHAR(50) NOT NULL UNIQUE COMMENT '分类名称',
-  `description` VARCHAR(200) COMMENT '分类描述',
-  `sort_order` INT DEFAULT 0 COMMENT '排序',
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  INDEX idx_name (`name`)
-) ENGINE=InnoDB COMMENT='分类表';
-
--- ===========================================
 -- 插入初始数据
 -- ===========================================
 
@@ -220,15 +208,6 @@ INSERT INTO `tag` (`name`, `color`) VALUES
 ('人工智能', '#9B59B6'),
 ('大数据', '#E67E22'),
 ('云计算', '#1ABC9C')
-ON DUPLICATE KEY UPDATE `name`=`name`;
-
--- 插入默认分类
-INSERT INTO `category` (`name`, `description`, `sort_order`) VALUES
-('课程设计', '各类课程设计项目', 1),
-('毕业设计', '毕业设计项目', 2),
-('竞赛作品', '各类竞赛参赛作品', 3),
-('开源项目', '开源合作项目', 4),
-('工具软件', '实用工具软件', 5)
 ON DUPLICATE KEY UPDATE `name`=`name`;
 
 -- ===========================================

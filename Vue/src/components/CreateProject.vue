@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { createProject, uploadFiles } from '@/api/project'
 import { getTags } from '@/api/tag'
@@ -34,6 +34,121 @@ const visibilityOptions = [
   { value: 1, label: '公开', description: '所有人都可以查看和访问' },
   { value: 0, label: '私有', description: '只有你可以查看和访问' }
 ]
+
+// 按文件夹结构组织文件
+const organizedFiles = computed(() => {
+  const fileTree = {}
+  
+  selectedFiles.value.forEach((file, index) => {
+    const path = file.relativePath || file.webkitRelativePath || file.name
+    const parts = path.split('/')
+    
+    // 如果没有路径，直接放在根目录
+    if (parts.length === 1) {
+      if (!fileTree['__root__']) {
+        fileTree['__root__'] = { type: 'folder', name: '根目录', children: [] }
+      }
+      fileTree['__root__'].children.push({ 
+        type: 'file', 
+        fileIndex: index,
+        name: file.name,
+        size: file.size
+      })
+    } else {
+      // 有路径，构建文件夹树
+      let currentLevel = fileTree
+      
+      parts.forEach((part, idx) => {
+        if (idx === parts.length - 1) {
+          // 最后一个部分是文件
+          if (!currentLevel['__files__']) {
+            currentLevel['__files__'] = []
+          }
+          currentLevel['__files__'].push({ 
+            type: 'file',
+            fileIndex: index,
+            name: part,
+            size: file.size
+          })
+        } else {
+          // 中间部分是文件夹
+          if (!currentLevel[part]) {
+            currentLevel[part] = { type: 'folder', name: part, children: {} }
+          }
+          currentLevel = currentLevel[part].children
+        }
+      })
+    }
+  })
+  
+  return fileTree
+})
+
+// 展开/折叠状态
+const expandedFolders = ref(new Set())
+
+// 切换文件夹展开状态
+const toggleFolder = (folderKey) => {
+  log('切换文件夹:', folderKey, '当前展开:', Array.from(expandedFolders.value))
+  const newSet = new Set(expandedFolders.value)
+  if (newSet.has(folderKey)) {
+    newSet.delete(folderKey)
+    log('折叠文件夹:', folderKey)
+  } else {
+    newSet.add(folderKey)
+    log('展开文件夹:', folderKey)
+  }
+  expandedFolders.value = newSet
+}
+
+// 递归渲染文件树
+const renderFileTree = (tree, level = 0, parentKey = '') => {
+  const result = []
+  
+  // 先显示当前层的文件
+  if (tree['__files__']) {
+    tree['__files__'].forEach(file => {
+      result.push({ ...file, level })
+    })
+  }
+  
+  // 再递归显示子文件夹
+  Object.keys(tree).forEach(key => {
+    if (key !== '__files__' && key !== '__root__') {
+      const folder = tree[key]
+      const folderKey = parentKey ? `${parentKey}/${key}` : key
+      const isExpanded = expandedFolders.value.has(folderKey)
+      
+      result.push({ 
+        type: 'folder', 
+        name: folder.name, 
+        level, 
+        isFolder: true,
+        folderKey,
+        isExpanded
+      })
+      
+      // 如果文件夹已展开，递归显示子内容
+      if (isExpanded) {
+        result.push(...renderFileTree(folder.children, level + 1, folderKey))
+      }
+    }
+  })
+  
+  // 处理根目录的文件
+  if (tree['__root__']) {
+    tree['__root__'].children.forEach(file => {
+      result.push({ ...file, level })
+    })
+  }
+  
+  return result
+}
+
+// 展平的文件列表（用于显示）
+const displayFiles = computed(() => {
+  return renderFileTree(organizedFiles.value)
+})
 
 // 加载标签列表
 const loadTags = async () => {
@@ -184,6 +299,21 @@ const handleFileSelect = (event) => {
   // 过滤出符合要求的文件
   const validFiles = files.filter(file => file.size <= maxSize)
   
+  // 如果是文件夹上传，保留相对路径信息
+  validFiles.forEach((file, index) => {
+    // webkitRelativePath 包含文件夹路径，如 "folder/subfolder/file.txt"
+    if (file.webkitRelativePath) {
+      file.relativePath = file.webkitRelativePath
+      if (index < 3) { // 只打印前3个文件的日志
+        log(`文件 ${index + 1}:`, file.name, '路径:', file.webkitRelativePath)
+      }
+    } else {
+      if (index < 3) {
+        log(`文件 ${index + 1}:`, file.name, '(无路径信息)')
+      }
+    }
+  })
+  
   // 添加到待上传列表
   selectedFiles.value.push(...validFiles)
   log('已选择文件:', validFiles.length, '个')
@@ -199,8 +329,74 @@ const handleDrop = (event) => {
   event.preventDefault()
   event.stopPropagation()
   
-  const files = Array.from(event.dataTransfer.files)
+  const items = event.dataTransfer.items
+  const files = []
+  
+  // 处理拖拽的文件夹
+  if (items) {
+    // 使用 DataTransferItemList API 处理文件夹
+    const traverseFileTree = (item, path = '') => {
+      return new Promise((resolve) => {
+        if (item.isFile) {
+          item.file((file) => {
+            // 创建新对象，复制所有属性并添加路径
+            const fileWithPath = new File([file], file.name, {
+              type: file.type,
+              lastModified: file.lastModified
+            })
+            // 添加自定义属性
+            Object.defineProperty(fileWithPath, 'relativePath', {
+              value: path + file.name,
+              writable: false,
+              enumerable: true,
+              configurable: true
+            })
+            files.push(fileWithPath)
+            resolve()
+          })
+        } else if (item.isDirectory) {
+          const dirReader = item.createReader()
+          dirReader.readEntries(async (entries) => {
+            for (const entry of entries) {
+              await traverseFileTree(entry, path + item.name + '/')
+            }
+            resolve()
+          })
+        } else {
+          resolve()
+        }
+      })
+    }
+    
+    // 遍历所有拖拽项
+    const promises = Array.from(items).map(item => {
+      const entry = item.webkitGetAsEntry()
+      if (entry) {
+        return traverseFileTree(entry)
+      }
+      return Promise.resolve()
+    })
+    
+    Promise.all(promises).then(() => {
+      processFiles(files)
+    })
+  } else {
+    // 降级处理：直接使用 files
+    const fileList = Array.from(event.dataTransfer.files)
+    fileList.forEach(file => {
+      if (file.webkitRelativePath) {
+        file.relativePath = file.webkitRelativePath
+      }
+    })
+    processFiles(fileList)
+  }
+}
+
+// 处理文件（验证和添加）
+const processFiles = (files) => {
   if (files.length === 0) return
+  
+  log('拖拽的文件数量:', files.length)
   
   // 验证文件大小
   const maxSize = 50 * 1024 * 1024
@@ -210,6 +406,17 @@ const handleDrop = (event) => {
     toast.warning('部分文件超过 50MB，已自动过滤')
   }
   
+  // 打印前3个文件的路径信息
+  validFiles.forEach((file, index) => {
+    if (index < 3) {
+      if (file.relativePath || file.webkitRelativePath) {
+        log(`文件 ${index + 1}:`, file.name, '路径:', file.relativePath || file.webkitRelativePath)
+      } else {
+        log(`文件 ${index + 1}:`, file.name, '(无路径信息)')
+      }
+    }
+  })
+  
   selectedFiles.value.push(...validFiles)
   log('拖拽添加文件:', validFiles.length, '个')
 }
@@ -218,6 +425,18 @@ const handleDrop = (event) => {
 const removeFile = (index) => {
   selectedFiles.value.splice(index, 1)
   log('移除文件，剩余:', selectedFiles.value.length, '个')
+}
+
+// 按路径移除文件
+const removeFileByPath = (path) => {
+  const index = selectedFiles.value.findIndex(file => {
+    const filePath = file.relativePath || file.webkitRelativePath || file.name
+    return filePath === path
+  })
+  if (index > -1) {
+    selectedFiles.value.splice(index, 1)
+    log('移除文件，剩余:', selectedFiles.value.length, '个')
+  }
 }
 
 // 格式化文件大小
@@ -344,12 +563,15 @@ onMounted(() => {
                 ref="fileInput"
                 type="file"
                 multiple
+                webkitdirectory
+                mozdirectory
+                directory
                 style="display: none"
                 @change="handleFileSelect"
               />
               <div class="upload-icon">📁</div>
-              <p class="upload-text">点击选择文件或拖拽文件到此处</p>
-              <p class="upload-hint">支持批量上传，单个文件不超过 50MB</p>
+              <p class="upload-text">点击选择文件或文件夹，或直接拖拽到此处</p>
+              <p class="upload-hint">支持批量上传文件和整个文件夹，单个文件不超过 50MB</p>
             </div>
 
             <!-- 文件列表 -->
@@ -365,21 +587,23 @@ onMounted(() => {
                 </button>
               </div>
               <div
-                v-for="(file, index) in selectedFiles"
+                v-for="(item, index) in displayFiles"
                 :key="index"
-                class="file-item"
+                :class="['file-item', { 'folder-item': item.isFolder }]"
+                :style="{ paddingLeft: (item.level * 20 + 12) + 'px' }"
               >
                 <div class="file-info">
-                  <span class="file-icon">📄</span>
+                  <span class="file-icon">{{ item.isFolder ? '📁' : '📄' }}</span>
                   <div class="file-details">
-                    <span class="file-name">{{ file.name }}</span>
-                    <span class="file-size">{{ formatFileSize(file.size) }}</span>
+                    <span class="file-name">{{ item.name }}</span>
+                    <span v-if="!item.isFolder" class="file-size">{{ formatFileSize(item.size) }}</span>
                   </div>
                 </div>
                 <button
+                  v-if="!item.isFolder"
                   type="button"
                   class="remove-btn"
-                  @click="removeFile(index)"
+                  @click="removeFileByPath(item.relativePath || item.webkitRelativePath || item.name)"
                 >
                   ✕
                 </button>
@@ -730,6 +954,16 @@ onMounted(() => {
 
 .file-item:hover {
   background-color: #f9f9f9;
+}
+
+/* 文件夹项样式 */
+.folder-item {
+  background-color: #fafafa;
+  font-weight: 500;
+}
+
+.folder-item .file-name {
+  color: #0059b3;
 }
 
 .file-info {

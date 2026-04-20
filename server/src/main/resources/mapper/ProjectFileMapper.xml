@@ -136,4 +136,9 @@
         ORDER BY created_at DESC
     </select>
     
+    <!-- 删除项目的所有文件（用于覆盖上传） -->
+    <delete id="deleteByProjectId">
+        DELETE FROM project_file WHERE project_id = #{projectId}
+    </delete>
+    
 </mapper>

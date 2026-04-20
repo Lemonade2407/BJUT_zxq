@@ -117,6 +117,39 @@ public class ProjectFileController {
     }
     
     /**
+     * 覆盖上传文件（先删除再上传）
+     * POST /api/projects/{projectId}/files/overwrite-upload
+     */
+    @PostMapping("/overwrite-upload")
+    public Result<List<ProjectFile>> overwriteUploadFiles(
+            HttpServletRequest request,
+            @PathVariable Integer projectId,
+            @RequestParam("files") MultipartFile[] files,
+            @RequestParam(value = "parentId", required = false) Integer parentId) {
+            
+        log.info("收到覆盖上传请求，项目 ID: {}, 文件数量：{}", projectId, files.length);
+            
+        try {
+            // 1. 获取当前用户 ID
+            Integer userId = getCurrentUserId(request);
+            
+            // 2. 先删除项目的所有文件
+            int deletedCount = projectFileService.deleteAllProjectFiles(projectId);
+            log.info("已删除旧文件 {} 个", deletedCount);
+                
+            // 3. 批量上传新文件
+            List<ProjectFile> projectFiles = projectFileService.uploadFiles(projectId, files, parentId, userId);
+                
+            log.info("覆盖上传成功，删除 {} 个旧文件，上传 {} 个新文件", deletedCount, projectFiles.size());
+            return Result.success("覆盖上传成功，已替换 " + deletedCount + " 个旧文件", projectFiles);
+                
+        } catch (Exception e) {
+            log.error("覆盖上传失败：{}", e.getMessage());
+            return Result.error(500, "覆盖上传失败：" + e.getMessage());
+        }
+    }
+    
+    /**
      * 获取文件列表
      * GET /api/projects/{projectId}/files?parentId=xxx
      */
@@ -141,6 +174,33 @@ public class ProjectFileController {
         } catch (Exception e) {
             log.error("文件列表查询失败：{}", e.getMessage());
             return Result.error(500, "文件列表查询失败：" + e.getMessage());
+        }
+    }
+    
+    /**
+     * 获取所有文件（用于构建完整的树形结构）
+     * GET /api/projects/{projectId}/files/all
+     */
+    @GetMapping("/all")
+    public Result<List<ProjectFile>> getAllFiles(
+            HttpServletRequest request,
+            @PathVariable Integer projectId) {
+        
+        log.info("收到所有文件查询请求，项目 ID: {}", projectId);
+        
+        try {
+            // 1. 获取当前用户 ID（用于权限验证）
+            Integer userId = getCurrentUserId(request);
+            
+            // 2. 查询所有文件
+            List<ProjectFile> files = projectFileService.getAllFiles(projectId);
+            
+            log.info("所有文件查询成功，文件数量：{}", files.size());
+            return Result.success("所有文件查询成功", files);
+            
+        } catch (Exception e) {
+            log.error("所有文件查询失败：{}", e.getMessage());
+            return Result.error(500, "所有文件查询失败：" + e.getMessage());
         }
     }
     

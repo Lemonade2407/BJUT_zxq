@@ -358,4 +358,29 @@ public class AuthController {
             return Result.error(500, "头像上传失败：" + e.getMessage());
         }
     }
+    
+    /**
+     * 根据 ID 获取用户信息（公开接口）
+     * GET /api/auth/user/{userId}
+     */
+    @GetMapping("/user/{userId}")
+    public Result<User> getUserById(@PathVariable Integer userId) {
+        log.debug("获取用户信息，用户 ID: {}", userId);
+        
+        try {
+            User user = userService.getUserById(userId);
+            if (user == null) {
+                return Result.error(404, "用户不存在");
+            }
+            
+            // 不返回密码等敏感信息
+            user.setPassword(null);
+            
+            log.info("获取用户信息成功：{}, {}", user.getId(), user.getUsername());
+            return Result.success(user);
+        } catch (Exception e) {
+            log.error("获取用户信息失败：{}", e.getMessage());
+            return Result.error(500, "获取用户信息失败：" + e.getMessage());
+        }
+    }
 }

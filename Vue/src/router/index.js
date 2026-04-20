@@ -8,6 +8,8 @@ import ProjectSquare from '@/components/ProjectSquare.vue'
 // import TeamSquare from '@/components/TeamSquare.vue'  // 暂时注释，后续开发
 import ProjectDetail from '@/components/ProjectDetail.vue'
 import Settings from '@/components/Settings.vue'
+import Favorites from '@/components/Favorites.vue'
+import SearchResult from '@/components/SearchResult.vue'
 import { log } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 
@@ -106,6 +108,28 @@ const routes = [
     component: Settings,
     meta: { 
       title: '设置 - 北京工业大学项目协作平台',
+      requiresAuth: true 
+    }
+  },
+  
+  // 我的收藏
+  {
+    path: '/favorites',
+    name: 'Favorites',
+    component: Favorites,
+    meta: { 
+      title: '我的收藏 - 北京工业大学项目协作平台',
+      requiresAuth: true 
+    }
+  },
+  
+  // 搜索结果
+  {
+    path: '/search',
+    name: 'SearchResult',
+    component: SearchResult,
+    meta: { 
+      title: '搜索结果 - 北京工业大学项目协作平台',
       requiresAuth: true 
     }
   },

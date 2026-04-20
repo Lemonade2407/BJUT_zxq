@@ -246,6 +246,22 @@ public class UserService {
     }
     
     /**
+     * 根据 ID 获取用户信息（公开接口）
+     * @param userId 用户 ID
+     * @return 用户信息
+     */
+    public User getUserById(Integer userId) {
+        log.debug("获取用户信息，ID：{}", userId);
+        
+        User user = userMapper.selectById(userId);
+        if (user != null) {
+            // 清除密码
+            user.setPassword(null);
+        }
+        return user;
+    }
+    
+    /**
      * 更新用户信息
      * @param userId 用户 ID
      * @param user 新的用户信息

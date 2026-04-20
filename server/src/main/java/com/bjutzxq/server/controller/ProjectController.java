@@ -24,6 +24,10 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequestMapping("/projects")
+@CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"}, 
+             allowedHeaders = "*", 
+             allowCredentials = "true",
+             methods = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE, RequestMethod.OPTIONS})
 public class ProjectController {
     @Autowired
     private ProjectService projectService;
@@ -358,6 +362,66 @@ public class ProjectController {
         } catch (Exception e) {
             log.error("获取公开项目列表失败：{}", e.getMessage());
             return Result.error(500, "服务器内部错误");
+        }
+    }
+    
+    /**
+     * 下载项目（打包为 ZIP）
+     * GET /api/projects/{id}/download
+     */
+    @GetMapping("/{id}/download")
+    @CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"}, 
+                 allowedHeaders = "*", 
+                 allowCredentials = "true",
+                 methods = {RequestMethod.GET, RequestMethod.OPTIONS})
+    public ResponseEntity<Resource> downloadProject(
+            HttpServletRequest request,
+            @PathVariable Integer id) {
+        log.info("收到项目下载请求，项目 ID: {}", id);
+        
+        try {
+            // 1. 获取当前用户 ID
+            Integer userId = getCurrentUserId(request);
+            
+            // 2. 获取项目信息
+            Project project = projectService.selectById(id);
+            if (project == null) {
+                log.warn("下载失败：项目不存在，ID: {}", id);
+                return ResponseEntity.notFound().build();
+            }
+            
+            // 3. 检查权限（私有项目只能所有者下载）
+            if (project.getVisibility() != null && project.getVisibility() == 0) {
+                if (!project.getOwnerId().equals(userId)) {
+                    log.warn("下载失败：无权限下载私有项目，项目 ID: {}, 用户 ID: {}", id, userId);
+                    return ResponseEntity.status(403).build();
+                }
+            }
+            
+            // 4. 打包项目为 ZIP
+            java.nio.file.Path zipPath = projectService.packageProjectToZip(id, project.getName());
+            
+            if (zipPath == null || !Files.exists(zipPath)) {
+                log.error("下载失败：ZIP 文件生成失败，项目 ID: {}", id);
+                return ResponseEntity.internalServerError().build();
+            }
+            
+            // 5. 创建响应
+            Resource resource = new FileSystemResource(zipPath.toFile());
+            String fileName = project.getName() + "_" + id + ".zip";
+            
+            log.info("项目下载成功，项目 ID: {}, 文件名: {}", id, fileName);
+            
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, 
+                            "attachment; filename=\"" + fileName + "\"")
+                    .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(resource.contentLength()))
+                    .body(resource);
+            
+        } catch (Exception e) {
+            log.error("项目下载失败：{}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 }

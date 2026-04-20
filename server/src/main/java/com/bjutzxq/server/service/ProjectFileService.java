@@ -20,6 +20,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.*;
 
 /**
  * 项目文件服务类
@@ -58,7 +59,15 @@ public class ProjectFileService {
         // TODO: 添加病毒扫描功能
         // TODO: 支持断点续传和大文件分片上传
         
+        // 清空目录缓存（避免不同批次之间的缓存污染）
+        directoryCache.clear();
+        cacheHitCount = 0;
+        cacheMissCount = 0;
+        log.info("已清空目录缓存");
+        
         List<ProjectFile> uploadedFiles = new ArrayList<>();
+        int processedCount = 0;
+        long startTime = System.currentTimeMillis();
         
         try {
             // 1. 遍历所有上传的文件
@@ -66,6 +75,21 @@ public class ProjectFileService {
                 if (file.isEmpty()) {
                     log.warn("跳过空文件：{}", file.getOriginalFilename());
                     continue;
+                }
+                
+                processedCount++;
+                
+                // 每处理100个文件或最后一个文件时记录进度
+                if (processedCount % 100 == 0 || processedCount == files.length) {
+                    long elapsed = System.currentTimeMillis() - startTime;
+                    double avgTimePerFile = elapsed / (double) processedCount;
+                    int remaining = files.length - processedCount;
+                    long estimatedRemaining = (long) (remaining * avgTimePerFile);
+                    
+                    log.info("========== 上传进度: {}/{} ({:.1f}%) ==========", 
+                        processedCount, files.length, (processedCount * 100.0 / files.length));
+                    log.info("已耗时: {}秒, 预计剩余: {}秒", 
+                        elapsed / 1000, estimatedRemaining / 1000);
                 }
                 
                 // 2. 解析文件名中的路径信息（前端传来的文件名可能包含相对路径）
@@ -89,11 +113,18 @@ public class ProjectFileService {
                 }
             }
             
-            log.info("批量上传完成，成功上传 {} 个文件", uploadedFiles.size());
+            long totalTime = System.currentTimeMillis() - startTime;
+            double hitRate = (cacheHitCount + cacheMissCount) > 0 ? 
+                (cacheHitCount * 100.0 / (cacheHitCount + cacheMissCount)) : 0;
+            log.info("批量上传完成！成功上传 {} 个文件，总耗时: {}秒", uploadedFiles.size(), totalTime / 1000);
+            log.info("缓存统计 - 命中: {}, 未命中: {}, 命中率: {:.2f}%", 
+                cacheHitCount, cacheMissCount, hitRate);
             return uploadedFiles;
             
         } catch (Exception e) {
-            log.error("批量上传失败：{}", e.getMessage(), e);
+            long totalTime = System.currentTimeMillis() - startTime;
+            log.error("批量上传失败：已处理 {}/{} 个文件，耗时: {}秒，错误: {}", 
+                processedCount, files.length, totalTime / 1000, e.getMessage(), e);
             throw new RuntimeException("批量上传失败：" + e.getMessage());
         }
     }
@@ -149,6 +180,8 @@ public class ProjectFileService {
         directory.setIsDir(1);  // 1-目录
         directory.setParentId(parentId);
         directory.setUploaderId(uploaderId);
+        directory.setStorageUrl("");  // 目录不需要存储 URL，设置为空字符串
+        directory.setStorageType(0);  // 无存储
         
         // 3. 保存到数据库
         projectFileMapper.insert(directory);
@@ -166,6 +199,56 @@ public class ProjectFileService {
     public List<ProjectFile> getFileList(Integer projectId, Integer parentId) {
         log.info("查询文件列表，项目 ID: {}, 父目录 ID: {}", projectId, parentId);
         return projectFileMapper.selectByProjectIdAndParentId(projectId, parentId);
+    }
+    
+    /**
+     * 获取项目的所有文件（用于构建完整的树形结构）
+     * @param projectId 项目 ID
+     * @return 所有文件列表
+     */
+    public List<ProjectFile> getAllFiles(Integer projectId) {
+        log.info("查询项目所有文件，项目 ID: {}", projectId);
+        return projectFileMapper.selectByProjectId(projectId);
+    }
+    
+    /**
+     * 删除项目的所有文件（用于覆盖上传）
+     * @param projectId 项目 ID
+     * @return 删除的文件数量
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public int deleteAllProjectFiles(Integer projectId) {
+        log.info("开始删除项目所有文件，项目 ID: {}", projectId);
+        
+        // 1. 先查询所有文件，用于删除 OSS 上的文件
+        List<ProjectFile> allFiles = projectFileMapper.selectByProjectId(projectId);
+        int fileCount = allFiles.size();
+        
+        if (fileCount == 0) {
+            log.info("项目没有文件，无需删除");
+            return 0;
+        }
+        
+        // 2. 删除 OSS 上的文件（只删除文件，不删除目录）
+        int ossDeletedCount = 0;
+        for (ProjectFile file : allFiles) {
+            if (!Constants.File.TYPE_DIRECTORY.equals(file.getIsDir()) && file.getStorageUrl() != null && !file.getStorageUrl().isEmpty()) {
+                try {
+                    ossUtil.delete(file.getStorageUrl());
+                    ossDeletedCount++;
+                    log.debug("OSS 文件删除成功: {}", file.getStorageUrl());
+                } catch (Exception e) {
+                    log.warn("OSS 文件删除失败: {}, 错误: {}", file.getStorageUrl(), e.getMessage());
+                    // 不抛出异常，继续删除其他文件
+                }
+            }
+        }
+        
+        // 3. 删除数据库记录
+        int deletedRows = projectFileMapper.deleteByProjectId(projectId);
+        
+        log.info("项目文件删除完成，数据库删除: {} 条, OSS 删除: {} 个文件", deletedRows, ossDeletedCount);
+        return deletedRows;
     }
     
     /**
@@ -467,15 +550,77 @@ public class ProjectFileService {
         String relativePath = originalFileName.substring(0, lastSeparatorIndex);
         String fileName = originalFileName.substring(lastSeparatorIndex + 1);
 
-        // 2. 递归创建目录结构
-        Integer targetParentId = createDirectoriesRecursively(projectId, relativePath, baseParentId, uploaderId);
+        // 2. 递归创建目录结构（使用缓存避免重复查询）
+        Integer targetParentId = createDirectoriesRecursivelyWithCache(projectId, relativePath, baseParentId, uploaderId);
 
         // 3. 保存文件并返回文件信息
         return saveUploadedFile(projectId, file, fileName, targetParentId, uploaderId);
     }
 
+    // 目录缓存：key = "projectId:parentPath:dirName", value = directoryId
+    private final java.util.Map<String, Integer> directoryCache = new java.util.concurrent.ConcurrentHashMap<>();
+    
+    // 缓存统计
+    private int cacheHitCount = 0;
+    private int cacheMissCount = 0;
+
     /**
-     * 递归创建目录结构
+     * 递归创建目录结构（带缓存优化）
+     * @param projectId 项目 ID
+     * @param relativePath 相对路径（如：dir1/dir2/dir3）
+     * @param currentParentId 当前父目录 ID
+     * @param uploaderId 上传者 ID
+     * @return 最终创建的目录 ID
+     */
+    private Integer createDirectoriesRecursivelyWithCache(Integer projectId, String relativePath, Integer currentParentId, Integer uploaderId) {
+        // 分割路径
+        String[] pathParts = relativePath.split("/");
+
+        Integer currentDirId = currentParentId;
+
+        // 逐级创建目录
+        for (String dirName : pathParts) {
+            if (dirName == null || dirName.trim().isEmpty()) {
+                continue;
+            }
+
+            // 构建缓存 key
+            String cacheKey = projectId + ":" + buildFilePath(currentDirId) + ":" + dirName.trim();
+            
+            // 先查缓存
+            Integer cachedDirId = directoryCache.get(cacheKey);
+            if (cachedDirId != null) {
+                currentDirId = cachedDirId;
+                cacheHitCount++;
+                log.debug("[缓存命中] 目录：{}, ID: {}, 命中率: {}/{}", 
+                    dirName, currentDirId, cacheHitCount, cacheHitCount + cacheMissCount);
+                continue;
+            }
+
+            // 检查目录是否已存在
+            cacheMissCount++;
+            String displayPath = buildFilePath(currentDirId);
+            ProjectFile existing = projectFileMapper.selectByPath(projectId, displayPath, dirName.trim());
+
+            if (existing != null && Constants.File.TYPE_DIRECTORY.equals(existing.getIsDir())) {
+                // 目录已存在，使用现有目录
+                currentDirId = existing.getId();
+                directoryCache.put(cacheKey, currentDirId);  // 加入缓存
+                log.debug("目录已存在：{}, ID: {}", dirName, currentDirId);
+            } else {
+                // 创建新目录
+                ProjectFile directory = createDirectory(projectId, dirName.trim(), currentDirId, uploaderId);
+                currentDirId = directory.getId();
+                directoryCache.put(cacheKey, currentDirId);  // 加入缓存
+                log.debug("创建目录：{}, ID: {}", dirName, currentDirId);
+            }
+        }
+
+        return currentDirId;
+    }
+
+    /**
+     * 递归创建目录结构（旧方法，保留兼容）
      * @param projectId 项目 ID
      * @param relativePath 相对路径（如：dir1/dir2/dir3）
      * @param currentParentId 当前父目录 ID
@@ -516,56 +661,63 @@ public class ProjectFileService {
      * 保存上传的文件（公共方法）
      */
     private ProjectFile saveUploadedFile(Integer projectId, MultipartFile file, String fileName, Integer parentId, Integer uploaderId) throws IOException {
+        long fileStartTime = System.currentTimeMillis();
+        
         // 1. 生成文件存储路径
         String fileExtension = getFileExtension(fileName);
         
-        // 2. 判断是否为多媒体或大文件 (例如 > 5MB)
-        boolean isLargeFile = file.getSize() > 5 * 1024 * 1024 || 
-                              fileExtension.matches("(mp4|avi|mov|jpg|png|gif|zip|rar|pdf)");
+        // 2. 统一使用 OSS 存储（先上传到 OSS，成功后再创建数据库记录）
+        log.info("[{}] 开始上传至 OSS: {}, 大小: {} bytes", 
+            Thread.currentThread().getName(), fileName, file.getSize());
+        String ossUrl;
+        try {
+            long ossStartTime = System.currentTimeMillis();
+            ossUrl = ossUtil.upload(file);
+            long ossEndTime = System.currentTimeMillis();
+            
+            if (ossUrl == null || ossUrl.trim().isEmpty()) {
+                throw new RuntimeException("OSS 返回的 URL 为空");
+            }
+            log.info("[{}] OSS 上传成功: {}, 耗时: {}ms", 
+                Thread.currentThread().getName(), ossUrl, (ossEndTime - ossStartTime));
+        } catch (Exception e) {
+            log.error("[{}] OSS 上传失败: {}", Thread.currentThread().getName(), e.getMessage(), e);
+            throw new RuntimeException("OSS 上传失败: " + e.getMessage());
+        }
         
+        // 3. OSS 上传成功后，创建数据库记录
+        long dbStartTime = System.currentTimeMillis();
         ProjectFile projectFile = new ProjectFile();
         projectFile.setProjectId(projectId);
         projectFile.setFileName(fileName);
         projectFile.setFilePath(buildFilePath(parentId));
         projectFile.setFileSize(file.getSize());
         projectFile.setFileType(fileExtension);
+        projectFile.setStorageType(2);  // OSS 存储
+        projectFile.setStorageUrl(ossUrl);  // 确保 storageUrl 不为 null
         projectFile.setIsDir(0);  // 0-文件
         projectFile.setParentId(parentId);
         projectFile.setUploaderId(uploaderId);
-
-        if (isLargeFile) {
-            // --- 走 OSS 流程 ---
-            log.info("检测到大文件/多媒体，上传至 OSS: {}", fileName);
+        
+        // 如果是 README.md 文件，读取内容用于预览
+        if (isReadmeFile(fileName)) {
             try {
-                String ossUrl = ossUtil.upload(file);
-                projectFile.setStorageType(2);
-                projectFile.setStorageUrl(ossUrl);
-            } catch (Exception e) {
-                log.error("OSS 上传失败", e);
-                throw new RuntimeException("OSS 上传失败: " + e.getMessage());
-            }
-        } else {
-            // --- 小文件也使用 OSS(简化架构,避免 Git 存储膨胀) ---
-            log.info("上传小文件至 OSS: {}", fileName);
-            try {
-                String ossUrl = ossUtil.upload(file);
-                projectFile.setStorageType(2);  // 统一使用 OSS
-                projectFile.setStorageUrl(ossUrl);
-                
-                // 如果是 README.md 文件，读取内容用于预览
-                if (isReadmeFile(fileName)) {
-                    String content = new String(file.getBytes());
-                    projectFile.setContent(content);
-                }
-            } catch (Exception e) {
-                log.error("OSS 上传失败", e);
-                throw new RuntimeException("OSS 上传失败: " + e.getMessage());
+                String content = new String(file.getBytes());
+                projectFile.setContent(content);
+            } catch (IOException e) {
+                log.warn("读取 README 内容失败: {}", e.getMessage());
+                // 不抛出异常，继续保存
             }
         }
 
-        // 3. 保存到数据库
+        // 4. 保存到数据库
         projectFileMapper.insert(projectFile);
-        log.info("文件上传成功，文件 ID: {}, 存储类型: {}", projectFile.getId(), projectFile.getStorageType());
+        long dbEndTime = System.currentTimeMillis();
+        long totalTime = System.currentTimeMillis() - fileStartTime;
+        
+        log.info("[{}] 文件上传完成: {}, 总耗时: {}ms (OSS: {}ms, DB: {}ms)", 
+            Thread.currentThread().getName(), fileName, totalTime, 
+            (dbStartTime - fileStartTime), (dbEndTime - dbStartTime));
 
         return projectFile;
     }

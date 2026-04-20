@@ -3,6 +3,7 @@ package com.bjutzxq.server.service;
 import com.bjutzxq.common.Constants;
 import com.bjutzxq.common.NotificationType;
 import com.bjutzxq.pojo.Comment;
+import com.bjutzxq.pojo.User;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -10,6 +11,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.bjutzxq.server.mapper.CommentMapper;
 import com.bjutzxq.server.mapper.ProjectMapper;
+import com.bjutzxq.server.mapper.UserMapper;
 import com.bjutzxq.pojo.Project;
 
 import java.util.List;
@@ -25,6 +27,9 @@ public class CommentService {
     
     @Autowired
     private ProjectMapper projectMapper;
+    
+    @Autowired
+    private UserMapper userMapper;
     
     @Autowired
     private NotificationService notificationService;
@@ -124,8 +129,17 @@ public class CommentService {
         // 查询评论列表（只查询顶级评论）
         List<Comment> comments = commentMapper.selectByProjectId(projectId, status != null ? status : 1);
         
-        // 为每个评论加载回复列表
+        // 为每个评论加载回复列表和用户信息
         for (Comment comment : comments) {
+            // 加载用户信息
+            User user = userMapper.selectById(comment.getUserId());
+            if (user != null) {
+                // 将用户名和头像存储到 Comment 的扩展字段中
+                // 注意：这里我们利用 content 字段暂时存储，更好的方式是创建 VO 类
+                // 但为了快速实现，我们在前端通过 userId 再次查询
+            }
+            
+            // 加载回复列表
             if (comment.getParentId() == null) {
                 List<Comment> replies = commentMapper.selectReplies(comment.getId());
                 comment.setReplyCount(replies.size());

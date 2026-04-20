@@ -73,3 +73,11 @@ export function uploadAvatar(file) {
     }
   })
 }
+
+// 根据 ID 获取用户信息
+export function getUserById(userId) {
+  return request({
+    url: `/auth/user/${userId}`,
+    method: 'get'
+  })
+}
