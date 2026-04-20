@@ -72,6 +72,12 @@
 #      - 流程：备份当前版本 → 切换 main 分支 → 部署 → 健康检查
 #      - 耗时：2-4 分钟
 #
+#   8) 本地上传部署 🆕
+#      - 适用场景：从本地上传代码包部署
+#      - 特点：不拉取 Git 代码，直接使用上传的文件
+#      - 流程：解压上传文件 → 构建 → 部署
+#      - 耗时：2-4 分钟
+#
 # 【前置要求】
 #   - Docker 已安装
 #   - Docker Compose 已安装
@@ -129,6 +135,7 @@ show_menu() {
     echo -e "  ${CYAN}5) 仅重建前端${NC}    - 只重新构建前端服务"
     echo -e "  ${CYAN}6) 测试分支部署${NC}  - 切换到 test 分支并部署 🆕"
     echo -e "  ${CYAN}7) 生产分支部署${NC}  - 切换到 main 分支并部署 🆕"
+    echo -e "  ${CYAN}8) 本地上传部署${NC}  - 使用上传的代码包部署 🆕"
     echo -e "  ${CYAN}0) 退出${NC}"
     echo ""
 }
@@ -555,6 +562,19 @@ main() {
             start_services
             show_result
             echo -e "${GREEN}✅ 生产环境部署成功！${NC}"
+            ;;
+        
+        8|upload)
+            echo -e "${BOLD}📦 模式: 本地上传部署${NC}"
+            echo ""
+            check_config
+            check_docker
+            # 不拉取 Git 代码，直接使用上传的文件
+            stop_services
+            build_images "incremental"
+            start_services
+            show_result
+            echo -e "${GREEN}✅ 本地上传部署成功！${NC}"
             ;;
         
         0|exit)

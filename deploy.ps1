@@ -79,13 +79,13 @@ Write-Host ""
 Write-Host "[4/4] 远程部署..." -ForegroundColor Blue
 
 if ($choice -eq "1" -or $choice -eq "") {
-    # 完整部署：解压 + 重新构建
+    # 完整部署：解压 + 重新构建（不拉取Git代码）
     $remoteScript = @"
 cd $REMOTE_PATH
 rm -rf *
 unzip -o /opt/deploy.zip
 chmod +x deploy.sh
-./deploy.sh 2
+./deploy.sh 8
 "@
 } elseif ($choice -eq "2") {
     # 仅重启：不解压，直接重启
@@ -94,7 +94,7 @@ cd $REMOTE_PATH
 docker compose restart
 "@
 } elseif ($choice -eq "3") {
-    # 测试分支部署
+    # 测试分支部署（需要Git）
     $remoteScript = @"
 cd $REMOTE_PATH
 rm -rf *
@@ -103,7 +103,7 @@ chmod +x deploy.sh
 ./deploy.sh 6
 "@
 } elseif ($choice -eq "4") {
-    # 生产分支部署
+    # 生产分支部署（需要Git）
     $remoteScript = @"
 cd $REMOTE_PATH
 rm -rf *
