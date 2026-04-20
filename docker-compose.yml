@@ -6,6 +6,8 @@ services:
     restart: always
     # 使用 host 网络,避免 docker-proxy 问题
     network_mode: host
+    ports:
+      - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
       MYSQL_DATABASE: bjut_zxq
@@ -49,11 +51,11 @@ services:
       mysql:
         condition: service_healthy
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/actuator/health"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/actuator/health"]
       interval: 30s
-      timeout: 3s
-      retries: 3
-      start_period: 60s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
 
   # Vue前端(Nginx)
   frontend:
