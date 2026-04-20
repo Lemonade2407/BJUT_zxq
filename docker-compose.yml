@@ -6,8 +6,6 @@ services:
     restart: always
     # 使用 host 网络,避免 docker-proxy 问题
     network_mode: host
-    ports:
-      - "3306:3306"
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root123456}
       MYSQL_DATABASE: bjut_zxq
