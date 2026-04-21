@@ -48,11 +48,6 @@ public class TagService {
             throw new RuntimeException("标签名称已存在");
         }
         
-        // 设置默认颜色（如果未指定）
-        if (tag.getColor() == null || tag.getColor().trim().isEmpty()) {
-            tag.setColor("#1890ff"); // 默认蓝色
-        }
-        
         // 设置初始使用次数
         if (tag.getUsageCount() == null) {
             tag.setUsageCount(0);
@@ -100,11 +95,6 @@ public class TagService {
                 throw new RuntimeException("标签名称已存在");
             }
             existingTag.setName(tag.getName().trim());
-        }
-        
-        // 更新其他字段
-        if (tag.getColor() != null && !tag.getColor().trim().isEmpty()) {
-            existingTag.setColor(tag.getColor().trim());
         }
         
         // 执行更新
