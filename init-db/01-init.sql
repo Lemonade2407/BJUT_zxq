@@ -200,14 +200,27 @@ CREATE TABLE IF NOT EXISTS `download_log` (
 INSERT INTO `tag` (`name`) VALUES
 ('Java'),
 ('Python'),
+('C'),
+('C++'),
+('Qt'),
 ('Vue'),
 ('Spring Boot'),
 ('MySQL'),
 ('React'),
 ('Node.js'),
+('JavaScript'),
+('TypeScript'),
+('Go'),
+('Rust'),
 ('人工智能'),
+('机器学习'),
+('深度学习'),
 ('大数据'),
-('云计算')
+('云计算'),
+('Docker'),
+('Linux'),
+('Android'),
+('iOS')
 ON DUPLICATE KEY UPDATE `name`=`name`;
 
 -- ===========================================
