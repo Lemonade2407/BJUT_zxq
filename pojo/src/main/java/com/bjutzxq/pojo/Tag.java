@@ -19,11 +19,6 @@ public class Tag {
     private String name;
     
     /**
-     * 标签颜色
-     */
-    private String color;
-    
-    /**
      * 使用次数
      */
     private Integer usageCount;

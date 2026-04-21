@@ -58,7 +58,7 @@ CREATE TABLE IF NOT EXISTS `project` (
 CREATE TABLE IF NOT EXISTS `tag` (
   `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '标签ID',
   `name` VARCHAR(50) NOT NULL UNIQUE COMMENT '标签名称',
-  `color` VARCHAR(20) DEFAULT '#409EFF' COMMENT '标签颜色',
+  `usage_count` INT DEFAULT 0 COMMENT '使用次数',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   INDEX idx_name (`name`)
 ) ENGINE=InnoDB COMMENT='标签表';
@@ -197,17 +197,17 @@ CREATE TABLE IF NOT EXISTS `download_log` (
 -- ===========================================
 
 -- 插入默认标签
-INSERT INTO `tag` (`name`, `color`) VALUES
-('Java', '#E74C3C'),
-('Python', '#3498DB'),
-('Vue', '#42B983'),
-('Spring Boot', '#6DB33F'),
-('MySQL', '#00758F'),
-('React', '#61DAFB'),
-('Node.js', '#339933'),
-('人工智能', '#9B59B6'),
-('大数据', '#E67E22'),
-('云计算', '#1ABC9C')
+INSERT INTO `tag` (`name`) VALUES
+('Java'),
+('Python'),
+('Vue'),
+('Spring Boot'),
+('MySQL'),
+('React'),
+('Node.js'),
+('人工智能'),
+('大数据'),
+('云计算')
 ON DUPLICATE KEY UPDATE `name`=`name`;
 
 -- ===========================================

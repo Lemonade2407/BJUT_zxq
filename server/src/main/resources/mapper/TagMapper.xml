@@ -6,14 +6,13 @@
     <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.Tag">
         <id column="id" property="id"/>
         <result column="name" property="name"/>
-        <result column="color" property="color"/>
         <result column="usage_count" property="usageCount"/>
     </resultMap>
     
     <!-- 插入标签 -->
     <insert id="insert" parameterType="com.bjutzxq.pojo.Tag" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO tag (name, color, usage_count)
-        VALUES (#{name}, #{color}, #{usageCount})
+        INSERT INTO tag (name, usage_count)
+        VALUES (#{name}, #{usageCount})
     </insert>
     
     <!-- 删除标签 -->
@@ -27,9 +26,6 @@
         <set>
             <if test="name != null and name != ''">
                 name = #{name},
-            </if>
-            <if test="color != null and color != ''">
-                color = #{color},
             </if>
             <if test="usageCount != null">
                 usage_count = #{usageCount},
