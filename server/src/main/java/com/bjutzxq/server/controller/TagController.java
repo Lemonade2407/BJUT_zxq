@@ -130,6 +130,27 @@ public class TagController {
     }
     
     /**
+     * 根据分组查询标签
+     * GET /api/tags/category/{category}
+     */
+    @GetMapping("/category/{category}")
+    public Result<List<Tag>> getTagsByCategory(@PathVariable String category) {
+        log.debug("收到按分组查询标签请求，分组：{}", category);
+        
+        try {
+            List<Tag> tags = tagService.getTagsByCategory(category);
+            log.debug("分组标签查询成功，分组：{}, 数量：{}", category, tags.size());
+            return Result.success(tags);
+        } catch (IllegalArgumentException e) {
+            log.warn("查询分组标签失败：{}", e.getMessage());
+            return Result.error(400, e.getMessage());
+        } catch (Exception e) {
+            log.error("查询分组标签失败：{}", e.getMessage());
+            return Result.error(500, "服务器内部错误：" + e.getMessage());
+        }
+    }
+    
+    /**
      * 根据名称搜索标签
      * GET /api/tags/search/name?name=xxx
      */

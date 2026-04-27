@@ -1,9 +1,11 @@
 <script setup>
-import { computed } from 'vue'
+import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import Header from './components/Header.vue'
 import Footer from './components/Footer.vue'
 import tokenManager from '@/utils/tokenManager'
+import notificationWS from '@/utils/websocket'
+import { log, error as logError } from '@/utils/logger'
 
 const route = useRoute()
 
@@ -15,6 +17,29 @@ const showMainLayout = computed(() => {
 // 检查登录状态（用于 Header 显示用户信息）
 const isLoggedIn = computed(() => {
   return tokenManager.isLoggedIn()
+})
+
+// 初始化全局 WebSocket 连接
+const initGlobalWebSocket = () => {
+  if (!tokenManager.isLoggedIn()) {
+    log('未登录，跳过 WebSocket 连接')
+    return
+  }
+  
+  // 连接到 WebSocket
+  notificationWS.connect()
+  log('全局 WebSocket 已初始化')
+}
+
+// 组件挂载时初始化 WebSocket
+onMounted(() => {
+  initGlobalWebSocket()
+})
+
+// 组件卸载时断开 WebSocket（应用关闭时）
+onUnmounted(() => {
+  notificationWS.disconnect()
+  log('全局 WebSocket 已断开')
 })
 </script>
 

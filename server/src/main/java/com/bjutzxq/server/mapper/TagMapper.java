@@ -47,6 +47,13 @@ public interface TagMapper {
     List<Tag> selectAll();
     
     /**
+     * 根据分组查询标签
+     * @param category 标签分组
+     * @return 标签列表
+     */
+    List<Tag> selectByCategory(@Param("category") String category);
+    
+    /**
      * 根据名称查询标签（模糊查询）
      * @param name 标签名称
      * @return 标签列表

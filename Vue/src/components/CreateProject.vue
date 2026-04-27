@@ -2,7 +2,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { createProject, uploadFiles } from '@/api/project'
-import { getTags } from '@/api/tag'
+import { getTagsByCategory } from '@/api/tag'
 import { toast } from '@/utils/toast'
 import { log, error as logError } from '@/utils/logger'
 
@@ -16,8 +16,19 @@ const form = ref({
   visibility: 1 // 默认公开
 })
 
-// 标签列表
-const tags = ref([])
+// 标签列表（按分组）
+const tagsByCategory = ref({
+  '技术栈': [],
+  '领域': [],
+  '其他': []
+})
+
+// 每个分类显示的标签数量（分页）
+const displayCount = ref({
+  '技术栈': 10,
+  '领域': 10,
+  '其他': 10
+})
 
 // 加载状态
 const isLoading = ref(false)
@@ -153,11 +164,24 @@ const displayFiles = computed(() => {
 // 加载标签列表
 const loadTags = async () => {
   try {
-    const res = await getTags()
-    if (res.code === 200 && res.data) {
-      tags.value = res.data
-      log('加载标签列表成功，数量:', tags.value.length)
+    // 并行请求三个分组的标签
+    const [techRes, domainRes, otherRes] = await Promise.all([
+      getTagsByCategory('技术栈'),
+      getTagsByCategory('领域'),
+      getTagsByCategory('其他')
+    ])
+    
+    if (techRes.code === 200) {
+      tagsByCategory.value['技术栈'] = techRes.data || []
     }
+    if (domainRes.code === 200) {
+      tagsByCategory.value['领域'] = domainRes.data || []
+    }
+    if (otherRes.code === 200) {
+      tagsByCategory.value['其他'] = otherRes.data || []
+    }
+    
+    log('加载标签列表成功')
   } catch (error) {
     logError('加载标签列表失败:', error)
   }
@@ -171,6 +195,24 @@ const toggleTag = (tagId) => {
   } else {
     form.value.tagIds.push(tagId)
   }
+}
+
+// 查看更多标签
+const showMoreTags = (category) => {
+  const totalCount = tagsByCategory.value[category].length
+  const currentCount = displayCount.value[category]
+  // 每次增加10个，但不超过总数
+  displayCount.value[category] = Math.min(currentCount + 10, totalCount)
+}
+
+// 获取当前分类显示的标签
+const getDisplayedTags = (category) => {
+  return tagsByCategory.value[category].slice(0, displayCount.value[category])
+}
+
+// 是否还有更多标签
+const hasMoreTags = (category) => {
+  return displayCount.value[category] < tagsByCategory.value[category].length
 }
 
 // 验证表单
@@ -512,16 +554,76 @@ onMounted(() => {
             <label class="form-label">
               项目标签 <span class="optional">(可选)</span>
             </label>
-            <div class="tags-grid">
-              <div
-                v-for="tag in tags"
-                :key="tag.id"
-                :class="['tag-item', { selected: form.tagIds.includes(tag.id) }]"
-                @click="toggleTag(tag.id)"
-              >
-                {{ tag.name }}
+            
+            <!-- 技术栈标签 -->
+            <div v-if="tagsByCategory['技术栈'].length > 0" class="tag-category">
+              <h4 class="category-title">🛠️ 技术栈</h4>
+              <div class="tags-grid">
+                <div
+                  v-for="tag in getDisplayedTags('技术栈')"
+                  :key="tag.id"
+                  :class="['tag-item', { selected: form.tagIds.includes(tag.id) }]"
+                  @click="toggleTag(tag.id)"
+                >
+                  {{ tag.name }}
+                </div>
               </div>
+              <button
+                v-if="hasMoreTags('技术栈')"
+                type="button"
+                class="show-more-btn"
+                @click="showMoreTags('技术栈')"
+              >
+                查看更多 ({{ tagsByCategory['技术栈'].length - displayCount['技术栈'] }})
+              </button>
             </div>
+            
+            <!-- 领域标签 -->
+            <div v-if="tagsByCategory['领域'].length > 0" class="tag-category">
+              <h4 class="category-title">🎯 领域</h4>
+              <div class="tags-grid">
+                <div
+                  v-for="tag in getDisplayedTags('领域')"
+                  :key="tag.id"
+                  :class="['tag-item', { selected: form.tagIds.includes(tag.id) }]"
+                  @click="toggleTag(tag.id)"
+                >
+                  {{ tag.name }}
+                </div>
+              </div>
+              <button
+                v-if="hasMoreTags('领域')"
+                type="button"
+                class="show-more-btn"
+                @click="showMoreTags('领域')"
+              >
+                查看更多 ({{ tagsByCategory['领域'].length - displayCount['领域'] }})
+              </button>
+            </div>
+            
+            <!-- 其他标签 -->
+            <div v-if="tagsByCategory['其他'].length > 0" class="tag-category">
+              <h4 class="category-title">📌 其他</h4>
+              <div class="tags-grid">
+                <div
+                  v-for="tag in getDisplayedTags('其他')"
+                  :key="tag.id"
+                  :class="['tag-item', { selected: form.tagIds.includes(tag.id) }]"
+                  @click="toggleTag(tag.id)"
+                >
+                  {{ tag.name }}
+                </div>
+              </div>
+              <button
+                v-if="hasMoreTags('其他')"
+                type="button"
+                class="show-more-btn"
+                @click="showMoreTags('其他')"
+              >
+                查看更多 ({{ tagsByCategory['其他'].length - displayCount['其他'] }})
+              </button>
+            </div>
+            
             <p class="form-hint">点击标签进行选择，最多可选择多个标签</p>
           </div>
 
@@ -792,6 +894,39 @@ onMounted(() => {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   gap: 12px;
+}
+
+/* 标签分组 */
+.tag-category {
+  margin-bottom: 24px;
+}
+
+.category-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #003366;
+  margin: 0 0 12px 0;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #e8e8e8;
+}
+
+/* 查看更多按钮 */
+.show-more-btn {
+  margin-top: 12px;
+  padding: 8px 20px;
+  background-color: transparent;
+  border: 1px dashed #0059b3;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #0059b3;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.show-more-btn:hover {
+  background-color: rgba(0, 89, 179, 0.05);
+  border-style: solid;
 }
 
 .tag-item {

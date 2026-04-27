@@ -38,8 +38,7 @@ public class AuthController {
             @RequestBody RegisterRequest request,
             @RequestHeader(value = "X-Forwarded-For", required = false) String ipAddress) {
         log.info("收到用户注册请求，用户名：{}", request.getUsername());
-        
-        // TODO: 添加图形验证码防重放攻击机制
+
         // TODO: 添加邮箱验证功能，确保邮箱真实性
         
         try {

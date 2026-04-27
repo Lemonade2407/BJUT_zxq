@@ -52,9 +52,6 @@ public class CaptchaUtil {
     public static String generateCaptcha(String sessionId) {
         log.info("生成图形验证码，会话 ID: {}", sessionId);
         
-        // TODO: 添加验证码生成频率限制，防止恶意请求
-        // TODO: 考虑使用更复杂的验证码类型（如算术题、滑动验证等）
-        
         // 1. 生成随机验证码
         String code = generateRandomCode(CODE_LENGTH);
         

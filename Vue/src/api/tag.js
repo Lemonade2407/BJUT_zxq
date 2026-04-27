@@ -37,3 +37,11 @@ export function getHotTags(limit = 10) {
     params: { limit }
   })
 }
+
+// 根据分组获取标签
+export function getTagsByCategory(category) {
+  return request({
+    url: `/tags/category/${category}`,
+    method: 'get'
+  })
+}

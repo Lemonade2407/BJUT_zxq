@@ -58,9 +58,11 @@ CREATE TABLE IF NOT EXISTS `project` (
 CREATE TABLE IF NOT EXISTS `tag` (
   `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '标签ID',
   `name` VARCHAR(50) NOT NULL UNIQUE COMMENT '标签名称',
+  `category` VARCHAR(50) COMMENT '标签分组：技术栈、领域、其他',
   `usage_count` INT DEFAULT 0 COMMENT '使用次数',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  INDEX idx_name (`name`)
+  INDEX idx_name (`name`),
+  INDEX idx_category (`category`)
 ) ENGINE=InnoDB COMMENT='标签表';
 
 -- ===========================================
@@ -196,31 +198,55 @@ CREATE TABLE IF NOT EXISTS `download_log` (
 -- 插入初始数据
 -- ===========================================
 
--- 插入默认标签
-INSERT INTO `tag` (`name`) VALUES
-('Java'),
-('Python'),
-('C'),
-('C++'),
-('Qt'),
-('Vue'),
-('Spring Boot'),
-('MySQL'),
-('React'),
-('Node.js'),
-('JavaScript'),
-('TypeScript'),
-('Go'),
-('Rust'),
-('人工智能'),
-('机器学习'),
-('深度学习'),
-('大数据'),
-('云计算'),
-('Docker'),
-('Linux'),
-('Android'),
-('iOS')
+-- 插入默认标签（技术栈）
+INSERT INTO `tag` (`name`, `category`) VALUES
+('Java', '技术栈'),
+('Python', '技术栈'),
+('C', '技术栈'),
+('C++', '技术栈'),
+('JavaScript', '技术栈'),
+('TypeScript', '技术栈'),
+('Go', '技术栈'),
+('Rust', '技术栈'),
+('Spring Boot', '技术栈'),
+('Vue', '技术栈'),
+('React', '技术栈'),
+('Node.js', '技术栈'),
+('Qt', '技术栈'),
+('MySQL', '技术栈'),
+('PostgreSQL', '技术栈'),
+('MongoDB', '技术栈'),
+('Redis', '技术栈'),
+('Docker', '技术栈'),
+('Kubernetes', '技术栈'),
+('Linux', '技术栈'),
+('Android', '技术栈'),
+('iOS', '技术栈')
+ON DUPLICATE KEY UPDATE `name`=`name`;
+
+-- 插入默认标签（领域）
+INSERT INTO `tag` (`name`, `category`) VALUES
+('人工智能', '领域'),
+('机器学习', '领域'),
+('深度学习', '领域'),
+('大数据', '领域'),
+('云计算', '领域'),
+('物联网', '领域'),
+('Web开发', '领域'),
+('移动开发', '领域'),
+('桌面应用', '领域'),
+('游戏开发', '领域'),
+('嵌入式系统', '领域')
+ON DUPLICATE KEY UPDATE `name`=`name`;
+
+-- 插入默认标签（其他）
+INSERT INTO `tag` (`name`, `category`) VALUES
+('课程设计', '其他'),
+('毕业设计', '其他'),
+('竞赛作品', '其他'),
+('前后端分离', '其他'),
+('微服务', '其他'),
+('单体应用', '其他')
 ON DUPLICATE KEY UPDATE `name`=`name`;
 
 -- ===========================================

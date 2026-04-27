@@ -4,8 +4,9 @@ import { useRouter } from 'vue-router'
 import { getTrendingProjects } from '@/api/project'
 import { getNotifications, markAsRead as markNotificationRead, batchDeleteNotifications } from '@/api/notification'
 import { toast } from '@/utils/toast'
-import { error as logError } from '@/utils/logger'
+import { error as logError, log } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
+import notificationWS from '@/utils/websocket'
 
 const router = useRouter()
 
@@ -229,10 +230,54 @@ const handleProjectClick = (projectId) => {
   router.push(`/project/${projectId}`)
 }
 
-// 组件挂载时加载数据
+// 处理 WebSocket 接收到的新通知
+const handleNewNotification = (data) => {
+  log('收到实时通知:', data)
+  
+  // 构建通知对象
+  const newNotification = {
+    id: data.id,
+    type: data.notificationType,
+    icon: getNotificationIcon(data.notificationType),
+    title: getNotificationTitle(data.notificationType),
+    content: data.content,
+    time: formatTime(data.createdAt),
+    unread: data.isRead === 0,
+    sender: data.sender,
+    projectId: data.projectId
+  }
+  
+  // 将新通知添加到列表顶部
+  notifications.value.unshift(newNotification)
+  
+  // 如果当前显示全部，则增加显示数量
+  if (showAll.value) {
+    displayedCount.value++
+  }
+  
+  // 通过 WebSocket 发送确认（标记为已读）
+  if (newNotification.unread) {
+    notificationWS.ackNotification(data.id)
+    log('已发送通知确认:', data.id)
+  }
+  
+  // 显示提示
+  toast.info(`收到新通知：${newNotification.content}`)
+  
+  log('通知已添加到列表，当前通知数量:', notifications.value.length)
+}
+
+// 注册 WebSocket 消息监听器
+const registerWebSocketListener = () => {
+  notificationWS.on('notification', handleNewNotification)
+  log('已注册 WebSocket 通知监听器')
+}
+
+// 组件挂载时加载数据并注册监听器
 onMounted(() => {
   loadTrendingProjects()
   loadNotifications()
+  registerWebSocketListener()
 })
 
 </script>

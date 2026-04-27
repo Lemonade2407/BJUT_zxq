@@ -19,6 +19,11 @@ public class Tag {
     private String name;
     
     /**
+     * 标签分组：技术栈、领域、其他
+     */
+    private String category;
+    
+    /**
      * 使用次数
      */
     private Integer usageCount;

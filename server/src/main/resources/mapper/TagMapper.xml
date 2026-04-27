@@ -6,13 +6,14 @@
     <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.Tag">
         <id column="id" property="id"/>
         <result column="name" property="name"/>
+        <result column="category" property="category"/>
         <result column="usage_count" property="usageCount"/>
     </resultMap>
     
     <!-- 插入标签 -->
     <insert id="insert" parameterType="com.bjutzxq.pojo.Tag" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO tag (name, usage_count)
-        VALUES (#{name}, #{usageCount})
+        INSERT INTO tag (name, category, usage_count)
+        VALUES (#{name}, #{category}, #{usageCount})
     </insert>
     
     <!-- 删除标签 -->
@@ -26,6 +27,9 @@
         <set>
             <if test="name != null and name != ''">
                 name = #{name},
+            </if>
+            <if test="category != null">
+                category = #{category},
             </if>
             <if test="usageCount != null">
                 usage_count = #{usageCount},
@@ -41,7 +45,12 @@
     
     <!-- 查询所有标签 -->
     <select id="selectAll" resultMap="BaseResultMap">
-        SELECT * FROM tag ORDER BY usage_count DESC, id ASC
+        SELECT * FROM tag ORDER BY category ASC, usage_count DESC, id ASC
+    </select>
+    
+    <!-- 根据分组查询标签 -->
+    <select id="selectByCategory" resultMap="BaseResultMap">
+        SELECT * FROM tag WHERE category = #{category} ORDER BY usage_count DESC, id ASC
     </select>
     
     <!-- 根据名称查询标签（模糊查询） -->

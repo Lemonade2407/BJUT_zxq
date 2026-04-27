@@ -170,6 +170,19 @@ public class TagService {
     }
     
     /**
+     * 根据分组查询标签
+     * @param category 标签分组（技术栈、领域、其他）
+     * @return 标签列表
+     */
+    public List<Tag> getTagsByCategory(String category) {
+        log.debug("按分组查询标签，分组：{}", category);
+        if (category == null || category.trim().isEmpty()) {
+            throw new IllegalArgumentException("标签分组不能为空");
+        }
+        return tagMapper.selectByCategory(category.trim());
+    }
+    
+    /**
      * 根据名称搜索标签
      * @param name 标签名称
      * @return 标签列表

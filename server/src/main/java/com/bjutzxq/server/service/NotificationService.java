@@ -29,6 +29,9 @@ public class NotificationService {
     @Autowired
     private UserMapper userMapper;
     
+    @Autowired
+    private com.bjutzxq.server.handler.NotificationWebSocketHandler webSocketHandler;
+    
     /**
      * 通知类型常量
      */
@@ -81,6 +84,14 @@ public class NotificationService {
         notificationMapper.insert(notification);
         
         log.info("通知创建成功，ID: {}", notification.getId());
+        
+        // 通过 WebSocket 实时推送通知
+        try {
+            pushNotificationViaWebSocket(notification);
+        } catch (Exception e) {
+            // WebSocket 推送失败不应影响通知创建
+            log.error("WebSocket 推送通知失败，但不影响通知创建", e);
+        }
         
         return notification;
     }
@@ -337,5 +348,45 @@ public class NotificationService {
         notificationMapper.batchDelete(notificationIds);
         
         log.info("批量删除通知成功，数量：{}", notificationIds.size());
+    }
+    
+    /**
+     * 通过 WebSocket 推送通知
+     * @param notification 通知对象
+     */
+    private void pushNotificationViaWebSocket(Notification notification) {
+        if (notification.getUserId() == null) {
+            log.warn("通知接收用户 ID 为空，跳过 WebSocket 推送");
+            return;
+        }
+        
+        // 构建推送数据
+        Map<String, Object> pushData = new HashMap<>();
+        pushData.put("type", "notification");
+        pushData.put("id", notification.getId());
+        pushData.put("userId", notification.getUserId());
+        pushData.put("senderId", notification.getSenderId());
+        pushData.put("projectId", notification.getProjectId());
+        pushData.put("notificationType", notification.getType());
+        pushData.put("content", notification.getContent());
+        pushData.put("isRead", notification.getIsRead());
+        pushData.put("createdAt", notification.getCreatedAt());
+        
+        // 获取发送者信息
+        if (notification.getSenderId() != null) {
+            User sender = userMapper.selectById(notification.getSenderId());
+            if (sender != null) {
+                Map<String, Object> senderInfo = new HashMap<>();
+                senderInfo.put("id", sender.getId());
+                senderInfo.put("username", sender.getUsername());
+                senderInfo.put("avatar", sender.getAvatar());
+                pushData.put("sender", senderInfo);
+            }
+        }
+        
+        // 推送通知
+        webSocketHandler.sendNotification(notification.getUserId(), pushData);
+        
+        log.debug("已通过 WebSocket 推送通知给用户 {}", notification.getUserId());
     }
 }
