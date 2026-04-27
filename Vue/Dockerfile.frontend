@@ -10,6 +10,9 @@ COPY package*.json ./
 # 使用 ci 模式安装依赖（严格遵守 package-lock.json）
 RUN npm ci
 
+# 修复 node_modules 中可执行文件的权限
+RUN chmod -R +x node_modules/.bin
+
 # 复制所有源代码
 COPY . .
 
