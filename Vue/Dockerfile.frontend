@@ -1,9 +1,26 @@
-# 前端Dockerfile
-# 直接使用预构建的前端文件,避免 Docker 中的构建权限问题
+# 前端 Dockerfile - 多阶段构建
+# 第一阶段：使用 Node.js 构建
+FROM node:18-alpine AS builder
+
+WORKDIR /app
+
+# 复制依赖文件（利用 Docker 缓存层）
+COPY package*.json ./
+
+# 使用 ci 模式安装依赖（严格遵守 package-lock.json）
+RUN npm ci
+
+# 复制所有源代码
+COPY . .
+
+# 构建生产版本
+RUN npm run build
+
+# 第二阶段：使用 Nginx 提供静态文件服务
 FROM nginx:alpine
 
-# 复制本地已构建的 dist 文件夹
-COPY dist /usr/share/nginx/html
+# 从构建阶段复制 dist 文件夹
+COPY --from=builder /app/dist /usr/share/nginx/html
 
 # 注意: nginx.conf 由 docker-compose.yml 的 volumes 挂载,不需要在这里复制
 
@@ -14,5 +31,5 @@ EXPOSE 80
 HEALTHCHECK --interval=30s --timeout=3s --retries=3 \
   CMD curl -f http://localhost:80/ || exit 1
 
-# 启动Nginx
+# 启动 Nginx
 CMD ["nginx", "-g", "daemon off;"]

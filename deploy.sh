@@ -22,17 +22,13 @@
 #     ./deploy.sh 1        # 首次部署（强制重新构建）
 #     ./deploy.sh 2        # 快速部署（增量构建，推荐）
 #     ./deploy.sh 3        # 极速重启（不重新构建）
-#     ./deploy.sh 4        # 仅重建后端
-#     ./deploy.sh 5        # 仅重建前端
-#     ./deploy.sh 6        # 测试分支部署
-#     ./deploy.sh 7        # 生产分支部署
+#     ./deploy.sh 4        # 本地上传部署
 #
 #   方式 3: 使用别名
 #     ./deploy.sh first    # 等同于 ./deploy.sh 1
 #     ./deploy.sh fast     # 等同于 ./deploy.sh 2
 #     ./deploy.sh restart  # 等同于 ./deploy.sh 3
-#     ./deploy.sh test     # 等同于 ./deploy.sh 6
-#     ./deploy.sh prod     # 等同于 ./deploy.sh 7
+#     ./deploy.sh upload   # 等同于 ./deploy.sh 4
 #
 # 【部署模式说明】
 #   1) 首次部署
@@ -50,32 +46,10 @@
 #      - 特点：不重新构建镜像，仅重启容器
 #      - 耗时：10-30 秒
 #
-#   4) 仅重建后端
-#      - 适用场景：只修改了后端代码
-#      - 特点：只构建后端镜像，前端不变
-#      - 耗时：2-3 分钟
-#
-#   5) 仅重建前端
-#      - 适用场景：只修改了前端代码
-#      - 特点：只构建前端镜像，后端不变
-#      - 耗时：1-2 分钟
-#
-#   6) 测试分支部署 🆕
-#      - 适用场景：新功能测试验证
-#      - 特点：自动切换到 test 分支并部署
-#      - 流程：拉取 test 分支 → 构建 → 部署 → 验证
-#      - 耗时：2-4 分钟
-#
-#   7) 生产分支部署 🆕
-#      - 适用场景：正式发布到生产环境
-#      - 特点：从 test 合并到 main 或直接部署 main 分支
-#      - 流程：备份当前版本 → 切换 main 分支 → 部署 → 健康检查
-#      - 耗时：2-4 分钟
-#
-#   8) 本地上传部署 🆕
+#   4) 本地上传部署 🆕
 #      - 适用场景：从本地上传代码包部署
 #      - 特点：不拉取 Git 代码，直接使用上传的文件
-#      - 流程：解压上传文件 → 构建 → 部署
+#      - 流程：解压上传文件 → 构建前端 → 部署
 #      - 耗时：2-4 分钟
 #
 # 【前置要求】
@@ -131,11 +105,7 @@ show_menu() {
     echo -e "  ${CYAN}1) 首次部署${NC}      - 完整构建，适合第一次部署"
     echo -e "  ${CYAN}2) 快速部署${NC}      - 增量构建，适合日常更新（推荐）⭐"
     echo -e "  ${CYAN}3) 极速重启${NC}      - 不重新构建，仅重启服务"
-    echo -e "  ${CYAN}4) 仅重建后端${NC}    - 只重新构建后端服务"
-    echo -e "  ${CYAN}5) 仅重建前端${NC}    - 只重新构建前端服务"
-    echo -e "  ${CYAN}6) 测试分支部署${NC}  - 切换到 test 分支并部署 🆕"
-    echo -e "  ${CYAN}7) 生产分支部署${NC}  - 切换到 main 分支并部署 🆕"
-    echo -e "  ${CYAN}8) 本地上传部署${NC}  - 使用上传的代码包部署 🆕"
+    echo -e "  ${CYAN}4) 本地上传部署${NC}  - 使用上传的代码包部署 🆕"
     echo -e "  ${CYAN}0) 退出${NC}"
     echo ""
 }
@@ -155,7 +125,7 @@ check_config() {
             echo "  - OSS_ACCESS_KEY_ID (阿里云OSS AccessKey ID)"
             echo "  - OSS_ACCESS_KEY_SECRET (阿里云OSS AccessKey Secret)"
             echo ""
-            read -p "配置完成后按 Enter 继续..."
+            read -r -p "配置完成后按 Enter 继续..."
         else
             echo -e "${RED}✗ 未找到 .env.example${NC}"
             exit 1
@@ -170,8 +140,8 @@ check_docker() {
     echo -e "${BLUE}[2/5] 检查 Docker 环境...${NC}"
     if ! command -v docker &> /dev/null; then
         echo -e "${RED}✗ Docker 未安装${NC}"
-        read -p "是否自动安装 Docker? (y/n): " INSTALL_DOCKER
-        if [ "$INSTALL_DOCKER" = "y" ] || [ "$INSTALL_DOCKER" = "Y" ]; then
+        read -r -p "是否自动安装 Docker? (y/n): " INSTALL_DOCKER
+        if [ "${INSTALL_DOCKER}" = "y" ] || [ "${INSTALL_DOCKER}" = "Y" ]; then
             curl -fsSL https://get.docker.com | sh
             systemctl start docker
             systemctl enable docker
@@ -193,43 +163,13 @@ check_docker() {
 
 # 拉取最新代码
 pull_code() {
-    local target_branch=${1:-""}
-    
     echo -e "${BLUE}[3/5] 检查代码更新...${NC}"
     if command -v git &> /dev/null && [ -d .git ]; then
         CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "unknown")
         echo "当前分支: ${CURRENT_BRANCH}"
         
-        # 如果指定了目标分支，则切换分支
-        if [ -n "$target_branch" ] && [ "$target_branch" != "$CURRENT_BRANCH" ]; then
-            echo -e "${YELLOW}⚠ 正在切换到 $target_branch 分支...${NC}"
-            
-            # 检查是否有未提交的更改
-            if ! git diff-index --quiet HEAD --; then
-                echo -e "${RED}✗ 检测到未提交的更改${NC}"
-                read -p "是否暂存更改并继续? (y/n): " STASH_CHANGES
-                if [ "$STASH_CHANGES" = "y" ] || [ "$STASH_CHANGES" = "Y" ]; then
-                    git stash push -m "Auto-stash before deploy to $target_branch"
-                    echo -e "${GREEN}✓ 更改已暂存${NC}"
-                else
-                    echo -e "${RED}✗ 请先提交或暂存更改${NC}"
-                    exit 1
-                fi
-            fi
-            
-            # 检查目标分支是否存在
-            if ! git show-ref --verify --quiet refs/heads/$target_branch; then
-                echo -e "${YELLOW}⚠ 本地不存在 $target_branch 分支，尝试从远程获取...${NC}"
-                git fetch origin $target_branch:$target_branch 2>/dev/null || true
-            fi
-            
-            # 切换分支
-            git checkout $target_branch
-            echo -e "${GREEN}✓ 已切换到 $target_branch 分支${NC}"
-        fi
-        
-        read -p "是否拉取最新代码? (y/n, 默认y): " PULL_CODE
-        if [ "$PULL_CODE" != "n" ] && [ "$PULL_CODE" != "N" ]; then
+        read -r -p "是否拉取最新代码? (y/n, 默认y): " PULL_CODE
+        if [ "${PULL_CODE}" != "n" ] && [ "${PULL_CODE}" != "N" ]; then
             echo "正在拉取最新代码..."
             git pull
             echo -e "${GREEN}✓ 代码已更新${NC}"
@@ -238,9 +178,6 @@ pull_code() {
         fi
     else
         echo -e "${CYAN}⊘ 非 Git 仓库,跳过代码更新检查${NC}"
-        if [ -n "$target_branch" ]; then
-            echo -e "${RED}⚠ 分支部署需要 Git 仓库${NC}"
-        fi
     fi
     echo ""
 }
@@ -257,13 +194,13 @@ stop_services() {
 build_images() {
     echo -e "${BLUE}[5/5] 构建 Docker 镜像...${NC}"
     
-    if [ "$1" = "nocache" ]; then
+    if [ "${1}" = "nocache" ]; then
         echo -e "${YELLOW}⚠ 强制重新构建（不使用缓存）${NC}"
         docker compose build --no-cache
-    elif [ "$1" = "backend" ]; then
+    elif [ "${1}" = "backend" ]; then
         echo "正在构建后端..."
         docker compose build backend
-    elif [ "$1" = "frontend" ]; then
+    elif [ "${1}" = "frontend" ]; then
         echo "正在构建前端..."
         docker compose build frontend
     else
@@ -271,7 +208,7 @@ build_images() {
         echo ""
         
         # 并行构建前后端
-        echo "正在后台构建前端..."
+        echo "正在后台构建前端镜像..."
         docker compose build frontend &
         FRONTEND_PID=$!
 
@@ -280,13 +217,13 @@ build_images() {
         BACKEND_PID=$!
 
         # 等待两个构建完成
-        wait $FRONTEND_PID 2>/dev/null
+        wait "${FRONTEND_PID}" 2>/dev/null
         FRONTEND_RESULT=$?
 
-        wait $BACKEND_PID 2>/dev/null
+        wait "${BACKEND_PID}" 2>/dev/null
         BACKEND_RESULT=$?
 
-        if [ $FRONTEND_RESULT -ne 0 ] || [ $BACKEND_RESULT -ne 0 ]; then
+        if [ "${FRONTEND_RESULT}" -ne 0 ] || [ "${BACKEND_RESULT}" -ne 0 ]; then
             echo -e "${RED}✗ 镜像构建失败${NC}"
             exit 1
         fi
@@ -301,8 +238,8 @@ start_services() {
     local services=${1:-""}
     
     echo -e "${BLUE}启动服务...${NC}"
-    if [ -n "$services" ]; then
-        docker compose up -d $services
+    if [ -n "${services}" ]; then
+        docker compose up -d "${services}"
     else
         docker compose up -d
     fi
@@ -315,26 +252,26 @@ start_services() {
     WAIT_COUNT=0
     INTERVAL=3
 
-    while [ $WAIT_COUNT -lt $MAX_WAIT ]; do
-        if [ -z "$services" ]; then
+    while [ "${WAIT_COUNT}" -lt "${MAX_WAIT}" ]; do
+        if [ -z "${services}" ]; then
             # 检查所有服务
             HEALTHY_COUNT=$(docker compose ps --format json 2>/dev/null | grep -c '"healthy"' || true)
-            if [ "$HEALTHY_COUNT" -ge 3 ] 2>/dev/null; then
+            if [ "${HEALTHY_COUNT}" -ge 3 ] 2>/dev/null; then
                 echo -e "\n${GREEN}✓ 所有服务已就绪!${NC}"
                 break
             fi
         else
             # 检查指定服务
             ALL_HEALTHY=true
-            for service in $services; do
-                STATUS=$(docker compose ps --format json $service 2>/dev/null | grep -o '"healthy"\|"unhealthy"\|"starting"' | head -1)
-                if [ "$STATUS" != '"healthy"' ]; then
+            for service in ${services}; do
+                STATUS=$(docker compose ps --format json "${service}" 2>/dev/null | grep -o '"healthy"\|"unhealthy"\|"starting"' | head -1)
+                if [ "${STATUS}" != '"healthy"' ]; then
                     ALL_HEALTHY=false
                     break
                 fi
             done
             
-            if [ "$ALL_HEALTHY" = true ]; then
+            if [ "${ALL_HEALTHY}" = true ]; then
                 echo -e "\n${GREEN}✓ 服务已就绪!${NC}"
                 break
             fi
@@ -345,11 +282,11 @@ start_services() {
             echo -n "."
         fi
         
-        sleep $INTERVAL
+        sleep "${INTERVAL}"
         WAIT_COUNT=$((WAIT_COUNT + INTERVAL))
     done
 
-    if [ $WAIT_COUNT -ge $MAX_WAIT ]; then
+    if [ "${WAIT_COUNT}" -ge "${MAX_WAIT}" ]; then
         echo -e "\n${YELLOW}⚠ 等待超时，请手动检查服务状态${NC}"
     fi
     
@@ -364,7 +301,7 @@ restart_services() {
     echo "3) 后端 + 前端"
     echo "4) 全部服务"
     echo ""
-    read -p "请输入选项 (1-4, 默认1): " CHOICE
+    read -r -p "请输入选项 (1-4, 默认1): " CHOICE
 
     case ${CHOICE:-1} in
         1) SERVICES="backend" ;;
@@ -377,13 +314,13 @@ restart_services() {
     echo ""
     
     # 检查服务是否运行
-    if [ -n "$SERVICES" ]; then
-        if ! docker compose ps --quiet $SERVICES 2>/dev/null | grep -q .; then
+    if [ -n "${SERVICES}" ]; then
+        if ! docker compose ps --quiet "${SERVICES}" 2>/dev/null | grep -q .; then
             echo -e "${YELLOW}⚠ 服务未运行,正在启动...${NC}"
-            docker compose up -d $SERVICES
+            docker compose up -d "${SERVICES}"
         else
-            echo -e "${BLUE}正在重启服务: $SERVICES${NC}"
-            docker compose restart $SERVICES
+            echo -e "${BLUE}正在重启服务: ${SERVICES}${NC}"
+            docker compose restart "${SERVICES}"
         fi
     else
         echo -e "${BLUE}正在重启所有服务...${NC}"
@@ -392,28 +329,6 @@ restart_services() {
 
     echo ""
     start_services "$SERVICES"
-}
-
-# 备份当前版本（用于回滚）
-backup_current_version() {
-    echo -e "${BLUE}备份当前版本...${NC}"
-    BACKUP_DIR="backups/$(date +%Y%m%d_%H%M%S)"
-    mkdir -p "$BACKUP_DIR"
-    
-    # 备份 Docker 镜像标签
-    docker images --format "{{.Repository}}:{{.Tag}}" | grep bjut-zxq > "$BACKUP_DIR/images.txt" 2>/dev/null || true
-    
-    # 备份当前 Git commit
-    if command -v git &> /dev/null && [ -d .git ]; then
-        git rev-parse HEAD > "$BACKUP_DIR/git_commit.txt" 2>/dev/null || true
-        git branch --show-current > "$BACKUP_DIR/git_branch.txt" 2>/dev/null || true
-    fi
-    
-    # 备份配置文件
-    cp .env "$BACKUP_DIR/.env.backup" 2>/dev/null || true
-    
-    echo -e "${GREEN}✓ 版本已备份到: $BACKUP_DIR${NC}"
-    echo ""
 }
 
 # 显示部署结果
@@ -447,6 +362,11 @@ show_result() {
     echo -e "   前端: ${GREEN}http://${SERVER_IP}${NC}"
     echo -e "   后端: ${GREEN}http://${SERVER_IP}/api${NC}"
     echo ""
+    echo -e "${YELLOW}⚠️  如果前端未更新，请尝试:${NC}"
+    echo -e "   1. 强制刷新浏览器: ${CYAN}Ctrl + Shift + R (Windows) 或 Cmd + Shift + R (Mac)${NC}"
+    echo -e "   2. 清除浏览器缓存后重新访问"
+    echo -e "   3. 使用无痕模式访问测试"
+    echo ""
     echo -e "${BLUE}📝 常用命令:${NC}"
     echo -e "   查看日志:     ${CYAN}docker compose logs -f${NC}"
     echo -e "   查看后端日志: ${CYAN}docker compose logs -f backend${NC}"
@@ -475,10 +395,10 @@ main() {
     else
         # 显示菜单并获取用户选择
         show_menu
-        read -p "请输入选项 (0-5): " MODE
+        read -r -p "请输入选项 (0-4): " MODE
     fi
 
-    case $MODE in
+    case "${MODE}" in
         1|first)
             echo -e "${BOLD}🚀 模式: 首次部署${NC}"
             echo ""
@@ -510,61 +430,7 @@ main() {
             show_result
             ;;
         
-        4|backend)
-            echo -e "${BOLD}🔧 模式: 仅重建后端${NC}"
-            echo ""
-            check_config
-            check_docker
-            pull_code
-            build_images "backend"
-            docker compose up -d backend
-            start_services "backend"
-            show_result
-            ;;
-        
-        5|frontend)
-            echo -e "${BOLD}🎨 模式: 仅重建前端${NC}"
-            echo ""
-            check_config
-            check_docker
-            pull_code
-            build_images "frontend"
-            docker compose up -d frontend
-            start_services "frontend"
-            show_result
-            ;;
-        
-        6|test)
-            echo -e "${BOLD}🧪 模式: 测试分支部署${NC}"
-            echo ""
-            check_config
-            check_docker
-            pull_code "test"
-            stop_services
-            build_images "incremental"
-            start_services
-            show_result
-            echo -e "${YELLOW}⚠️  提示: 测试完成后，请记得合并到 main 分支${NC}"
-            ;;
-        
-        7|prod)
-            echo -e "${BOLD}🚀 模式: 生产分支部署${NC}"
-            echo ""
-            check_config
-            check_docker
-            
-            # 生产部署前备份
-            backup_current_version
-            
-            pull_code "main"
-            stop_services
-            build_images "incremental"
-            start_services
-            show_result
-            echo -e "${GREEN}✅ 生产环境部署成功！${NC}"
-            ;;
-        
-        8|upload)
+        4|upload)
             echo -e "${BOLD}📦 模式: 本地上传部署${NC}"
             echo ""
             check_config
