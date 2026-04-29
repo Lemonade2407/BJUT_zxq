@@ -84,13 +84,25 @@ public class AuthController {
             User user = new User();
             user.setUsername(request.getUsername());
             user.setPassword(request.getPassword());
-            user.setStudentId(request.getStudentId());
+            user.setEmployeeId(request.getEmployeeId());
             user.setRealName(request.getRealName());
             user.setClassName(request.getClassName());
             user.setEmail(request.getEmail());
             user.setPhone(request.getPhone());
             user.setSex(request.getSex());
             user.setBio(request.getBio());
+            
+            // 6. 设置角色（默认为学生）
+            if (request.getRole() != null && !request.getRole().trim().isEmpty()) {
+                try {
+                    user.setRole(com.bjutzxq.common.Role.valueOf(request.getRole().toUpperCase()));
+                } catch (IllegalArgumentException e) {
+                    log.warn("无效的角色：{}，使用默认角色 USER", request.getRole());
+                    user.setRole(com.bjutzxq.common.Role.USER);
+                }
+            } else {
+                user.setRole(com.bjutzxq.common.Role.USER);
+            }
             
             // 6. 调用服务层注册
             User registeredUser = userService.register(user);

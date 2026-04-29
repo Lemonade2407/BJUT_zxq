@@ -25,11 +25,11 @@ public interface UserMapper {
     User selectByEmail(@Param("email") String email);
     
     /**
-     * 根据学号查询用户
-     * @param studentId 学号
+     * 根据身份标识号查询用户（学生为学号，教师为职工号）
+     * @param employeeId 身份标识号
      * @return 用户对象
      */
-    User selectByStudentId(@Param("studentId") String studentId);
+    User selectByEmployeeId(@Param("employeeId") String employeeId);
     
     /**
      * 根据 ID 查询用户

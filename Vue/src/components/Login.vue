@@ -30,7 +30,7 @@ const errorMessage = ref('')
 // 验证用户名
 const validateUsername = () => {
   if (!loginForm.username) {
-    errors.username = '请输入用户名/学号/邮箱'
+    errors.username = '请输入用户名/邮箱/身份标识号'
     return false
   }
   errors.username = ''
@@ -156,7 +156,7 @@ const goToRegister = () => {
             type="text"
             class="form-input"
             :class="{ error: errors.username }"
-            placeholder="请输入用户名"
+            placeholder="请输入用户名/邮箱/身份标识号"
             @blur="validateUsername"
             @input="clearError('username')"
           />

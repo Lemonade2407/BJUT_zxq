@@ -64,15 +64,15 @@ public class UserService {
             throw new RuntimeException("用户名已存在");
         }
         
-        // 3. 检查学号是否已存在
-        if (user.getStudentId() == null || user.getStudentId().trim().isEmpty()) {
-            log.warn("注册失败：学号为空");
-            throw new RuntimeException("学号不能为空");
+        // 3. 检查身份标识号是否已存在（学生为学号，教师为职工号）
+        if (user.getEmployeeId() == null || user.getEmployeeId().trim().isEmpty()) {
+            log.warn("注册失败：身份标识号为空");
+            throw new RuntimeException("身份标识号不能为空");
         }
-        existingUser = userMapper.selectByStudentId(user.getStudentId().trim());
+        existingUser = userMapper.selectByEmployeeId(user.getEmployeeId().trim());
         if (existingUser != null) {
-            log.warn("学号已被使用：{}", user.getStudentId());
-            throw new RuntimeException("学号已被使用");
+            log.warn("身份标识号已被使用：{}", user.getEmployeeId());
+            throw new RuntimeException("身份标识号已被使用");
         }
         
         // 4. 检查邮箱是否已存在
@@ -93,6 +93,7 @@ public class UserService {
         if (user.getSex() == null || user.getSex().isEmpty()) {
             user.setSex(Constants.User.SEX_UNKNOWN);
         }
+        // 设置默认角色为学生
         if (user.getRole() == null) {
             user.setRole(Role.USER);
         }
@@ -137,13 +138,22 @@ public class UserService {
             throw new IllegalArgumentException("密码必须包含字母和数字");
         }
         
-        // 验证学号
-        if (user.getStudentId() == null || user.getStudentId().trim().isEmpty()) {
-            throw new IllegalArgumentException("学号不能为空");
+        // 验证身份标识号（学生为学号，教师为职工号）
+        if (user.getEmployeeId() == null || user.getEmployeeId().trim().isEmpty()) {
+            throw new IllegalArgumentException("身份标识号不能为空");
         }
-        // 学号格式：8位数字 或 1位字母+8位数字
-        if (!user.getStudentId().matches("^([A-Za-z]?\\d{8})$")) {
-            throw new IllegalArgumentException("学号格式不正确");
+        
+        // 根据角色验证不同格式
+        if (user.getRole() == Role.TEACHER) {
+            // 教师职工号：5位数字
+            if (!user.getEmployeeId().matches("^\\d{5}$")) {
+                throw new IllegalArgumentException("教师职工号格式不正确");
+            }
+        } else {
+            // 学生学号：8位数字 或 1位字母(S或B)+8位数字
+            if (!user.getEmployeeId().matches("^(S|B)?\\d{8}$")) {
+                throw new IllegalArgumentException("学生学号格式不正确");
+            }
         }
         
         // 验证邮箱
@@ -178,7 +188,7 @@ public class UserService {
             user = userMapper.selectByEmail(username);
         }
         if (user == null) {
-            user = userMapper.selectByStudentId(username);
+            user = userMapper.selectByEmployeeId(username);
         }
         
         if (user == null) {

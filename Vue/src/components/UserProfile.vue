@@ -12,13 +12,14 @@ const router = useRouter()
 const userInfo = ref({
   id: null,
   username: '',
-  studentId: '',
+  employeeId: '', // 身份标识号（学生为学号，教师为职工号）
   email: '',
   phone: '',
   sex: '',
   bio: '',
   avatar: '',
-  role: ''
+  role: '',
+  className: '' // 班级（仅学生）
 })
 
 // 编辑模式
@@ -290,6 +291,16 @@ onMounted(() => {
               class="info-input"
             />
             <div v-else class="info-value">{{ userInfo.username }}</div>
+          </div>
+
+          <div class="info-item">
+            <label>{{ userInfo.role === 'TEACHER' ? '职工号' : '学号' }}</label>
+            <div class="info-value">{{ userInfo.employeeId || '未设置' }}</div>
+          </div>
+
+          <div v-if="userInfo.role === 'USER'" class="info-item">
+            <label>班级</label>
+            <div class="info-value">{{ userInfo.className || '未设置' }}</div>
           </div>
 
           <div class="info-item">

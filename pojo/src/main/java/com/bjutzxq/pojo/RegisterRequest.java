@@ -24,9 +24,14 @@ public class RegisterRequest {
     private String confirmPassword;
     
     /**
-     * 学号
+     * 身份标识号（学生为学号，教师为职工号）
      */
-    private String studentId;
+    private String employeeId;
+    
+    /**
+     * 用户角色（USER-学生, TEACHER-教师）
+     */
+    private String role;
     
     /**
      * 真实姓名

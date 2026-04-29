@@ -15,21 +15,21 @@ CREATE TABLE IF NOT EXISTS `user` (
   `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '用户ID',
   `username` VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
   `password` VARCHAR(255) NOT NULL COMMENT '密码(BCrypt加密)',
-  `student_id` VARCHAR(20) COMMENT '学号',
+  `employee_id` VARCHAR(20) COMMENT '身份标识号（学生为学号，教师为职工号）',
   `real_name` VARCHAR(50) COMMENT '真实姓名',
-  `class_name` VARCHAR(100) COMMENT '班级',
+  `class_name` VARCHAR(100) COMMENT '班级（仅学生需要填写）',
   `email` VARCHAR(100) COMMENT '邮箱',
   `avatar` TEXT COMMENT '头像URL或Base64数据',
   `phone` VARCHAR(20) COMMENT '手机号',
   `sex` VARCHAR(10) DEFAULT 'U' COMMENT '性别: U-未知, M-男, F-女',
   `bio` TEXT COMMENT '个人简介',
-  `role` VARCHAR(20) DEFAULT 'USER' COMMENT '角色: USER, ADMIN',
+  `role` VARCHAR(20) DEFAULT 'USER' COMMENT '角色: USER-学生, TEACHER-教师, ADMIN-管理员',
   `status` TINYINT DEFAULT 1 COMMENT '状态: 0-禁用, 1-正常',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   INDEX idx_username (`username`),
   INDEX idx_email (`email`),
-  INDEX idx_student_id (`student_id`)
+  INDEX idx_employee_id (`employee_id`)
 ) ENGINE=InnoDB COMMENT='用户表';
 
 -- ===========================================

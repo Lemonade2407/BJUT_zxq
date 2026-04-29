@@ -25,9 +25,9 @@ public class User {
     private String password;
     
     /**
-     * 学号
+     * 身份标识号（学生为学号，教师为职工号）
      */
-    private String studentId;
+    private String employeeId;
     
     /**
      * 真实姓名

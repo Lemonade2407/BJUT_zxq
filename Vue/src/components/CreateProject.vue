@@ -21,11 +21,11 @@ const form = ref({
 
 // 项目类型选项
 const projectTypeOptions = [
-  { value: 'COURSE', label: '课程设计', icon: '📚' },
-  { value: 'THESIS', label: '毕业设计', icon: '🎓' },
-  { value: 'COMPETITION', label: '竞赛作品', icon: '🏆' },
-  { value: 'PERSONAL', label: '个人项目', icon: '💼' },
-  { value: 'OTHER', label: '其他', icon: '📌' }
+  { value: 'COURSE', label: '课程设计' },
+  { value: 'THESIS', label: '毕业设计' },
+  { value: 'COMPETITION', label: '竞赛作品' },
+  { value: 'PERSONAL', label: '个人项目' },
+  { value: 'OTHER', label: '其他' }
 ]
 
 // 课程列表
@@ -609,7 +609,6 @@ onMounted(() => {
                 :class="['type-option', { selected: form.projectType === option.value }]"
                 @click="form.projectType = option.value"
               >
-                <span class="type-icon">{{ option.icon }}</span>
                 <span class="type-label">{{ option.label }}</span>
               </div>
             </div>
@@ -740,7 +739,6 @@ onMounted(() => {
                 @click="form.visibility = option.value"
               >
                 <div class="option-header">
-                  <span class="option-icon">{{ option.value === 1 ? '🌍' : '🔒' }}</span>
                   <span class="option-label">{{ option.label }}</span>
                 </div>
                 <p class="option-description">{{ option.description }}</p>
@@ -1087,10 +1085,6 @@ onMounted(() => {
   box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
 }
 
-.type-icon {
-  font-size: 32px;
-}
-
 .type-label {
   font-size: 14px;
   font-weight: 600;
@@ -1178,14 +1172,7 @@ onMounted(() => {
 }
 
 .option-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
   margin-bottom: 8px;
-}
-
-.option-icon {
-  font-size: 20px;
 }
 
 .option-label {

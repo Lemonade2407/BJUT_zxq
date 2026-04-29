@@ -11,13 +11,14 @@ const registerForm = reactive({
   username: '',
   password: '',
   confirmPassword: '',
-  studentId: '',
+  employeeId: '', // 身份标识号（学生为学号，教师为职工号）
   realName: '',
   className: '',
   email: '',
   phone: '',
   sex: '未知',
   bio: '',
+  role: 'USER', // 默认是学生
   captchaCode: '',
   captchaSessionId: ''
 })
@@ -27,7 +28,7 @@ const errors = reactive({
   username: '',
   password: '',
   confirmPassword: '',
-  studentId: '',
+  employeeId: '',
   realName: '',
   className: '',
   email: '',
@@ -150,18 +151,28 @@ const validateConfirmPassword = () => {
   return true
 }
 
-// 验证学号
-const validateStudentId = () => {
-  if (!registerForm.studentId) {
-    errors.studentId = '学号不能为空'
+// 验证身份标识号（学生为学号，教师为职工号）
+const validateEmployeeId = () => {
+  if (!registerForm.employeeId) {
+    errors.employeeId = registerForm.role === 'TEACHER' ? '职工号不能为空' : '学号不能为空'
     return false
   }
-  // 学号格式：8位数字 或 1位字母+8位数字
-  if (!/^([A-Za-z]?\d{8})$/.test(registerForm.studentId)) {
-    errors.studentId = '学号格式不正确，应为8位数字或1位字母+8位数字'
-    return false
+  
+  // 学生学号：8位数字 或 1位字母(S或B)+8位数字
+  if (registerForm.role === 'USER') {
+    if (!/^(S|B)?\d{8}$/.test(registerForm.employeeId)) {
+      errors.employeeId = '学号格式不正确，应为8位数字或S/B+8位数字'
+      return false
+    }
+  } else {
+    // 教师职工号：5位数字
+    if (!/^\d{5}$/.test(registerForm.employeeId)) {
+      errors.employeeId = '职工号格式不正确，应为5位数字'
+      return false
+    }
   }
-  errors.studentId = ''
+  
+  errors.employeeId = ''
   return true
 }
 
@@ -181,13 +192,16 @@ const validateRealName = () => {
 
 // 验证班级
 const validateClassName = () => {
-  if (!registerForm.className) {
-    errors.className = '班级不能为空'
-    return false
-  }
-  if (registerForm.className.length < 2 || registerForm.className.length > 50) {
-    errors.className = '班级名称长度应为 2-50 位'
-    return false
+  // 仅学生需要填写班级
+  if (registerForm.role === 'USER') {
+    if (!registerForm.className) {
+      errors.className = '班级不能为空'
+      return false
+    }
+    if (registerForm.className.length < 2 || registerForm.className.length > 50) {
+      errors.className = '班级名称长度应为 2-50 位'
+      return false
+    }
   }
   errors.className = ''
   return true
@@ -241,7 +255,7 @@ const handleRegister = async () => {
     validateUsername(),
     validatePassword(),
     validateConfirmPassword(),
-    validateStudentId(),
+    validateEmployeeId(),
     validateRealName(),
     validateClassName(),
     validateEmail(),
@@ -263,13 +277,14 @@ const handleRegister = async () => {
       username: registerForm.username.trim(),
       password: registerForm.password,
       confirmPassword: registerForm.confirmPassword,
-      studentId: registerForm.studentId.trim(),
+      employeeId: registerForm.employeeId.trim(),
       realName: registerForm.realName.trim(),
-      className: registerForm.className.trim(),
+      className: registerForm.role === 'USER' ? registerForm.className.trim() : null,
       email: registerForm.email.trim(),
       phone: registerForm.phone?.trim() || null,
       sex: registerForm.sex,
       bio: registerForm.bio?.trim() || null,
+      role: registerForm.role,
       captchaSessionId: registerForm.captchaSessionId,
       captchaCode: registerForm.captchaCode
     })
@@ -345,6 +360,25 @@ const getStrengthColor = (level) => {
 
       <!-- 注册表单 -->
       <form @submit.prevent="handleRegister" class="register-form">
+        <!-- 身份选择 -->
+        <div class="form-group">
+          <label class="form-label">身份类型 *</label>
+          <div class="role-selector">
+            <div 
+              :class="['role-option', { selected: registerForm.role === 'USER' }]"
+              @click="registerForm.role = 'USER'"
+            >
+              <span class="role-label">学生</span>
+            </div>
+            <div 
+              :class="['role-option', { selected: registerForm.role === 'TEACHER' }]"
+              @click="registerForm.role = 'TEACHER'"
+            >
+              <span class="role-label">教师</span>
+            </div>
+          </div>
+        </div>
+
         <!-- 用户名 -->
         <div class="form-group">
           <label for="username" class="form-label">用户名 *</label>
@@ -361,20 +395,22 @@ const getStrengthColor = (level) => {
           <span v-if="errors.username" class="error-message">{{ errors.username }}</span>
         </div>
 
-        <!-- 学号 -->
+        <!-- 身份标识号（学生为学号，教师为职工号） -->
         <div class="form-group">
-          <label for="studentId" class="form-label">学号 *</label>
+          <label for="employeeId" class="form-label">
+            {{ registerForm.role === 'TEACHER' ? '职工号' : '学号' }} *
+          </label>
           <input
-            id="studentId"
-            v-model="registerForm.studentId"
+            id="employeeId"
+            v-model="registerForm.employeeId"
             type="text"
             class="form-input"
-            :class="{ error: errors.studentId }"
-            placeholder="例如：20230101 或 B20230101"
-            @blur="validateStudentId"
-            @input="clearError('studentId')"
+            :class="{ error: errors.employeeId }"
+            :placeholder="registerForm.role === 'TEACHER' ? '例如：12345' : '例如：20230101 或 S20230101'"
+            @blur="validateEmployeeId"
+            @input="clearError('employeeId')"
           />
-          <span v-if="errors.studentId" class="error-message">{{ errors.studentId }}</span>
+          <span v-if="errors.employeeId" class="error-message">{{ errors.employeeId }}</span>
         </div>
 
         <!-- 真实姓名 -->
@@ -393,8 +429,8 @@ const getStrengthColor = (level) => {
           <span v-if="errors.realName" class="error-message">{{ errors.realName }}</span>
         </div>
 
-        <!-- 班级 -->
-        <div class="form-group">
+        <!-- 班级（仅学生需要填写） -->
+        <div v-if="registerForm.role === 'USER'" class="form-group">
           <label for="className" class="form-label">班级 *</label>
           <input
             id="className"
@@ -402,7 +438,7 @@ const getStrengthColor = (level) => {
             type="text"
             class="form-input"
             :class="{ error: errors.className }"
-            placeholder="例如：软件工程2301班"
+            placeholder="例如：240802"
             @blur="validateClassName"
             @input="clearError('className')"
           />
@@ -664,6 +700,47 @@ const getStrengthColor = (level) => {
   font-size: 14px;
   font-weight: 500;
   color: #333333;
+}
+
+/* 身份选择器 */
+.role-selector {
+  display: flex;
+  gap: 12px;
+}
+
+.role-option {
+  flex: 1;
+  padding: 10px 16px;
+  background-color: #ffffff;
+  border: 2px solid #d9d9d9;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.role-option:hover {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.02);
+}
+
+.role-option.selected {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.05);
+}
+
+.role-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #333333;
+}
+
+.role-option.selected .role-label {
+  color: #059669;
+  font-weight: 600;
 }
 
 .form-input {
