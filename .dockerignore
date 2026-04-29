@@ -31,6 +31,11 @@ yarn-error.log*
 .env.local
 .env.*.local
 
+# SSL Certificates (敏感文件，不要提交)
+ssl/*.pem
+ssl/*.key
+ssl/*.crt
+
 # Docker
 docker-compose.override.yml
 
