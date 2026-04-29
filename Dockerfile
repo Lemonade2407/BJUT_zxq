@@ -17,8 +17,8 @@ COPY common/src common/src
 COPY pojo/src pojo/src
 COPY server/src server/src
 
-# 编译打包（跳过测试加快速度）
-RUN mvn clean package -DskipTests -pl server -am
+# 编译打包（完全跳过测试编译和执行为加快速度）
+RUN mvn clean package -Dmaven.test.skip=true -pl server -am
 
 # 运行阶段
 FROM eclipse-temurin:21-jre-alpine
