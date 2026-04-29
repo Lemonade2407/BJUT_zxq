@@ -247,7 +247,7 @@ const goToRegister = () => {
   align-items: center;
   min-height: 100vh;
   height: 100%;
-  background: linear-gradient(135deg, #003366 0%, #004080 50%, #0059b3 100%);
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
   padding: 20px;
   position: fixed;
   top: 0;
@@ -260,7 +260,7 @@ const goToRegister = () => {
 .login-box {
   background: #ffffff;
   border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 51, 102, 0.3);
+  box-shadow: 0 8px 32px rgba(6, 78, 59, 0.3);
   padding: 40px;
   width: 100%;
   max-width: 420px;
@@ -292,7 +292,7 @@ const goToRegister = () => {
 .login-title {
   font-size: 28px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
   margin: 0 0 8px 0;
 }
 
@@ -341,8 +341,8 @@ const goToRegister = () => {
 }
 
 .form-input:focus {
-  border-color: #0059b3;
-  box-shadow: 0 0 0 3px rgba(0, 89, 179, 0.1);
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
 .form-input.error {
@@ -377,7 +377,7 @@ const goToRegister = () => {
 }
 
 .password-toggle:hover svg {
-  fill: #0059b3;
+  fill: #10b981;
 }
 
 .error-message {
@@ -407,7 +407,7 @@ const goToRegister = () => {
   width: 16px;
   height: 16px;
   cursor: pointer;
-  accent-color: #0059b3;
+  accent-color: #10b981;
 }
 
 .checkbox-text {
@@ -416,13 +416,13 @@ const goToRegister = () => {
 
 .forgot-link {
   font-size: 13px;
-  color: #0059b3;
+  color: #10b981;
   text-decoration: none;
   transition: color 0.2s;
 }
 
 .forgot-link:hover {
-  color: #003366;
+  color: #059669;
   text-decoration: underline;
 }
 
@@ -447,7 +447,7 @@ const goToRegister = () => {
 /* 登录按钮 */
 .login-button {
   padding: 14px;
-  background: linear-gradient(135deg, #0059b3 0%, #003366 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   border: none;
   border-radius: 6px;
   color: #ffffff;
@@ -455,12 +455,12 @@ const goToRegister = () => {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 89, 179, 0.3);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 .login-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #004080 0%, #003366 100%);
-  box-shadow: 0 4px 12px rgba(0, 89, 179, 0.4);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
   transform: translateY(-1px);
 }
 
@@ -508,14 +508,14 @@ const goToRegister = () => {
 }
 
 .register-link {
-  color: #0059b3;
+  color: #10b981;
   font-weight: 500;
   text-decoration: none;
   transition: color 0.2s;
 }
 
 .register-link:hover {
-  color: #003366;
+  color: #059669;
   text-decoration: underline;
 }
 

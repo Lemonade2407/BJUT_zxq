@@ -293,11 +293,6 @@ onMounted(() => {
           </div>
 
           <div class="info-item">
-            <label>学号</label>
-            <div class="info-value">{{ userInfo.studentId }}</div>
-          </div>
-
-          <div class="info-item">
             <label>邮箱</label>
             <div class="info-value">{{ userInfo.email }}</div>
           </div>
@@ -419,7 +414,7 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #003366 0%, #004080 100%);
+  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
 }
 
 .header-content {
@@ -451,7 +446,7 @@ onMounted(() => {
   right: 0;
   width: 36px;
   height: 36px;
-  background: #003366;
+  background: #064e3b;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -464,7 +459,7 @@ onMounted(() => {
 }
 
 .avatar-upload-btn:hover {
-  background: #004080;
+  background: #047857;
   transform: scale(1.1);
 }
 
@@ -528,12 +523,12 @@ onMounted(() => {
 }
 
 .edit-btn {
-  background: #003366;
+  background: #064e3b;
   color: #ffffff;
 }
 
 .edit-btn:hover {
-  background: #004080;
+  background: #047857;
 }
 
 .save-btn {
@@ -607,9 +602,9 @@ onMounted(() => {
 .info-input:focus,
 .info-select:focus,
 .info-textarea:focus {
-  border-color: #003366;
+  border-color: #064e3b;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(0, 51, 102, 0.1);
+  box-shadow: 0 0 0 2px rgba(6, 78, 59, 0.1);
 }
 
 .info-textarea {
@@ -732,9 +727,9 @@ onMounted(() => {
 }
 
 .form-input:focus {
-  border-color: #003366;
+  border-color: #064e3b;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(0, 51, 102, 0.1);
+  box-shadow: 0 0 0 2px rgba(6, 78, 59, 0.1);
 }
 
 .modal-footer {
@@ -764,12 +759,12 @@ onMounted(() => {
 }
 
 .modal-btn.confirm {
-  background: #003366;
+  background: #064e3b;
   color: #ffffff;
 }
 
 .modal-btn.confirm:hover {
-  background: #004080;
+  background: #047857;
 }
 
 @media (max-width: 768px) {

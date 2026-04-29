@@ -7,15 +7,15 @@
       <div class="footer-logo">
         <img src="/logo.svg" alt="logo" class="footer-logo" />
       </div>
-      <p class="footer-tagline">工大知享圈，分享你的项目</p>
+      <p class="footer-tagline">Plant your ideas, grow your future.</p>
     </div>
   </footer>
 </template>
 
 <style scoped>
 .app-footer {
-  background: linear-gradient(135deg, #003366 0%, #004080 100%);
-  border-top: 2px solid #0059b3;
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
+  border-top: 2px solid #10b981;
   padding: 20px 32px;
   color: #ffffff;
   width: 100%;

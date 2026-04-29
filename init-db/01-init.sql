@@ -16,6 +16,8 @@ CREATE TABLE IF NOT EXISTS `user` (
   `username` VARCHAR(50) NOT NULL UNIQUE COMMENT '用户名',
   `password` VARCHAR(255) NOT NULL COMMENT '密码(BCrypt加密)',
   `student_id` VARCHAR(20) COMMENT '学号',
+  `real_name` VARCHAR(50) COMMENT '真实姓名',
+  `class_name` VARCHAR(100) COMMENT '班级',
   `email` VARCHAR(100) COMMENT '邮箱',
   `avatar` TEXT COMMENT '头像URL或Base64数据',
   `phone` VARCHAR(20) COMMENT '手机号',
@@ -38,6 +40,9 @@ CREATE TABLE IF NOT EXISTS `project` (
   `name` VARCHAR(200) NOT NULL COMMENT '项目名称',
   `description` TEXT COMMENT '项目描述',
   `owner_id` INT NOT NULL COMMENT '所有者ID',
+  `project_type` VARCHAR(20) DEFAULT 'OTHER' COMMENT '项目类型: COURSE-课程设计, THESIS-毕业设计, COMPETITION-竞赛作品, PERSONAL-个人项目, OTHER-其他',
+  `course_name` VARCHAR(100) COMMENT '课程名称（仅当 project_type=COURSE 时有效）',
+  `thesis_type` VARCHAR(20) COMMENT '毕设类型: UNDERGRADUATE-本科, MASTER-硕士, DOCTOR-博士（仅当 project_type=THESIS 时有效）',
   `visibility` TINYINT DEFAULT 1 COMMENT '可见性: 0-私有, 1-公开',
   `star_count` INT DEFAULT 0 COMMENT '收藏数',
   `watch_count` INT DEFAULT 0 COMMENT '关注数',
@@ -49,7 +54,9 @@ CREATE TABLE IF NOT EXISTS `project` (
   FOREIGN KEY (`owner_id`) REFERENCES `user`(`id`) ON DELETE CASCADE,
   INDEX idx_owner_id (`owner_id`),
   INDEX idx_visibility (`visibility`),
-  INDEX idx_name (`name`)
+  INDEX idx_name (`name`),
+  INDEX idx_project_type (`project_type`),
+  INDEX idx_course_name (`course_name`)
 ) ENGINE=InnoDB COMMENT='项目表';
 
 -- ===========================================
@@ -241,9 +248,6 @@ ON DUPLICATE KEY UPDATE `name`=`name`;
 
 -- 插入默认标签（其他）
 INSERT INTO `tag` (`name`, `category`) VALUES
-('课程设计', '其他'),
-('毕业设计', '其他'),
-('竞赛作品', '其他'),
 ('前后端分离', '其他'),
 ('微服务', '其他'),
 ('单体应用', '其他')

@@ -62,8 +62,8 @@ onUnmounted(() => {
 <style scoped>
 .app-dashboard {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-  color: #333333;
-  background-color: #f5f7fa;
+  color: #1f2937;
+  background-color: #ecfdf5;
   min-height: 100vh;
   width: 100%;
   display: flex;

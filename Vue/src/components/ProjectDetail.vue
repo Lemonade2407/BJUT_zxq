@@ -1446,7 +1446,7 @@ onMounted(() => {
 .project-title {
   font-size: 28px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
   margin: 0;
 }
 
@@ -1479,24 +1479,24 @@ onMounted(() => {
 }
 
 .action-btn:hover {
-  border-color: #0059b3;
-  color: #0059b3;
+  border-color: #10b981;
+  color: #10b981;
 }
 
 .action-btn.active {
-  background-color: #0059b3;
-  border-color: #0059b3;
+  background-color: #10b981;
+  border-color: #10b981;
   color: #ffffff;
 }
 
 .action-btn.primary {
-  background-color: #0059b3;
-  border-color: #0059b3;
+  background-color: #10b981;
+  border-color: #10b981;
   color: #ffffff;
 }
 
 .action-btn.primary:hover {
-  background-color: #004080;
+  background-color: #059669;
 }
 
 /* 项目信息栏 */
@@ -1543,7 +1543,7 @@ onMounted(() => {
 
 .loading-spinner {
   font-size: 48px;
-  color: #0059b3;
+  color: #10b981;
   animation: spin 1s linear infinite;
   margin-bottom: 16px;
 }
@@ -1582,8 +1582,8 @@ onMounted(() => {
 }
 
 .tab-btn.active {
-  color: #0059b3;
-  border-bottom-color: #0059b3;
+  color: #10b981;
+  border-bottom-color: #10b981;
   font-weight: 500;
 }
 
@@ -1657,7 +1657,7 @@ onMounted(() => {
 
 .loading-files p {
   font-size: 14px;
-  color: #0059b3;
+  color: #10b981;
   font-weight: 500;
 }
 
@@ -1723,7 +1723,7 @@ onMounted(() => {
 
 .create-issue-btn {
   padding: 10px 24px;
-  background-color: #0059b3;
+  background-color: #10b981;
   color: #ffffff;
   border: none;
   border-radius: 6px;
@@ -1733,7 +1733,7 @@ onMounted(() => {
 }
 
 .create-issue-btn:hover {
-  background-color: #004080;
+  background-color: #059669;
 }
 
 /* 评论区域 */
@@ -1756,13 +1756,13 @@ onMounted(() => {
 
 .comment-textarea:focus {
   outline: none;
-  border-color: #0059b3;
-  box-shadow: 0 0 0 3px rgba(0, 89, 179, 0.1);
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
 .submit-comment-btn {
   padding: 10px 24px;
-  background-color: #0059b3;
+  background-color: #10b981;
   color: #ffffff;
   border: none;
   border-radius: 6px;
@@ -1772,7 +1772,7 @@ onMounted(() => {
 }
 
 .submit-comment-btn:hover {
-  background-color: #004080;
+  background-color: #059669;
 }
 
 .comments-list {
@@ -1785,7 +1785,7 @@ onMounted(() => {
   padding: 16px;
   background-color: #f9f9f9;
   border-radius: 6px;
-  border-left: 3px solid #0059b3;
+  border-left: 3px solid #10b981;
 }
 
 .comment-header {
@@ -1807,7 +1807,7 @@ onMounted(() => {
   width: 36px;
   height: 36px;
   border-radius: 50%;
-  background-color: #0059b3;
+  background-color: #10b981;
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -1881,8 +1881,8 @@ onMounted(() => {
 .form-textarea:focus,
 .form-select:focus {
   outline: none;
-  border-color: #0059b3;
-  box-shadow: 0 0 0 3px rgba(0, 89, 179, 0.1);
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
 .form-input:disabled,
@@ -1911,10 +1911,10 @@ onMounted(() => {
 
 .tag-badge {
   padding: 6px 14px;
-  background-color: rgba(0, 89, 179, 0.08);
+  background-color: rgba(16, 185, 129, 0.08);
   border-radius: 16px;
   font-size: 13px;
-  color: #0059b3;
+  color: #10b981;
   font-weight: 500;
 }
 
@@ -1926,7 +1926,7 @@ onMounted(() => {
 .category-title-small {
   font-size: 14px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
   margin: 0 0 10px 0;
   padding-bottom: 6px;
   border-bottom: 1px solid #e8e8e8;
@@ -1942,11 +1942,11 @@ onMounted(() => {
 
 .tag-item {
   padding: 7px 14px;
-  background-color: rgba(0, 89, 179, 0.08);
+  background-color: rgba(16, 185, 129, 0.08);
   border: 2px solid transparent;
   border-radius: 6px;
   font-size: 13px;
-  color: #0059b3;
+  color: #10b981;
   cursor: pointer;
   transition: all 0.2s;
   text-align: center;
@@ -1954,14 +1954,14 @@ onMounted(() => {
 }
 
 .tag-item:hover {
-  background-color: rgba(0, 89, 179, 0.15);
+  background-color: rgba(16, 185, 129, 0.15);
   transform: translateY(-1px);
 }
 
 .tag-item.selected {
-  background-color: #0059b3;
+  background-color: #10b981;
   color: #ffffff;
-  border-color: #0059b3;
+  border-color: #10b981;
   font-weight: 600;
 }
 
@@ -1970,17 +1970,17 @@ onMounted(() => {
   margin-top: 10px;
   padding: 7px 18px;
   background-color: transparent;
-  border: 1px dashed #0059b3;
+  border: 1px dashed #10b981;
   border-radius: 6px;
   font-size: 12px;
-  color: #0059b3;
+  color: #10b981;
   cursor: pointer;
   transition: all 0.2s;
   width: 100%;
 }
 
 .show-more-btn:hover {
-  background-color: rgba(0, 89, 179, 0.05);
+  background-color: rgba(16, 185, 129, 0.05);
   border-style: solid;
 }
 
@@ -2026,9 +2026,9 @@ onMounted(() => {
 }
 
 .file-input-label:hover {
-  border-color: #0059b3;
-  color: #0059b3;
-  background-color: #f0f7ff;
+  border-color: #10b981;
+  color: #10b981;
+  background-color: #ecfdf5;
 }
 
 .selected-files-list {
@@ -2129,7 +2129,7 @@ onMounted(() => {
 
 .progress-fill {
   height: 100%;
-  background-color: #0059b3;
+  background-color: #10b981;
   transition: width 0.3s ease;
 }
 
@@ -2168,12 +2168,12 @@ onMounted(() => {
 }
 
 .btn-primary {
-  background-color: #0059b3;
+  background-color: #10b981;
   color: #ffffff;
 }
 
 .btn-primary:hover {
-  background-color: #004080;
+  background-color: #059669;
 }
 
 .btn-secondary {
@@ -2243,10 +2243,10 @@ onMounted(() => {
 }
 
 .upload-area:hover {
-  border-color: #0059b3;
-  background: linear-gradient(135deg, #f0f7ff 0%, #e8f4ff 100%);
+  border-color: #10b981;
+  background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 89, 179, 0.1);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.1);
 }
 
 .upload-area:hover::before {
@@ -2349,7 +2349,7 @@ onMounted(() => {
 }
 
 .folder-item .file-name {
-  color: #0059b3;
+  color: #10b981;
   font-weight: 600;
 }
 
@@ -2435,12 +2435,12 @@ onMounted(() => {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #0059b3, #0077cc, #0088ff);
+  background: linear-gradient(90deg, #10b981, #34d399, #6ee7b7);
   background-size: 200% 100%;
   animation: progressShine 2s ease-in-out infinite;
   transition: width 0.3s ease;
   border-radius: 4px;
-  box-shadow: 0 0 10px rgba(0, 89, 179, 0.3);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
 }
 
 @keyframes progressShine {
@@ -2454,7 +2454,7 @@ onMounted(() => {
 
 .progress-text {
   font-size: 13px;
-  color: #0059b3;
+  color: #10b981;
   font-weight: 600;
   text-align: center;
   letter-spacing: 0.3px;

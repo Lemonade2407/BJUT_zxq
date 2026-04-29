@@ -8,6 +8,8 @@
         <result column="username" property="username"/>
         <result column="password" property="password"/>
         <result column="student_id" property="studentId"/>
+        <result column="real_name" property="realName"/>
+        <result column="class_name" property="className"/>
         <result column="email" property="email"/>
         <result column="avatar" property="avatar"/>
         <result column="phone" property="phone"/>
@@ -22,7 +24,7 @@
     
     <!-- 基础列 -->
     <sql id="Base_Column_List">
-        id, username, password, student_id, email, avatar, phone, sex, bio, created_at, updated_at, status, role
+        id, username, password, student_id, real_name, class_name, email, avatar, phone, sex, bio, created_at, updated_at, status, role
     </sql>
     
     <!-- 根据用户名查询 -->
@@ -63,6 +65,8 @@
             username,
             password,
             student_id,
+            real_name,
+            class_name,
             email,
             avatar,
             phone,
@@ -74,6 +78,8 @@
             #{username},
             #{password},
             #{studentId},
+            #{realName},
+            #{className},
             #{email},
             #{avatar},
             #{phone},
@@ -90,6 +96,8 @@
         <set>
             <if test="username != null">username = #{username},</if>
             <if test="password != null">password = #{password},</if>
+            <if test="realName != null">real_name = #{realName},</if>
+            <if test="className != null">class_name = #{className},</if>
             <if test="email != null">email = #{email},</if>
             <if test="avatar != null">avatar = #{avatar},</if>
             <if test="phone != null">phone = #{phone},</if>

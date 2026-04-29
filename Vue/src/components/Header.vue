@@ -88,6 +88,10 @@ onMounted(() => {
     <div class="header-container">
       <div class="header-left">
         <img src="/logo.svg" alt="logo" class="app-logo" />
+        <div class="site-info">
+          <h1 class="site-name">ProjecTree知享圈</h1>
+          <p class="site-slogan">Plant your ideas, grow your future.</p>
+        </div>
         <!-- 导航菜单 -->
         <nav class="header-nav">
           <a 
@@ -144,16 +148,16 @@ onMounted(() => {
 
 <style scoped>
 .app-header {
-  background: linear-gradient(135deg, #003366 0%, #004080 100%);
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
   padding: 12px;
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 100;
-  border-bottom: 2px solid #0059b3;
+  border-bottom: 2px solid #10b981;
   width: 100%;
-  box-shadow: 0 2px 8px rgba(0, 51, 102, 0.2);
+  box-shadow: 0 2px 12px rgba(6, 78, 59, 0.3);
 }
 
 .header-container {
@@ -182,6 +186,28 @@ onMounted(() => {
   opacity: 0.9;
 }
 
+.site-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.site-name {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+.site-slogan {
+  margin: 0;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.7);
+  font-style: italic;
+  letter-spacing: 0.3px;
+}
+
 .header-nav {
   display: flex;
   gap: 4px;
@@ -201,7 +227,7 @@ onMounted(() => {
 }
 
 .nav-item:hover {
-  background-color: rgba(255, 255, 255, 0.15);
+  background-color: rgba(16, 185, 129, 0.2);
 }
 
 .nav-emoji {
@@ -210,12 +236,13 @@ onMounted(() => {
 }
 
 .nav-count {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(245, 158, 11, 0.9);
   padding: 2px 8px;
   border-radius: 10px;
   font-size: 12px;
   color: #ffffff;
   margin-left: 4px;
+  font-weight: 600;
 }
 
 .search-box {
@@ -227,13 +254,13 @@ onMounted(() => {
 .search-icon {
   position: absolute;
   left: 8px;
-  fill: #a8c0e0;
+  fill: #a7f3d0;
   pointer-events: none;
 }
 
 .search-input {
-  background-color: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background-color: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(16, 185, 129, 0.4);
   border-radius: 6px;
   padding: 6px 12px 6px 32px;
   color: #ffffff;
@@ -244,12 +271,12 @@ onMounted(() => {
 }
 
 .search-input::placeholder {
-  color: #a8c0e0;
+  color: #a7f3d0;
 }
 
 .search-input:focus {
-  border-color: #ffffff;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.25);
 }
 
 .header-icon-link svg {
@@ -260,13 +287,14 @@ onMounted(() => {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  border: 2px solid #ffffff;
+  border: 2px solid #10b981;
   cursor: pointer;
-  transition: border-color 0.2s;
+  transition: all 0.2s;
 }
 
 .user-avatar:hover {
-  border-color: #a8c0e0;
+  border-color: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.3);
 }
 
 .user-info {
@@ -287,19 +315,20 @@ onMounted(() => {
   justify-content: center;
   padding: 6px;
   color: #ffffff;
-  background-color: rgba(255, 255, 255, 0.15);
-  border: none;
+  background-color: rgba(245, 158, 11, 0.2);
+  border: 1px solid rgba(245, 158, 11, 0.4);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .logout-btn svg {
-  fill: #ffffff;
+  fill: #fbbf24;
 }
 
 .logout-btn:hover {
-  background-color: rgba(255, 255, 255, 0.3);
+  background-color: rgba(245, 158, 11, 0.35);
+  border-color: #f59e0b;
 }
 
 /* 退出确认对话框 */
@@ -354,7 +383,7 @@ onMounted(() => {
   margin: 0;
   font-size: 18px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
 }
 
 .close-btn {

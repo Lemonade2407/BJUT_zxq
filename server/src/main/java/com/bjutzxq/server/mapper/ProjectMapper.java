@@ -139,5 +139,18 @@ public interface ProjectMapper {
      * @return 项目列表
      */
     List<Project> selectByIds(@Param("projectIds") List<Integer> projectIds);
+    
+    /**
+     * 根据项目类型查询项目
+     * @param projectType 项目类型
+     * @param courseName 课程名称（可选）
+     * @param thesisType 毕设类型（可选）
+     * @return 项目列表
+     */
+    List<Project> selectByProjectType(
+        @Param("projectType") String projectType,
+        @Param("courseName") String courseName,
+        @Param("thesisType") String thesisType
+    );
 
 }

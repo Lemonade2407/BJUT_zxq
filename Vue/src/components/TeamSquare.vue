@@ -187,7 +187,7 @@ const handleViewDetail = (project) => {
 .page-title {
   font-size: 28px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
   margin-bottom: 8px;
 }
 
@@ -240,8 +240,8 @@ const handleViewDetail = (project) => {
 }
 
 .filter-tag.active {
-  background-color: #0059b3;
-  border-color: #0059b3;
+  background-color: #10b981;
+  border-color: #10b981;
   color: #ffffff;
 }
 
@@ -257,7 +257,7 @@ const handleViewDetail = (project) => {
 }
 
 .filter-select:focus {
-  border-color: #0059b3;
+  border-color: #10b981;
 }
 
 /* 项目网格 */
@@ -290,8 +290,8 @@ const handleViewDetail = (project) => {
 }
 
 .project-card:hover {
-  border-color: #0059b3;
-  box-shadow: 0 4px 12px rgba(0, 51, 102, 0.15);
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(6, 78, 59, 0.15);
   transform: translateY(-2px);
 }
 
@@ -305,7 +305,7 @@ const handleViewDetail = (project) => {
 .project-title {
   font-size: 18px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
   margin: 0;
   flex: 1;
 }
@@ -350,10 +350,10 @@ const handleViewDetail = (project) => {
 
 .tech-tag {
   padding: 4px 10px;
-  background-color: rgba(0, 89, 179, 0.08);
+  background-color: rgba(16, 185, 129, 0.08);
   border-radius: 4px;
   font-size: 12px;
-  color: #0059b3;
+  color: #10b981;
   font-weight: 500;
 }
 
@@ -380,7 +380,7 @@ const handleViewDetail = (project) => {
 /* 查看详情按钮 */
 .detail-btn {
   padding: 8px 20px;
-  background-color: #0059b3;
+  background-color: #10b981;
   border: none;
   border-radius: 6px;
   color: #ffffff;
@@ -391,8 +391,8 @@ const handleViewDetail = (project) => {
 }
 
 .detail-btn:hover {
-  background-color: #004080;
-  box-shadow: 0 2px 8px rgba(0, 89, 179, 0.3);
+  background-color: #059669;
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
 /* 分页控件 */
@@ -429,14 +429,14 @@ const handleViewDetail = (project) => {
 }
 
 .page-btn:hover:not(:disabled) {
-  background-color: #0059b3;
-  border-color: #0059b3;
+  background-color: #10b981;
+  border-color: #10b981;
   color: #ffffff;
 }
 
 .page-btn.active {
-  background-color: #0059b3;
-  border-color: #0059b3;
+  background-color: #10b981;
+  border-color: #10b981;
   color: #ffffff;
   font-weight: 600;
 }

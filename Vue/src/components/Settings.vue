@@ -72,12 +72,12 @@ const switchMenu = (key) => {
 /* 侧边栏样式 */
 .settings-sidebar {
   width: 240px;
-  background: linear-gradient(135deg, #003366 100%, #004080 0%);
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
   border-right: none;
   padding: 24px 0;
   top: 0;
   overflow-y: auto;
-  box-shadow: 2px 0 8px rgba(0, 51, 102, 0.1);
+  box-shadow: 2px 0 8px rgba(6, 78, 59, 0.2);
 }
 
 .sidebar-header {
@@ -109,14 +109,14 @@ const switchMenu = (key) => {
 }
 
 .nav-item:hover {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(16, 185, 129, 0.2);
   color: #ffffff;
 }
 
 .nav-item.active {
-  background: rgba(255, 255, 255, 0.2);
+  background: rgba(16, 185, 129, 0.3);
   color: #ffffff;
-  border-left-color: #ffffff;
+  border-left-color: #10b981;
   font-weight: 500;
 }
 
@@ -164,7 +164,7 @@ const switchMenu = (key) => {
 
   .nav-item.active {
     border-left: none;
-    border-bottom-color: #ffffff;
+    border-bottom-color: #10b981;
   }
 
   .settings-content {

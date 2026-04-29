@@ -12,9 +12,39 @@ const router = useRouter()
 const form = ref({
   name: '',
   description: '',
+  projectType: 'OTHER', // 默认其他
+  courseName: '',
+  thesisType: '',
   tagIds: [],
   visibility: 1 // 默认公开
 })
+
+// 项目类型选项
+const projectTypeOptions = [
+  { value: 'COURSE', label: '课程设计', icon: '📚' },
+  { value: 'THESIS', label: '毕业设计', icon: '🎓' },
+  { value: 'COMPETITION', label: '竞赛作品', icon: '🏆' },
+  { value: 'PERSONAL', label: '个人项目', icon: '💼' },
+  { value: 'OTHER', label: '其他', icon: '📌' }
+]
+
+// 课程列表
+const courseList = [
+  '软件工程课程设计',
+  '数据库课程设计',
+  '操作系统课程设计',
+  '计算机网络课程设计',
+  '编译原理课程设计',
+  '数据结构课程设计',
+  '算法设计课程设计'
+]
+
+// 毕设类型选项
+const thesisTypeOptions = [
+  { value: 'UNDERGRADUATE', label: '本科生毕设' },
+  { value: 'MASTER', label: '研究生毕设' },
+  { value: 'DOCTOR', label: '博士生毕设' }
+]
 
 // 标签列表（按分组）
 const tagsByCategory = ref({
@@ -234,6 +264,24 @@ const validateForm = () => {
   
   if (form.value.description.length < 10 || form.value.description.length > 500) {
     toast.warning('项目描述长度应在 10-500 个字符之间')
+    return false
+  }
+  
+  // 验证项目类型
+  if (!form.value.projectType) {
+    toast.warning('请选择项目类型')
+    return false
+  }
+  
+  // 如果是课程设计，必须选择课程名称
+  if (form.value.projectType === 'COURSE' && !form.value.courseName) {
+    toast.warning('请选择课程名称')
+    return false
+  }
+  
+  // 如果是毕业设计，必须选择毕设类型
+  if (form.value.projectType === 'THESIS' && !form.value.thesisType) {
+    toast.warning('请选择毕设类型')
     return false
   }
   
@@ -549,6 +597,58 @@ onMounted(() => {
             <div class="char-count">{{ form.description.length }}/500</div>
           </div>
 
+          <!-- 项目类型 -->
+          <div class="form-group">
+            <label class="form-label">
+              项目类型 <span class="required">*</span>
+            </label>
+            <div class="project-type-grid">
+              <div
+                v-for="option in projectTypeOptions"
+                :key="option.value"
+                :class="['type-option', { selected: form.projectType === option.value }]"
+                @click="form.projectType = option.value"
+              >
+                <span class="type-icon">{{ option.icon }}</span>
+                <span class="type-label">{{ option.label }}</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 课程名称（仅当选择课程设计时显示） -->
+          <div v-if="form.projectType === 'COURSE'" class="form-group">
+            <label for="courseName" class="form-label">
+              课程名称 <span class="required">*</span>
+            </label>
+            <select
+              id="courseName"
+              v-model="form.courseName"
+              class="form-select"
+            >
+              <option value="">请选择课程</option>
+              <option v-for="course in courseList" :key="course" :value="course">
+                {{ course }}
+              </option>
+            </select>
+          </div>
+
+          <!-- 毕设类型（仅当选择毕业设计时显示） -->
+          <div v-if="form.projectType === 'THESIS'" class="form-group">
+            <label class="form-label">
+              毕设类型 <span class="required">*</span>
+            </label>
+            <div class="thesis-type-options">
+              <div
+                v-for="option in thesisTypeOptions"
+                :key="option.value"
+                :class="['thesis-option', { selected: form.thesisType === option.value }]"
+                @click="form.thesisType = option.value"
+              >
+                {{ option.label }}
+              </div>
+            </div>
+          </div>
+
           <!-- 项目标签 -->
           <div class="form-group">
             <label class="form-label">
@@ -771,7 +871,7 @@ onMounted(() => {
 .page-title {
   font-size: 28px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
   margin: 0 0 8px 0;
 }
 
@@ -795,7 +895,7 @@ onMounted(() => {
 
 .loading-spinner {
   font-size: 48px;
-  color: #0059b3;
+  color: #10b981;
   animation: spin 1s linear infinite;
   margin-bottom: 16px;
 }
@@ -862,8 +962,8 @@ onMounted(() => {
 .form-textarea:focus,
 .form-select:focus {
   outline: none;
-  border-color: #0059b3;
-  box-shadow: 0 0 0 2px rgba(0, 89, 179, 0.1);
+  border-color: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.1);
 }
 
 .form-textarea {
@@ -904,10 +1004,10 @@ onMounted(() => {
 .category-title {
   font-size: 16px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
   margin: 0 0 12px 0;
   padding-bottom: 8px;
-  border-bottom: 2px solid #e8e8e8;
+  border-bottom: 2px solid #d1fae5;
 }
 
 /* 查看更多按钮 */
@@ -915,41 +1015,140 @@ onMounted(() => {
   margin-top: 12px;
   padding: 8px 20px;
   background-color: transparent;
-  border: 1px dashed #0059b3;
+  border: 1px dashed #10b981;
   border-radius: 6px;
   font-size: 13px;
-  color: #0059b3;
+  color: #10b981;
   cursor: pointer;
   transition: all 0.2s;
   width: 100%;
 }
 
 .show-more-btn:hover {
-  background-color: rgba(0, 89, 179, 0.05);
+  background-color: rgba(16, 185, 129, 0.05);
   border-style: solid;
 }
 
 .tag-item {
   padding: 8px 16px;
-  background-color: rgba(0, 89, 179, 0.08);
+  background-color: rgba(16, 185, 129, 0.08);
   border: 2px solid transparent;
   border-radius: 6px;
   font-size: 13px;
-  color: #0059b3;
+  color: #059669;
   cursor: pointer;
   transition: all 0.2s;
   text-align: center;
 }
 
 .tag-item:hover {
-  background-color: rgba(0, 89, 179, 0.15);
+  background-color: rgba(16, 185, 129, 0.15);
   transform: translateY(-1px);
 }
 
 .tag-item.selected {
-  background-color: #0059b3;
+  background-color: #10b981;
   color: #ffffff;
-  border-color: #0059b3;
+  border-color: #10b981;
+  font-weight: 600;
+}
+
+/* 项目类型选择 */
+.project-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.type-option {
+  padding: 16px;
+  background-color: #ffffff;
+  border: 2px solid #d9d9d9;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.type-option:hover {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.02);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.1);
+}
+
+.type-option.selected {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.05);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+}
+
+.type-icon {
+  font-size: 32px;
+}
+
+.type-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333333;
+}
+
+.type-option.selected .type-label {
+  color: #059669;
+}
+
+/* 课程名称下拉框 */
+.form-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 2px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #333333;
+  background-color: #ffffff;
+  cursor: pointer;
+  transition: all 0.2s;
+  outline: none;
+}
+
+.form-select:focus {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+/* 毕设类型选项 */
+.thesis-type-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.thesis-option {
+  padding: 12px 20px;
+  background-color: #ffffff;
+  border: 2px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #333333;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  font-weight: 500;
+}
+
+.thesis-option:hover {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.02);
+}
+
+.thesis-option.selected {
+  background-color: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
   font-weight: 600;
 }
 
@@ -969,13 +1168,13 @@ onMounted(() => {
 }
 
 .visibility-option:hover {
-  border-color: #0059b3;
-  background-color: rgba(0, 89, 179, 0.02);
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.02);
 }
 
 .visibility-option.selected {
-  border-color: #0059b3;
-  background-color: rgba(0, 89, 179, 0.05);
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.05);
 }
 
 .option-header {
@@ -1014,8 +1213,8 @@ onMounted(() => {
 }
 
 .upload-area:hover {
-  border-color: #0059b3;
-  background-color: rgba(0, 89, 179, 0.02);
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.02);
 }
 
 .upload-icon {
@@ -1098,7 +1297,7 @@ onMounted(() => {
 }
 
 .folder-item .file-name {
-  color: #0059b3;
+  color: #059669;
 }
 
 .file-info {
@@ -1161,8 +1360,8 @@ onMounted(() => {
 .upload-progress {
   margin-top: 16px;
   padding: 16px;
-  background-color: #f0f9ff;
-  border: 1px solid #bae7ff;
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
   border-radius: 6px;
 }
 
@@ -1177,14 +1376,14 @@ onMounted(() => {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #0059b3, #0077cc);
+  background: linear-gradient(90deg, #10b981, #34d399);
   transition: width 0.3s ease;
   border-radius: 4px;
 }
 
 .progress-text {
   font-size: 13px;
-  color: #0059b3;
+  color: #059669;
   font-weight: 500;
 }
 
@@ -1224,14 +1423,14 @@ onMounted(() => {
 }
 
 .btn-submit {
-  background-color: #0059b3;
+  background-color: #10b981;
   color: #ffffff;
 }
 
 .btn-submit:hover:not(:disabled) {
-  background-color: #004080;
+  background-color: #059669;
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 89, 179, 0.3);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
 }
 
 /* 响应式设计 */

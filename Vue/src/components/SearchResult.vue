@@ -210,7 +210,7 @@ onMounted(() => {
 .page-header h1 {
   font-size: 28px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
   margin-bottom: 8px;
 }
 
@@ -234,7 +234,7 @@ onMounted(() => {
 
 .spinner {
   font-size: 48px;
-  color: #0059b3;
+  color: #10b981;
   animation: spin 1s linear infinite;
   margin-bottom: 16px;
 }
@@ -276,7 +276,7 @@ onMounted(() => {
 
 .btn-primary {
   padding: 10px 24px;
-  background-color: #0059b3;
+  background-color: #10b981;
   color: #ffffff;
   border: none;
   border-radius: 6px;
@@ -288,9 +288,9 @@ onMounted(() => {
 }
 
 .btn-primary:hover {
-  background-color: #004080;
+  background-color: #059669;
   transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(0, 89, 179, 0.3);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
 }
 
 /* 项目网格 */
@@ -313,8 +313,8 @@ onMounted(() => {
 }
 
 .project-card:hover {
-  border-color: #0059b3;
-  box-shadow: 0 4px 12px rgba(0, 51, 102, 0.15);
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(6, 78, 59, 0.15);
   transform: translateY(-2px);
 }
 
@@ -328,7 +328,7 @@ onMounted(() => {
 .project-name {
   font-size: 16px;
   font-weight: 600;
-  color: #0059b3;
+  color: #10b981;
 }
 
 .project-description {
@@ -352,10 +352,10 @@ onMounted(() => {
 
 .tech-tag {
   padding: 4px 10px;
-  background-color: rgba(0, 89, 179, 0.08);
+  background-color: rgba(16, 185, 129, 0.08);
   border-radius: 4px;
   font-size: 12px;
-  color: #0059b3;
+  color: #10b981;
   font-weight: 500;
 }
 
@@ -410,8 +410,8 @@ onMounted(() => {
 }
 
 .page-btn:hover:not(:disabled) {
-  background-color: #0059b3;
-  border-color: #0059b3;
+  background-color: #10b981;
+  border-color: #10b981;
   color: #ffffff;
 }
 
@@ -422,8 +422,8 @@ onMounted(() => {
 }
 
 .page-btn.active {
-  background-color: #0059b3;
-  border-color: #0059b3;
+  background-color: #10b981;
+  border-color: #10b981;
   color: #ffffff;
 }
 

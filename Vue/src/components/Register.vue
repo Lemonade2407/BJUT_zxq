@@ -12,6 +12,8 @@ const registerForm = reactive({
   password: '',
   confirmPassword: '',
   studentId: '',
+  realName: '',
+  className: '',
   email: '',
   phone: '',
   sex: '未知',
@@ -26,6 +28,8 @@ const errors = reactive({
   password: '',
   confirmPassword: '',
   studentId: '',
+  realName: '',
+  className: '',
   email: '',
   phone: '',
   captcha: ''
@@ -161,6 +165,34 @@ const validateStudentId = () => {
   return true
 }
 
+// 验证真实姓名
+const validateRealName = () => {
+  if (!registerForm.realName) {
+    errors.realName = '真实姓名不能为空'
+    return false
+  }
+  if (registerForm.realName.length < 2 || registerForm.realName.length > 20) {
+    errors.realName = '真实姓名长度应为 2-20 位'
+    return false
+  }
+  errors.realName = ''
+  return true
+}
+
+// 验证班级
+const validateClassName = () => {
+  if (!registerForm.className) {
+    errors.className = '班级不能为空'
+    return false
+  }
+  if (registerForm.className.length < 2 || registerForm.className.length > 50) {
+    errors.className = '班级名称长度应为 2-50 位'
+    return false
+  }
+  errors.className = ''
+  return true
+}
+
 // 验证邮箱
 const validateEmail = () => {
   if (!registerForm.email) {
@@ -210,6 +242,8 @@ const handleRegister = async () => {
     validatePassword(),
     validateConfirmPassword(),
     validateStudentId(),
+    validateRealName(),
+    validateClassName(),
     validateEmail(),
     validatePhone(),
     validateCaptcha()
@@ -230,6 +264,8 @@ const handleRegister = async () => {
       password: registerForm.password,
       confirmPassword: registerForm.confirmPassword,
       studentId: registerForm.studentId.trim(),
+      realName: registerForm.realName.trim(),
+      className: registerForm.className.trim(),
       email: registerForm.email.trim(),
       phone: registerForm.phone?.trim() || null,
       sex: registerForm.sex,
@@ -291,7 +327,7 @@ const getStrengthColor = (level) => {
     WEAK: '#d93025',
     MEDIUM: '#f9ab00',
     STRONG: '#34a853',
-    VERY_STRONG: '#0059b3'
+    VERY_STRONG: '#10b981'
   }
   return colors[level] || '#999999'
 }
@@ -339,6 +375,38 @@ const getStrengthColor = (level) => {
             @input="clearError('studentId')"
           />
           <span v-if="errors.studentId" class="error-message">{{ errors.studentId }}</span>
+        </div>
+
+        <!-- 真实姓名 -->
+        <div class="form-group">
+          <label for="realName" class="form-label">真实姓名 *</label>
+          <input
+            id="realName"
+            v-model="registerForm.realName"
+            type="text"
+            class="form-input"
+            :class="{ error: errors.realName }"
+            placeholder="请输入真实姓名"
+            @blur="validateRealName"
+            @input="clearError('realName')"
+          />
+          <span v-if="errors.realName" class="error-message">{{ errors.realName }}</span>
+        </div>
+
+        <!-- 班级 -->
+        <div class="form-group">
+          <label for="className" class="form-label">班级 *</label>
+          <input
+            id="className"
+            v-model="registerForm.className"
+            type="text"
+            class="form-input"
+            :class="{ error: errors.className }"
+            placeholder="例如：软件工程2301班"
+            @blur="validateClassName"
+            @input="clearError('className')"
+          />
+          <span v-if="errors.className" class="error-message">{{ errors.className }}</span>
         </div>
 
         <!-- 邮箱 -->
@@ -531,7 +599,7 @@ const getStrengthColor = (level) => {
   justify-content: center;
   align-items: center;
   min-height: 100vh;
-  background: linear-gradient(135deg, #003366 0%, #004080 50%, #0059b3 100%);
+  background: linear-gradient(135deg, #064e3b 0%, #065f46 50%, #047857 100%);
   padding: 20px;
 }
 
@@ -570,7 +638,7 @@ const getStrengthColor = (level) => {
 .register-title {
   font-size: 28px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
   margin: 0 0 8px 0;
 }
 
@@ -611,8 +679,8 @@ const getStrengthColor = (level) => {
 }
 
 .form-input:focus {
-  border-color: #0059b3;
-  box-shadow: 0 0 0 3px rgba(0, 89, 179, 0.1);
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
 .form-input.error {
@@ -643,7 +711,7 @@ const getStrengthColor = (level) => {
 }
 
 .password-toggle:hover svg {
-  fill: #0059b3;
+  fill: #10b981;
 }
 
 /* 密码强度 */
@@ -701,8 +769,8 @@ const getStrengthColor = (level) => {
 }
 
 .captcha-image:hover {
-  border-color: #0059b3;
-  box-shadow: 0 0 0 3px rgba(0, 89, 179, 0.1);
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
 .captcha-image img {
@@ -716,7 +784,7 @@ const getStrengthColor = (level) => {
   align-items: center;
   justify-content: center;
   font-size: 24px;
-  color: #0059b3;
+  color: #10b981;
   animation: spin 1s linear infinite;
 }
 
@@ -763,7 +831,7 @@ const getStrengthColor = (level) => {
 
 .register-button {
   padding: 14px;
-  background: linear-gradient(135deg, #0059b3 0%, #003366 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   border: none;
   border-radius: 6px;
   color: #ffffff;
@@ -771,13 +839,13 @@ const getStrengthColor = (level) => {
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  box-shadow: 0 2px 8px rgba(0, 89, 179, 0.3);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
   margin-top: 8px;
 }
 
 .register-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #004080 0%, #003366 100%);
-  box-shadow: 0 4px 12px rgba(0, 89, 179, 0.4);
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
   transform: translateY(-1px);
 }
 
@@ -824,14 +892,14 @@ const getStrengthColor = (level) => {
 }
 
 .login-link {
-  color: #0059b3;
+  color: #10b981;
   font-weight: 500;
   text-decoration: none;
   transition: color 0.2s;
 }
 
 .login-link:hover {
-  color: #003366;
+  color: #059669;
   text-decoration: underline;
 }
 

@@ -29,6 +29,16 @@ public class RegisterRequest {
     private String studentId;
     
     /**
+     * 真实姓名
+     */
+    private String realName;
+    
+    /**
+     * 班级
+     */
+    private String className;
+    
+    /**
      * 邮箱
      */
     private String email;

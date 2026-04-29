@@ -85,6 +85,8 @@ public class AuthController {
             user.setUsername(request.getUsername());
             user.setPassword(request.getPassword());
             user.setStudentId(request.getStudentId());
+            user.setRealName(request.getRealName());
+            user.setClassName(request.getClassName());
             user.setEmail(request.getEmail());
             user.setPhone(request.getPhone());
             user.setSex(request.getSex());

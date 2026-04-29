@@ -254,7 +254,7 @@ const handleProjectClick = (project) => {
 .page-title {
   font-size: 28px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
   margin-bottom: 8px;
 }
 
@@ -309,8 +309,8 @@ const handleProjectClick = (project) => {
 }
 
 .filter-tag.active {
-  background-color: #0059b3;
-  border-color: #0059b3;
+  background-color: #10b981;
+  border-color: #10b981;
   color: #ffffff;
 }
 
@@ -335,8 +335,8 @@ const handleProjectClick = (project) => {
 }
 
 .search-input:focus {
-  border-color: #0059b3;
-  box-shadow: 0 0 0 3px rgba(0, 89, 179, 0.1);
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
 }
 
 /* 项目网格 */
@@ -359,8 +359,8 @@ const handleProjectClick = (project) => {
 }
 
 .project-card:hover {
-  border-color: #0059b3;
-  box-shadow: 0 4px 12px rgba(0, 51, 102, 0.15);
+  border-color: #10b981;
+  box-shadow: 0 4px 12px rgba(6, 78, 59, 0.15);
   transform: translateY(-2px);
 }
 
@@ -374,7 +374,7 @@ const handleProjectClick = (project) => {
 .project-name {
   font-size: 16px;
   font-weight: 600;
-  color: #0059b3;
+  color: #10b981;
 }
 
 .project-description {
@@ -398,10 +398,10 @@ const handleProjectClick = (project) => {
 
 .tech-tag {
   padding: 4px 10px;
-  background-color: rgba(0, 89, 179, 0.08);
+  background-color: rgba(16, 185, 129, 0.08);
   border-radius: 4px;
   font-size: 12px;
-  color: #0059b3;
+  color: #10b981;
   font-weight: 500;
 }
 
@@ -457,14 +457,14 @@ const handleProjectClick = (project) => {
 }
 
 .page-btn:hover:not(:disabled) {
-  background-color: #0059b3;
-  border-color: #0059b3;
+  background-color: #10b981;
+  border-color: #10b981;
   color: #ffffff;
 }
 
 .page-btn.active {
-  background-color: #0059b3;
-  border-color: #0059b3;
+  background-color: #10b981;
+  border-color: #10b981;
   color: #ffffff;
   font-weight: 600;
 }
@@ -545,15 +545,15 @@ const handleProjectClick = (project) => {
   background-color: #ffffff;
   border: 1px solid #d9d9d9;
   border-radius: 6px;
-  color: #0059b3;
+  color: #10b981;
   font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .pagination-btn:hover:not(:disabled) {
-  background-color: #f0f4ff;
-  border-color: #0059b3;
+  background-color: #ecfdf5;
+  border-color: #10b981;
 }
 
 .pagination-btn:disabled {

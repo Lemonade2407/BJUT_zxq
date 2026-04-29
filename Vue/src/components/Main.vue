@@ -26,7 +26,7 @@ const notificationListRef = ref(null)
 const getNotificationColor = (type) => {
   const colors = {
     1: '#f9ab00',      // 点赞
-    2: '#0059b3',      // 评论
+    2: '#10b981',      // 评论
     3: '#e91e63',      // 关注
     4: '#5f6368'       // 系统通知
   }
@@ -415,14 +415,14 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 16px;
-  border-bottom: 2px solid #003366;
+  border-bottom: 2px solid #064e3b;
   padding-bottom: 12px;
 }
 
 .section-title {
   font-size: 16px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
   margin: 0;
 }
 
@@ -472,10 +472,10 @@ onMounted(() => {
 }
 
 .trending-item:hover {
-  border-color: #0059b3;
-  background-color: #f0f4ff;
+  border-color: #10b981;
+  background-color: #ecfdf5;
   transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(0, 89, 179, 0.1);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.1);
 }
 
 .trending-header {
@@ -486,7 +486,7 @@ onMounted(() => {
 }
 
 .trending-name {
-  color: #0059b3;
+  color: #10b981;
   text-decoration: none;
   font-size: 14px;
   font-weight: 600;
@@ -518,8 +518,8 @@ onMounted(() => {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 10px;
-  background-color: rgba(0, 51, 102, 0.08);
-  color: #003366;
+  background-color: rgba(6, 78, 59, 0.08);
+  color: #064e3b;
 }
 
 .trending-badge.hot {
@@ -577,18 +577,18 @@ onMounted(() => {
 }
 
 .notification-item:hover {
-  border-color: #0059b3;
-  background-color: #f0f4ff;
+  border-color: #10b981;
+  background-color: #ecfdf5;
 }
 
 .notification-item.unread {
-  border-color: #0059b3;
-  background-color: rgba(0, 89, 179, 0.02);
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.02);
 }
 
 .notification-item.unread:hover {
-  border-color: #0059b3;
-  background-color: rgba(0, 89, 179, 0.08);
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.08);
 }
 
 .notification-icon {
@@ -619,7 +619,7 @@ onMounted(() => {
 .notification-title {
   font-size: 14px;
   font-weight: 600;
-  color: #003366;
+  color: #064e3b;
 }
 
 .notification-time {
@@ -645,7 +645,7 @@ onMounted(() => {
 
 .notification-count span {
   font-size: 12px;
-  color: #003366;
+  color: #064e3b;
   font-weight: 600;
 }
 
@@ -712,7 +712,7 @@ onMounted(() => {
   display: inline-block;
   animation: spin 1s linear infinite;
   font-size: 20px;
-  color: #0059b3;
+  color: #10b981;
 }
 
 
@@ -732,7 +732,7 @@ onMounted(() => {
   display: inline-block;
   animation: spin 1s linear infinite;
   font-size: 16px;
-  color: #0059b3;
+  color: #10b981;
 }
 
 @keyframes spin {

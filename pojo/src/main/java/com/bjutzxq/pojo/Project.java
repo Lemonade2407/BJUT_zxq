@@ -30,6 +30,21 @@ public class Project {
     private Integer ownerId;
     
     /**
+     * 项目类型: COURSE-课程设计, THESIS-毕业设计, COMPETITION-竞赛作品, PERSONAL-个人项目, OTHER-其他
+     */
+    private String projectType;
+    
+    /**
+     * 课程名称（仅当 project_type=COURSE 时有效）
+     */
+    private String courseName;
+    
+    /**
+     * 毕设类型: UNDERGRADUATE-本科, MASTER-硕士, DOCTOR-博士（仅当 project_type=THESIS 时有效）
+     */
+    private String thesisType;
+    
+    /**
      * 可见性:0-私有，1-公开
      */
     private Integer visibility;
