@@ -235,7 +235,7 @@ onMounted(() => {
         <div class="header-content">
           <div class="avatar-wrapper">
             <img
-              :src="userInfo.avatar || '/bjut-logo.svg'"
+              :src="userInfo.avatar || '/logo.svg'"
               alt="头像"
               class="profile-avatar"
             />

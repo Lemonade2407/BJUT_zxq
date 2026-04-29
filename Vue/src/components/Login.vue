@@ -135,9 +135,9 @@ const goToRegister = () => {
     <div class="login-box">
       <!-- Logo 和标题 -->
       <div class="login-header">
-        <img src="/bjut-logo.svg" alt="北京工业大学校徽" class="login-logo" />
+        <img src="/logo.svg" alt="logo" class="login-logo" />
         <h1 class="login-title">欢迎登录</h1>
-        <p class="login-subtitle">北京工业大学项目协作平台</p>
+        <p class="login-subtitle">工大项目分享平台</p>
       </div>
 
       <!-- 登录表单 -->

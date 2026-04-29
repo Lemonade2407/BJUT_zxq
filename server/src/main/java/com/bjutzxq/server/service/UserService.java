@@ -98,7 +98,7 @@ public class UserService {
         }
         // 设置默认头像
         if (user.getAvatar() == null || user.getAvatar().trim().isEmpty()) {
-            user.setAvatar("/bjut-logo.svg");
+            user.setAvatar("/logo.svg");
         }
         
         // 7. 插入用户
@@ -568,7 +568,7 @@ public class UserService {
         try {
             // 5. 删除旧头像（如果不是默认头像）
             String oldAvatar = user.getAvatar();
-            if (oldAvatar != null && !oldAvatar.equals("/bjut-logo.svg") && !oldAvatar.trim().isEmpty()) {
+            if (oldAvatar != null && !oldAvatar.equals("/logo.svg") && !oldAvatar.trim().isEmpty()) {
                 try {
                     ossUtil.delete(oldAvatar);
                     log.info("已删除旧头像: {}", oldAvatar);

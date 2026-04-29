@@ -302,9 +302,9 @@ const getStrengthColor = (level) => {
     <div class="register-box">
       <!-- Logo 和标题 -->
       <div class="register-header">
-        <img src="/bjut-logo.svg" alt="北京工业大学校徽" class="register-logo" />
+        <img src="/logo.svg" alt="logo" class="register-logo" />
         <h1 class="register-title">用户注册</h1>
-        <p class="register-subtitle">加入北京工业大学项目协作平台</p>
+        <p class="register-subtitle">加入工大项目协作平台</p>
       </div>
 
       <!-- 注册表单 -->

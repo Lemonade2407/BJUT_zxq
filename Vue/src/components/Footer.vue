@@ -5,7 +5,7 @@
   <footer class="app-footer">
     <div class="footer-container">
       <div class="footer-logo">
-        <img src="/bjut-logo.svg" alt="北京工业大学校徽" class="footer-logo" />
+        <img src="/logo.svg" alt="logo" class="footer-logo" />
       </div>
       <p class="footer-tagline">工大知享圈，分享你的项目</p>
     </div>

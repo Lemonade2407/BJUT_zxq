@@ -19,7 +19,7 @@ const routes = [
     path: '/login',
     name: 'Login',
     component: Login,
-    meta: { title: '登录 - 北京工业大学项目协作平台' }
+    meta: { title: '登录' }
   },
   
   // 注册页面
@@ -27,7 +27,7 @@ const routes = [
     path: '/register',
     name: 'Register',
     component: Register,
-    meta: { title: '注册 - 北京工业大学项目协作平台' }
+    meta: { title: '注册' }
   },
   
   // 主页
@@ -40,7 +40,7 @@ const routes = [
     name: 'Home',
     component: Main,
     meta: { 
-      title: '主页 - 北京工业大学项目协作平台',
+      title: '主页',
       requiresAuth: true 
     }
   },
@@ -51,7 +51,7 @@ const routes = [
     name: 'Repository',
     component: UserRepository,
     meta: { 
-      title: '我的仓库 - 北京工业大学项目协作平台',
+      title: '我的仓库',
       requiresAuth: true 
     }
   },
@@ -62,7 +62,7 @@ const routes = [
     name: 'CreateProject',
     component: CreateProject,
     meta: { 
-      title: '创建项目 - 北京工业大学项目协作平台',
+      title: '创建项目',
       requiresAuth: true 
     }
   },
@@ -73,7 +73,7 @@ const routes = [
     name: 'Projects',
     component: ProjectSquare,
     meta: { 
-      title: '项目广场 - 北京工业大学项目协作平台',
+      title: '项目广场',
       requiresAuth: true 
     }
   },
@@ -84,7 +84,7 @@ const routes = [
     name: 'ProjectDetail',
     component: ProjectDetail,
     meta: { 
-      title: '项目详情 - 北京工业大学项目协作平台',
+      title: '项目详情',
       requiresAuth: true 
     },
     props: true // 允许将路由参数作为 props 传递
@@ -96,7 +96,7 @@ const routes = [
   //   name: 'Team',
   //   component: TeamSquare,
   //   meta: { 
-  //     title: '组队广场 - 北京工业大学项目协作平台',
+  //     title: '组队广场',
   //     requiresAuth: true 
   //   }
   // },
@@ -107,7 +107,7 @@ const routes = [
     name: 'Settings',
     component: Settings,
     meta: { 
-      title: '设置 - 北京工业大学项目协作平台',
+      title: '设置',
       requiresAuth: true 
     }
   },
@@ -118,7 +118,7 @@ const routes = [
     name: 'Favorites',
     component: Favorites,
     meta: { 
-      title: '我的收藏 - 北京工业大学项目协作平台',
+      title: '我的收藏',
       requiresAuth: true 
     }
   },
@@ -129,7 +129,7 @@ const routes = [
     name: 'SearchResult',
     component: SearchResult,
     meta: { 
-      title: '搜索结果 - 北京工业大学项目协作平台',
+      title: '搜索结果',
       requiresAuth: true 
     }
   },
@@ -157,15 +157,15 @@ const router = createRouter({
 // 全局前置守卫
 // TODO: 添加路由级别的权限控制（根据用户角色）
 // TODO: 添加路由访问日志，便于审计
-router.beforeEach((to, from) => {
+router.beforeEach((to) => {
   // 设置页面标题
-  document.title = to.meta.title || '北京工业大学项目协作平台'
+  document.title = to.meta?.title || '项目协作平台'
   
   // 检查是否需要登录
   const isLoggedIn = tokenManager.isLoggedIn()
   
-  if (to.meta.requiresAuth && !isLoggedIn) {
-    // TODO: 保存用户原始访问路径，登录后自动跳转回去
+  // 检查路由是否需要认证
+  if (to.meta?.requiresAuth && !isLoggedIn) {
     // 需要登录但未登录，跳转到登录页
     return {
       path: '/login',

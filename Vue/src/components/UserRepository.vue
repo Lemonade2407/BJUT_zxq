@@ -12,7 +12,7 @@ const router = useRouter()
 const userInfo = ref({
   id: 1,
   username: 'Admin',
-  avatar: '/bjut-logo.svg'
+  avatar: '/logo.svg'
 })
 
 // 仓库标签页（固定为"我创建的"）
