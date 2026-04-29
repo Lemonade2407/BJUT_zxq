@@ -25,7 +25,8 @@ public class WebMvcConfig implements WebMvcConfigurer {
         // 允许的域名
         config.setAllowedOrigins(Arrays.asList(
             "http://localhost:5173",
-            "http://127.0.0.1:5173"
+            "http://127.0.0.1:5173",
+            "https://bjut-zxq.cn"
         ));
         
         // 允许的方法
