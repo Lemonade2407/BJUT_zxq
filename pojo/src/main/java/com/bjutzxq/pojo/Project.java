@@ -75,6 +75,11 @@ public class Project {
     private Integer viewCount;
     
     /**
+     * 项目文档 URL（支持 PDF、Word 等格式）
+     */
+    private String documentUrl;
+    
+    /**
      * 创建时间
      */
     private LocalDateTime createdAt;

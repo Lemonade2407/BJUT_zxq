@@ -17,6 +17,7 @@
         <result column="file_count" property="fileCount"/>
         <result column="download_count" property="downloadCount"/>
         <result column="view_count" property="viewCount"/>
+        <result column="document_url" property="documentUrl"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
         <!-- 非数据库字段，用于教学管理 -->
@@ -26,7 +27,7 @@
     
     <!-- 基础列 -->
     <sql id="Base_Column_List">
-        id, name, description, owner_id, project_type, course_name, thesis_type, visibility, star_count, watch_count, file_count, download_count, view_count, created_at, updated_at
+        id, name, description, owner_id, project_type, course_name, thesis_type, visibility, star_count, watch_count, file_count, download_count, view_count, document_url, created_at, updated_at
     </sql>
 
     <!-- 新增项目 -->
@@ -40,6 +41,7 @@
             thesis_type,
             visibility,
             file_count,
+            document_url,
             created_at,
             updated_at
         ) VALUES (
@@ -51,6 +53,7 @@
             #{thesisType},
             #{visibility},
             #{fileCount},
+            #{documentUrl},
             NOW(),
             NOW()
         )
@@ -67,6 +70,7 @@
             <if test="thesisType != null">thesis_type = #{thesisType},</if>
             <if test="visibility != null">visibility = #{visibility},</if>
             <if test="fileCount != null">file_count = #{fileCount},</if>
+            <if test="documentUrl != null">document_url = #{documentUrl},</if>
             updated_at = NOW()
         </set>
         WHERE id = #{id}

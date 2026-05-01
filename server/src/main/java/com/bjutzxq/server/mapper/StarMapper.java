@@ -41,4 +41,11 @@ public interface StarMapper {
      * @return 点赞数
      */
     int countByProjectId(@Param("projectId") Integer projectId);
+    
+    /**
+     * 根据项目 ID 删除所有点赞记录
+     * @param projectId 项目 ID
+     * @return 影响行数
+     */
+    int deleteByProjectId(@Param("projectId") Integer projectId);
 }

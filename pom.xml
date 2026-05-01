@@ -33,6 +33,7 @@
         <bytebuddy.version>1.14.12</bytebuddy.version>
         <aliyun.oss.version>3.17.4</aliyun.oss.version>
         <spring.security.version>6.2.7</spring.security.version>
+        <caffeine.version>3.1.8</caffeine.version>
     </properties>
 
     <dependencyManagement>
@@ -157,6 +158,12 @@
                 <groupId>org.springframework.security</groupId>
                 <artifactId>spring-security-crypto</artifactId>
                 <version>${spring.security.version}</version>
+            </dependency>
+            <!-- Caffeine 缓存 -->
+            <dependency>
+                <groupId>com.github.ben-manes.caffeine</groupId>
+                <artifactId>caffeine</artifactId>
+                <version>${caffeine.version}</version>
             </dependency>
         </dependencies>
     </dependencyManagement>

@@ -6,6 +6,9 @@ import com.bjutzxq.pojo.User;
 import com.bjutzxq.server.mapper.ProjectFileMapper;
 import com.bjutzxq.server.mapper.UserMapper;
 import com.bjutzxq.server.util.OssUtil;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -60,7 +63,7 @@ public class ProjectFileService {
         // TODO: 支持断点续传和大文件分片上传
         
         // 清空目录缓存（避免不同批次之间的缓存污染）
-        directoryCache.clear();
+        directoryCache.invalidateAll();
         cacheHitCount = 0;
         cacheMissCount = 0;
         log.info("已清空目录缓存");
@@ -229,22 +232,22 @@ public class ProjectFileService {
             return 0;
         }
         
-        // 2. 删除 OSS 上的文件（只删除文件，不删除目录）
+        // 2. 收集需要删除的 OSS 文件 URL（只删除文件，不删除目录）
+        List<String> ossFileUrls = allFiles.stream()
+            .filter(file -> !Constants.File.TYPE_DIRECTORY.equals(file.getIsDir()))
+            .map(ProjectFile::getStorageUrl)
+            .filter(url -> url != null && !url.isEmpty())
+            .collect(java.util.stream.Collectors.toList());
+        
+        // 3. 批量删除 OSS 文件（一次请求最多 1000 个）
         int ossDeletedCount = 0;
-        for (ProjectFile file : allFiles) {
-            if (!Constants.File.TYPE_DIRECTORY.equals(file.getIsDir()) && file.getStorageUrl() != null && !file.getStorageUrl().isEmpty()) {
-                try {
-                    ossUtil.delete(file.getStorageUrl());
-                    ossDeletedCount++;
-                    log.debug("OSS 文件删除成功: {}", file.getStorageUrl());
-                } catch (Exception e) {
-                    log.warn("OSS 文件删除失败: {}, 错误: {}", file.getStorageUrl(), e.getMessage());
-                    // 不抛出异常，继续删除其他文件
-                }
-            }
+        if (!ossFileUrls.isEmpty()) {
+            log.info("开始批量删除 OSS 文件，数量: {}", ossFileUrls.size());
+            ossDeletedCount = ossUtil.batchDelete(ossFileUrls);
+            log.info("OSS 文件批量删除完成，成功删除: {} 个", ossDeletedCount);
         }
         
-        // 3. 删除数据库记录
+        // 4. 删除数据库记录
         int deletedRows = projectFileMapper.deleteByProjectId(projectId);
         
         log.info("项目文件删除完成，数据库删除: {} 条, OSS 删除: {} 个文件", deletedRows, ossDeletedCount);
@@ -527,13 +530,6 @@ public class ProjectFileService {
     /**
      * 判断是否为 README.md 文件
      */
-    private boolean isReadmeFile(String fileName) {
-        if (fileName == null) {
-            return false;
-        }
-        return fileName.equalsIgnoreCase("README.md");
-    }
-
     /**
      * 上传带路径的文件（用于文件夹上传）
      * @param projectId 项目 ID
@@ -557,12 +553,27 @@ public class ProjectFileService {
         return saveUploadedFile(projectId, file, fileName, targetParentId, uploaderId);
     }
 
-    // 目录缓存：key = "projectId:parentPath:dirName", value = directoryId
-    private final java.util.Map<String, Integer> directoryCache = new java.util.concurrent.ConcurrentHashMap<>();
+    /**
+     * 目录缓存（使用 Caffeine，10分钟过期，最多10000条）
+     */
+    private Cache<String, Integer> directoryCache;
     
     // 缓存统计
     private int cacheHitCount = 0;
     private int cacheMissCount = 0;
+    
+    /**
+     * 初始化缓存
+     */
+    @PostConstruct
+    public void init() {
+        directoryCache = Caffeine.newBuilder()
+            .maximumSize(10000)
+            .expireAfterWrite(10, TimeUnit.MINUTES)
+            .recordStats()
+            .build();
+        log.info("目录缓存初始化完成（最大容量: 10000, 过期时间: 10分钟）");
+    }
 
     /**
      * 递归创建目录结构（带缓存优化）
@@ -588,7 +599,7 @@ public class ProjectFileService {
             String cacheKey = projectId + ":" + buildFilePath(currentDirId) + ":" + dirName.trim();
             
             // 先查缓存
-            Integer cachedDirId = directoryCache.get(cacheKey);
+            Integer cachedDirId = directoryCache.getIfPresent(cacheKey);
             if (cachedDirId != null) {
                 currentDirId = cachedDirId;
                 cacheHitCount++;
@@ -698,17 +709,6 @@ public class ProjectFileService {
         projectFile.setIsDir(0);  // 0-文件
         projectFile.setParentId(parentId);
         projectFile.setUploaderId(uploaderId);
-        
-        // 如果是 README.md 文件，读取内容用于预览
-        if (isReadmeFile(fileName)) {
-            try {
-                String content = new String(file.getBytes());
-                projectFile.setContent(content);
-            } catch (IOException e) {
-                log.warn("读取 README 内容失败: {}", e.getMessage());
-                // 不抛出异常，继续保存
-            }
-        }
 
         // 4. 保存到数据库
         projectFileMapper.insert(projectFile);
@@ -723,3 +723,5 @@ public class ProjectFileService {
     }
 
 }
+
+

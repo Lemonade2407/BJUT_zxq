@@ -2,6 +2,7 @@ package com.bjutzxq.server.controller;
 
 import com.bjutzxq.common.Constants;
 import com.bjutzxq.common.Result;
+import com.bjutzxq.pojo.BatchDownloadRequest;
 import com.bjutzxq.pojo.Project;
 import com.bjutzxq.pojo.ProjectRequest;
 import com.bjutzxq.server.service.ProjectService;
@@ -422,6 +423,72 @@ public class ProjectController {
             
         } catch (Exception e) {
             log.error("项目下载失败：{}", e.getMessage(), e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+    
+    /**
+     * 批量下载学生项目（教师专用）
+     * POST /api/projects/batch-download
+     * Body: { "projectIds": [1, 2, 3], "className": "软件2101", "courseName": "软件工程" }
+     */
+    @PostMapping("/batch-download")
+    @CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"}, 
+                 allowedHeaders = "*", 
+                 allowCredentials = "true",
+                 methods = {RequestMethod.POST, RequestMethod.OPTIONS})
+    public ResponseEntity<Resource> batchDownloadProjects(
+            HttpServletRequest request,
+            @RequestBody BatchDownloadRequest batchRequest) {
+        log.info("收到批量下载请求，项目数量: {}, 班级: {}, 课程: {}", 
+                batchRequest.getProjectIds().size(), 
+                batchRequest.getClassName(), 
+                batchRequest.getCourseName());
+        
+        try {
+            // 1. 获取当前用户 ID 并验证是否为教师
+            Integer userId = getCurrentUserId(request);
+            com.bjutzxq.pojo.User user = projectService.getUserById(userId);
+            if (user == null || !"TEACHER".equals(user.getRole())) {
+                log.warn("批量下载失败：非教师用户，用户 ID: {}", userId);
+                return ResponseEntity.status(403).build();
+            }
+            
+            // 2. 验证参数
+            if (batchRequest.getProjectIds() == null || batchRequest.getProjectIds().isEmpty()) {
+                log.warn("批量下载失败：项目 ID 列表为空");
+                return ResponseEntity.badRequest().build();
+            }
+            
+            // 3. 批量打包项目
+            String className = batchRequest.getClassName() != null ? batchRequest.getClassName() : "未知班级";
+            String courseName = batchRequest.getCourseName() != null ? batchRequest.getCourseName() : "未知课程";
+            java.nio.file.Path zipPath = projectService.batchPackageProjects(
+                batchRequest.getProjectIds(), 
+                className, 
+                courseName
+            );
+            
+            if (zipPath == null || !Files.exists(zipPath)) {
+                log.error("批量下载失败：ZIP 文件生成失败");
+                return ResponseEntity.internalServerError().build();
+            }
+            
+            // 4. 创建响应
+            Resource resource = new FileSystemResource(zipPath.toFile());
+            String fileName = className + "_" + courseName + ".zip";
+            
+            log.info("批量下载成功，文件名: {}, 大小: {} bytes", fileName, resource.contentLength());
+            
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, 
+                            "attachment; filename*=UTF-8''" + java.net.URLEncoder.encode(fileName, "UTF-8"))
+                    .header(HttpHeaders.CONTENT_LENGTH, String.valueOf(resource.contentLength()))
+                    .body(resource);
+            
+        } catch (Exception e) {
+            log.error("批量下载失败：{}", e.getMessage(), e);
             return ResponseEntity.internalServerError().build();
         }
     }

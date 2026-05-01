@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getProjectList } from '@/api/project'
+import { getProjectList, batchDownloadProjects } from '@/api/project'
 import { getActiveCourses } from '@/api/course'
 import { toast } from '@/utils/toast'
 import { log, error as logError } from '@/utils/logger'
@@ -125,6 +125,40 @@ const handleSearch = () => {
   currentPageNum.value = 1
 }
 
+// 批量下载学生项目
+const handleBatchDownload = async () => {
+  if (!hasSearched.value || filteredProjects.value.length === 0) {
+    toast.warning('请先查询并筛选出要下载的项目')
+    return
+  }
+  
+  // 检查是否有班级和课程信息
+  if (!filters.value.className && !filters.value.courseName) {
+    toast.warning('请至少选择班级或课程之一')
+    return
+  }
+  
+  try {
+    log('开始批量下载，项目数量:', filteredProjects.value.length)
+    toast.info(`正在打包 ${filteredProjects.value.length} 个项目...`)
+    
+    // 提取所有项目 ID
+    const projectIds = filteredProjects.value.map(p => p.id)
+    
+    // 调用批量下载 API
+    await batchDownloadProjects({
+      projectIds: projectIds,
+      className: filters.value.className || '未知班级',
+      courseName: filters.value.courseName || '未知课程'
+    })
+    
+    toast.success('批量下载成功！')
+  } catch (error) {
+    logError('批量下载失败:', error)
+    toast.error(error.message || '批量下载失败，请稍后重试')
+  }
+}
+
 // 加载学生项目
 const loadStudentProjects = async () => {
   loading.value = true
@@ -243,6 +277,13 @@ onMounted(() => {
                 </button>
                 <button @click="resetFilters" class="reset-btn">
                   🔄 重置
+                </button>
+                <button 
+                  v-if="hasSearched && filteredProjects.length > 0"
+                  @click="handleBatchDownload" 
+                  class="batch-download-btn"
+                >
+                  📦 批量下载 ({{ filteredProjects.length }})
                 </button>
               </div>
             </div>
@@ -496,6 +537,29 @@ onMounted(() => {
   background: linear-gradient(135deg, #e8e8e8 0%, #d9d9d9 100%);
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.batch-download-btn {
+  padding: 10px 24px;
+  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+}
+
+.batch-download-btn:hover {
+  background: linear-gradient(135deg, #d97706 0%, #b45309 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.4);
+}
+
+.batch-download-btn:active {
+  transform: translateY(0);
 }
 
 .filter-summary {

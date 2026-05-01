@@ -3,14 +3,12 @@ package com.bjutzxq.server.util;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Component;
 
 /**
  * 密码加密工具类
  * 使用 BCrypt 算法，比 MD5 更安全
  */
 @Slf4j
-@Component
 public class PasswordUtil {
     
     private static final PasswordEncoder passwordEncoder = new BCryptPasswordEncoder();

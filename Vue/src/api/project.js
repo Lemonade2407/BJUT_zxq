@@ -195,6 +195,61 @@ export function downloadProject(projectId) {
   })
 }
 
+// 批量下载学生项目（教师专用）
+export function batchDownloadProjects(data) {
+  import('@/utils/tokenManager').then(({ default: tokenManager }) => {
+    const token = tokenManager.getToken()
+    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+    
+    console.log('开始批量下载项目，数量:', data.projectIds.length)
+    console.log('班级:', data.className)
+    console.log('课程:', data.courseName)
+    
+    if (!token) {
+      console.error('未登录，请先登录')
+      throw new Error('未登录')
+    }
+    
+    const url = `${baseUrl}/projects/batch-download`
+    
+    return fetch(url, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(data)
+    }).then(response => {
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
+      
+      // 从 Content-Disposition 头中提取文件名
+      const contentDisposition = response.headers.get('Content-Disposition')
+      let fileName = `${data.className}_${data.courseName}.zip`
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+        if (filenameMatch && filenameMatch[1]) {
+          fileName = decodeURIComponent(filenameMatch[1])
+        }
+      }
+      
+      return response.blob().then(blob => {
+        const downloadUrl = window.URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = downloadUrl
+        link.download = fileName
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        window.URL.revokeObjectURL(downloadUrl)
+        console.log('批量下载成功')
+      })
+    })
+  })
+}
+
 // 上传单个文件
 export function uploadFile(projectId, file, parentId = null) {
   const formData = new FormData()
@@ -279,6 +334,44 @@ export function getProjectFiles(projectId, parentId = null) {
 export function getAllProjectFiles(projectId) {
   return request({
     url: `/projects/${projectId}/files/all`,
+    method: 'get'
+  })
+}
+
+// ==================== 项目文档相关 API ====================
+
+// 上传项目文档
+export function uploadProjectDocument(projectId, file, onProgress = null) {
+  const formData = new FormData()
+  formData.append('file', file)
+  
+  return request({
+    url: `/projects/${projectId}/document/upload`,
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    },
+    timeout: 120000, // 文档上传超时时间设置为2分钟（120秒）
+    onUploadProgress: onProgress ? (progressEvent) => {
+      const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+      onProgress(percentCompleted)
+    } : undefined
+  })
+}
+
+// 删除项目文档
+export function deleteProjectDocument(projectId) {
+  return request({
+    url: `/projects/${projectId}/document`,
+    method: 'delete'
+  })
+}
+
+// 获取项目文档 URL
+export function getProjectDocument(projectId) {
+  return request({
+    url: `/projects/${projectId}/document`,
     method: 'get'
   })
 }

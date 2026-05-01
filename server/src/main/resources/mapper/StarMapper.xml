@@ -49,4 +49,9 @@
         WHERE project_id = #{projectId}
     </select>
     
+    <!-- 根据项目 ID 删除所有点赞记录 -->
+    <delete id="deleteByProjectId" parameterType="java.lang.Integer">
+        DELETE FROM star WHERE project_id = #{projectId}
+    </delete>
+    
 </mapper>

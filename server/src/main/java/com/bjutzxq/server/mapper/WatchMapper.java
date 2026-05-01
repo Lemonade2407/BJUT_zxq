@@ -48,4 +48,11 @@ public interface WatchMapper {
      * @return 项目 ID 列表
      */
     java.util.List<Integer> selectProjectIdsByUserId(@Param("userId") Integer userId);
+    
+    /**
+     * 根据项目 ID 删除所有关注记录
+     * @param projectId 项目 ID
+     * @return 影响行数
+     */
+    int deleteByProjectId(@Param("projectId") Integer projectId);
 }

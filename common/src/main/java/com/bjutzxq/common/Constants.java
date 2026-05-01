@@ -128,7 +128,7 @@ public class Constants {
          * Token 过期时间（2 小时）
          */
         public static final long TOKEN_EXPIRE_TIME = 7200 * 1000;
-        
+        // TODO: 测试用，生产环境请修改
         /**
          * Token 密钥（至少 32 字符/256 位，用于 HMAC-SHA256）
          */

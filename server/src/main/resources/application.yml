@@ -92,3 +92,9 @@ aliyun:
       # 2. 配置域名 CNAME 解析到 CDN 提供的地址
       # 3. 将 enabled 改为 true,并填写 CDN 域名
       # 示例: domain: https://cdn.yourdomain.com
+
+# 文件上传配置
+file:
+  upload:
+    max-size: 104857600  # 单个文件最大大小 100MB (字节)
+    allowed-types: "*"  # 支持所有文件类型

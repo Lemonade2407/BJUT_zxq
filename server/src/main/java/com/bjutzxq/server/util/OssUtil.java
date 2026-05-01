@@ -2,7 +2,11 @@ package com.bjutzxq.server.util;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
+import com.aliyun.oss.model.DeleteObjectsRequest;
+import com.aliyun.oss.model.DeleteObjectsResult;
 import com.aliyun.oss.model.OSSObject;
+import jakarta.annotation.PostConstruct;
+import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -13,10 +17,11 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * 阿里云 OSS 工具类
+ * 阿里云 OSS 工具类（单例模式）
  */
 @Slf4j
 @Component
@@ -42,6 +47,39 @@ public class OssUtil {
 
     @Value("${aliyun.oss.cdn.domain:}")
     private String cdnDomain;
+    
+    @Value("${file.upload.max-size:104857600}")
+    private long maxFileSize;
+    
+    @Value("${file.upload.allowed-types:jpg,jpeg,png,gif,bmp,pdf,doc,docx,xls,xlsx,ppt,pptx,zip,rar,7z,tar,gz,txt,md,java,py,js,ts,vue,html,css,json,xml,yml,yaml,c,cpp,h,hpp,cs,go,rb,php,sql,sh,bat,ps1}")
+    private String allowedTypesStr;
+    
+    /**
+     * OSS 客户端单例
+     */
+    private OSS ossClient;
+    
+    /**
+     * 初始化 OSS 客户端（应用启动时调用）
+     */
+    @PostConstruct
+    public void init() {
+        log.info("初始化 OSS 客户端...");
+        ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
+        log.info("OSS 客户端初始化成功");
+    }
+    
+    /**
+     * 销毁 OSS 客户端（应用关闭时调用）
+     */
+    @PreDestroy
+    public void destroy() {
+        if (ossClient != null) {
+            log.info("关闭 OSS 客户端...");
+            ossClient.shutdown();
+            log.info("OSS 客户端已关闭");
+        }
+    }
 
     /**
      * 上传文件到 OSS
@@ -59,21 +97,23 @@ public class OssUtil {
      * @return 文件的访问 URL
      */
     public String upload(MultipartFile file, String directory) throws IOException {
-        // 创建 OSSClient 实例
-        OSS ossClient = null;
         try {
-            ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
-
             // 获取原始文件名和后缀
             String originalFilename = file.getOriginalFilename();
             if (originalFilename == null || originalFilename.trim().isEmpty()) {
                 throw new IOException("文件名不能为空");
             }
             
-            // 验证文件大小(最大 100MB)
-            long maxSize = 100 * 1024 * 1024;
-            if (file.getSize() > maxSize) {
-                throw new IOException("文件大小不能超过 100MB");
+            // 验证文件大小（从配置读取）
+            if (file.getSize() > maxFileSize) {
+                long maxSizeMB = maxFileSize / 1024 / 1024;
+                throw new IOException("文件大小不能超过 " + maxSizeMB + "MB");
+            }
+            
+            // 验证文件类型
+            String fileExtension = getFileExtension(originalFilename);
+            if (!isAllowedType(fileExtension)) {
+                throw new IOException("不支持的文件类型: " + fileExtension);
             }
             
             // 获取文件扩展名（处理无扩展名的情况）
@@ -102,7 +142,7 @@ public class OssUtil {
 
             log.info("开始上传文件到 OSS: {}, 大小: {} bytes", objectName, file.getSize());
             
-            // 上传文件
+            // 使用单例 OSSClient 上传文件
             ossClient.putObject(bucketName, objectName, file.getInputStream());
 
             String accessUrl = getFileAccessUrl(objectName);
@@ -112,12 +152,40 @@ public class OssUtil {
         } catch (Exception e) {
             log.error("OSS 上传失败: {}", e.getMessage(), e);
             throw new IOException("OSS 上传失败: " + e.getMessage(), e);
-        } finally {
-            // 关闭 OSSClient
-            if (ossClient != null) {
-                ossClient.shutdown();
+        }
+    }
+    
+    /**
+     * 获取文件扩展名
+     */
+    private String getFileExtension(String fileName) {
+        int lastDotIndex = fileName.lastIndexOf(".");
+        if (lastDotIndex > 0 && lastDotIndex < fileName.length() - 1) {
+            return fileName.substring(lastDotIndex + 1).toLowerCase();
+        }
+        return "";
+    }
+    
+    /**
+     * 检查文件类型是否允许
+     */
+    private boolean isAllowedType(String extension) {
+        // 如果配置为 "*"，允许所有类型
+        if ("*".equals(allowedTypesStr.trim())) {
+            return true;
+        }
+        
+        if (extension == null || extension.isEmpty()) {
+            return false;
+        }
+        
+        String[] allowedTypes = allowedTypesStr.split(",");
+        for (String type : allowedTypes) {
+            if (type.trim().equalsIgnoreCase(extension)) {
+                return true;
             }
         }
+        return false;
     }
 
     /**
@@ -145,10 +213,7 @@ public class OssUtil {
             return;
         }
         
-        OSS ossClient = null;
         try {
-            ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
-            
             // 从 URL 中提取 ObjectName
             String objectName = extractObjectName(fileUrl);
             if (objectName != null && !objectName.isEmpty()) {
@@ -160,10 +225,6 @@ public class OssUtil {
             }
         } catch (Exception e) {
             log.error("删除 OSS 文件失败: {}, 错误: {}", fileUrl, e.getMessage());
-        } finally {
-            if (ossClient != null) {
-                ossClient.shutdown();
-            }
         }
     }
 
@@ -198,10 +259,7 @@ public class OssUtil {
             throw new IOException("文件 URL 不能为空");
         }
         
-        OSS ossClient = null;
         try {
-            ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
-            
             // 从 URL 中提取 ObjectName
             String objectName = extractObjectName(fileUrl);
             if (objectName == null || objectName.isEmpty()) {
@@ -210,7 +268,7 @@ public class OssUtil {
             
             log.debug("开始从 OSS 下载文件: {}", objectName);
             
-            // 获取 OSS 对象
+            // 使用单例 OSSClient 获取 OSS 对象
             OSSObject ossObject = ossClient.getObject(bucketName, objectName);
             
             // 读取文件内容
@@ -230,10 +288,59 @@ public class OssUtil {
         } catch (Exception e) {
             log.error("从 OSS 下载文件失败: {}, 错误: {}", fileUrl, e.getMessage());
             throw new IOException("OSS 下载失败: " + e.getMessage(), e);
-        } finally {
-            if (ossClient != null) {
-                ossClient.shutdown();
-            }
         }
     }
+    
+    /**
+     * 批量删除 OSS 文件（一次请求最多 1000 个）
+     * @param fileUrls 文件 URL 列表
+     * @return 成功删除的文件数量
+     */
+    public int batchDelete(List<String> fileUrls) {
+        if (fileUrls == null || fileUrls.isEmpty()) {
+            log.warn("批量删除文件失败: URL 列表为空");
+            return 0;
+        }
+        
+        int totalDeleted = 0;
+        
+        try {
+            // 提取所有 ObjectName
+            List<String> objectNames = fileUrls.stream()
+                .map(this::extractObjectName)
+                .filter(name -> name != null && !name.isEmpty())
+                .collect(java.util.stream.Collectors.toList());
+            
+            if (objectNames.isEmpty()) {
+                log.warn("批量删除文件失败: 无法解析任何 ObjectName");
+                return 0;
+            }
+            
+            log.info("开始批量删除 OSS 文件，数量: {}", objectNames.size());
+            
+            // OSS 批量删除 API 每次最多支持 1000 个文件
+            int batchSize = 1000;
+            for (int i = 0; i < objectNames.size(); i += batchSize) {
+                int endIndex = Math.min(i + batchSize, objectNames.size());
+                List<String> batch = objectNames.subList(i, endIndex);
+                
+                log.info("删除第 {}-{} 个文件...", i + 1, endIndex);
+                
+                DeleteObjectsRequest deleteRequest = new DeleteObjectsRequest(bucketName);
+                deleteRequest.setKeys(batch);
+                deleteRequest.setQuiet(true); // 静默模式，不返回详细信息
+                
+                DeleteObjectsResult deleteResult = ossClient.deleteObjects(deleteRequest);
+                totalDeleted += deleteResult.getDeletedObjects().size();
+            }
+            
+            log.info("批量删除 OSS 文件完成，成功删除: {}/{} 个", totalDeleted, objectNames.size());
+            
+        } catch (Exception e) {
+            log.error("批量删除 OSS 文件失败: {}", e.getMessage(), e);
+        }
+        
+        return totalDeleted;
+    }
 }
+

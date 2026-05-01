@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getProjectDetail, starProject, unstarProject, watchProject, unwatchProject, downloadProject, updateProject, deleteProject, uploadFiles, overwriteUploadFiles, getProjectFiles, getAllProjectFiles } from '@/api/project'
+import { getProjectDetail, starProject, unstarProject, watchProject, unwatchProject, downloadProject, updateProject, deleteProject, uploadFiles, overwriteUploadFiles, getProjectFiles, getAllProjectFiles, uploadProjectDocument, deleteProjectDocument, getProjectDocument } from '@/api/project'
 import { getProjectComments, createComment } from '@/api/comment'
 import { getTagsByCategory } from '@/api/tag'
 import { getActiveCourses } from '@/api/course'
@@ -10,6 +10,8 @@ import { toast } from '@/utils/toast'
 import { log, error as logError, warn } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 import FileTreeItem from './FileTreeItem.vue'
+import mammoth from 'mammoth'
+import { marked } from 'marked'
 
 const route = useRoute()
 const router = useRouter()
@@ -32,7 +34,7 @@ const comments = ref([])
 const newComment = ref('')
 
 // 标签页
-const activeTab = ref('readme') // readme, code, issues, comments, settings
+const activeTab = ref('readme') // readme, code, comments, settings
 
 // 标签列表（按分组）
 const tagsByCategory = ref({
@@ -75,6 +77,15 @@ const isLoadingFiles = ref(false)
 // 文件夹展开状态（存储展开的文件夹 ID）
 const expandedFolders = ref(new Set())
 
+// 项目文档相关
+const documentUrl = ref('')
+const documentName = ref('') // 原始文件名
+const isUploadingDocument = ref(false)
+const documentUploadProgress = ref(0)
+const selectedDocumentFile = ref(null)
+const documentContent = ref('') // 渲染后的 HTML 内容
+const isRenderingDocument = ref(false) // 是否正在渲染文档
+
 // 加载项目详情
 const loadProjectDetail = async () => {
   if (!projectId.value) {
@@ -107,6 +118,9 @@ const loadProjectDetail = async () => {
       
       // 加载项目文件列表
       await loadProjectFiles()
+      
+      // 加载项目文档
+      await loadProjectDocument()
       
       // 如果是所有者，初始化编辑表单
       if (isOwner.value) {
@@ -197,6 +211,221 @@ const loadProjectFiles = async () => {
     // 文件加载失败不影响主流程
   } finally {
     isLoadingFiles.value = false
+  }
+}
+
+// 加载项目文档
+const loadProjectDocument = async () => {
+  try {
+    const res = await getProjectDocument(projectId.value)
+    if (res.code === 200 && res.data) {
+      documentUrl.value = res.data
+      // 从 URL 提取文件名作为显示名称
+      const urlParts = res.data.split('/')
+      documentName.value = urlParts[urlParts.length - 1] || '未知文档'
+      log('项目文档加载成功:', documentUrl.value)
+      log('文档显示名称:', documentName.value)
+      
+      // 自动渲染 Word 或 Markdown 文档
+      if (isWordDocument()) {
+        await renderWordDocument()
+      } else if (isMarkdownDocument()) {
+        await renderMarkdownDocument()
+      }
+    }
+  } catch (error) {
+    logError('加载项目文档失败:', error)
+    // 文档加载失败不影响主流程
+  }
+}
+
+// 选择文档文件
+const handleDocumentFileSelect = (event) => {
+  const file = event.target.files[0]
+  if (!file) return
+  
+  // 验证文件类型
+  const allowedTypes = [
+    'application/pdf',
+    'application/msword',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain',
+    'text/markdown',
+    'application/vnd.ms-powerpoint',
+    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  ]
+  
+  const fileExtension = file.name.split('.').pop().toLowerCase()
+  const allowedExtensions = ['pdf', 'doc', 'docx', 'txt', 'md', 'ppt', 'pptx']
+  
+  if (!allowedExtensions.includes(fileExtension)) {
+    toast.error('不支持的文件类型，仅支持 PDF、Word、TXT、Markdown、PPT 格式')
+    event.target.value = '' // 清空选择
+    return
+  }
+  
+  selectedDocumentFile.value = file
+  log('选择的文档文件:', file.name, file.size, 'bytes')
+}
+
+// 上传项目文档
+const uploadDocument = async () => {
+  if (!selectedDocumentFile.value) {
+    toast.warning('请先选择文档文件')
+    return
+  }
+  
+  isUploadingDocument.value = true
+  documentUploadProgress.value = 0
+  
+  try {
+    log('开始上传项目文档...')
+    const res = await uploadProjectDocument(
+      projectId.value,
+      selectedDocumentFile.value,
+      (progress) => {
+        documentUploadProgress.value = progress
+      }
+    )
+    
+    if (res.code === 200 && res.data) {
+      documentUrl.value = res.data
+      // 保存原始文件名
+      documentName.value = selectedDocumentFile.value.name
+      selectedDocumentFile.value = null
+      toast.success('文档上传成功！')
+      log('文档上传成功:', documentUrl.value)
+      log('文档显示名称:', documentName.value)
+      
+      // 自动渲染 Word 或 Markdown 文档
+      if (isWordDocument()) {
+        await renderWordDocument()
+      } else if (isMarkdownDocument()) {
+        await renderMarkdownDocument()
+      }
+      
+      // 清空文件选择
+      const fileInput = document.getElementById('document-file-input')
+      if (fileInput) {
+        fileInput.value = ''
+      }
+    }
+  } catch (error) {
+    logError('上传项目文档失败:', error)
+    toast.error(error.message || '上传失败，请稍后重试')
+  } finally {
+    isUploadingDocument.value = false
+    documentUploadProgress.value = 0
+  }
+}
+
+// 删除项目文档
+const deleteDocument = async () => {
+  if (!confirm('确定要删除项目文档吗？')) {
+    return
+  }
+  
+  try {
+    const res = await deleteProjectDocument(projectId.value)
+    if (res.code === 200) {
+      documentUrl.value = ''
+      documentName.value = ''
+      documentContent.value = ''
+      toast.success('文档删除成功！')
+      log('项目文档删除成功')
+    }
+  } catch (error) {
+    logError('删除项目文档失败:', error)
+    toast.error(error.message || '删除失败，请稍后重试')
+  }
+}
+
+// 获取文档显示名称
+const getDocumentName = () => {
+  // 如果有原始文件名，优先使用
+  if (documentName.value) {
+    return documentName.value
+  }
+  // 否则从 URL 中提取
+  if (!documentUrl.value) return ''
+  const parts = documentUrl.value.split('/')
+  return parts[parts.length - 1] || '未知文档'
+}
+
+// 判断是否为 PDF 文档
+const isPdfDocument = () => {
+  if (!documentUrl.value) return false
+  return documentUrl.value.toLowerCase().endsWith('.pdf')
+}
+
+// 判断是否为 Word 文档
+const isWordDocument = () => {
+  if (!documentUrl.value) return false
+  const ext = documentUrl.value.toLowerCase()
+  return ext.endsWith('.doc') || ext.endsWith('.docx')
+}
+
+// 判断是否为 Markdown 文档
+const isMarkdownDocument = () => {
+  if (!documentUrl.value) return false
+  return documentUrl.value.toLowerCase().endsWith('.md')
+}
+
+// 渲染 Word 文档为 HTML
+const renderWordDocument = async () => {
+  if (!isWordDocument()) return
+  
+  isRenderingDocument.value = true
+  try {
+    log('开始渲染 Word 文档...')
+    
+    // 下载 Word 文件
+    const response = await fetch(documentUrl.value)
+    const arrayBuffer = await response.arrayBuffer()
+    
+    // 使用 mammoth 转换为 HTML
+    const result = await mammoth.convertToHtml({ arrayBuffer })
+    documentContent.value = result.value
+    
+    log('Word 转换后的 HTML 长度:', result.value?.length || 0)
+    log('Word 转换后的 HTML 内容预览:', result.value?.substring(0, 200))
+    
+    if (result.messages && result.messages.length > 0) {
+      log('Word 转换警告:', result.messages)
+    }
+    
+    log('Word 文档渲染成功')
+  } catch (error) {
+    logError('渲染 Word 文档失败:', error)
+    toast.error('Word 文档渲染失败，请下载后查看')
+    documentContent.value = ''
+  } finally {
+    isRenderingDocument.value = false
+  }
+}
+
+// 渲染 Markdown 文档为 HTML
+const renderMarkdownDocument = async () => {
+  if (!isMarkdownDocument()) return
+  
+  isRenderingDocument.value = true
+  try {
+    log('开始渲染 Markdown 文档...')
+    
+    // 下载 Markdown 文件
+    const response = await fetch(documentUrl.value)
+    const markdownText = await response.text()
+    
+    // 使用 marked 转换为 HTML
+    documentContent.value = marked(markdownText)
+    
+    log('Markdown 文档渲染成功')
+  } catch (error) {
+    logError('渲染 Markdown 文档失败:', error)
+    toast.error('Markdown 文档渲染失败，请下载后查看')
+    documentContent.value = ''
+  } finally {
+    isRenderingDocument.value = false
   }
 }
 
@@ -1026,19 +1255,13 @@ onMounted(() => {
               :class="['tab-btn', { active: activeTab === 'readme' }]"
               @click="switchTab('readme')"
             >
-              📄 README
+              📄 项目文档
             </button>
             <button 
               :class="['tab-btn', { active: activeTab === 'code' }]"
               @click="switchTab('code')"
             >
               💻 代码
-            </button>
-            <button 
-              :class="['tab-btn', { active: activeTab === 'issues' }]"
-              @click="switchTab('issues')"
-            >
-              🐛 Issues
             </button>
             <button 
               :class="['tab-btn', { active: activeTab === 'comments' }]"
@@ -1056,9 +1279,116 @@ onMounted(() => {
           </div>
         </div>
 
-        <!-- README 内容 -->
-        <div v-if="activeTab === 'readme'" class="content-section readme-content">
-          <pre class="readme-text">{{ project.readme }}</pre>
+        <!-- 项目文档内容 -->
+        <div v-if="activeTab === 'readme'" class="content-section document-content">
+          <!-- 已有文档：显示预览 -->
+          <div v-if="documentUrl" class="document-viewer">
+            <!-- 删除按钮（仅所有者可见，放在右上角） -->
+            <button 
+              v-if="isOwner"
+              class="btn-delete-document-float"
+              @click="deleteDocument"
+              title="删除文档"
+            >
+              删除文档
+            </button>
+            
+            <!-- PDF 预览 -->
+            <iframe 
+              v-if="isPdfDocument()"
+              :src="documentUrl"
+              class="pdf-preview"
+              frameborder="0"
+            ></iframe>
+            
+            <!-- Word 文档预览 -->
+            <div v-else-if="isWordDocument()" class="word-preview">
+              <div v-if="isRenderingDocument" class="rendering-loading">
+                <span class="loading-spinner">⟳</span>
+                <p>正在渲染 Word 文档...</p>
+              </div>
+              <div v-else-if="documentContent" class="rendered-content" v-html="documentContent"></div>
+              <div v-else class="render-failed">
+                <p>⚠️ Word 文档渲染失败</p>
+                <a :href="documentUrl" target="_blank" class="download-link">
+                  ⬇️ 下载文档
+                </a>
+              </div>
+            </div>
+            
+            <!-- Markdown 文档预览 -->
+            <div v-else-if="isMarkdownDocument()" class="markdown-preview">
+              <div v-if="isRenderingDocument" class="rendering-loading">
+                <span class="loading-spinner">⟳</span>
+                <p>正在渲染 Markdown 文档...</p>
+              </div>
+              <div v-else-if="documentContent" class="rendered-content markdown-body" v-html="documentContent"></div>
+              <div v-else class="render-failed">
+                <p>⚠️ Markdown 文档渲染失败</p>
+                <a :href="documentUrl" target="_blank" class="download-link">
+                  ⬇️ 下载文档
+                </a>
+              </div>
+            </div>
+            
+            <!-- 其他格式：提供下载链接 -->
+            <div v-else class="document-download">
+              <p>此文档格式不支持在线预览，请下载后查看</p>
+              <a :href="documentUrl" target="_blank" class="download-link">
+                ⬇️ 下载文档
+              </a>
+            </div>
+          </div>
+          
+          <!-- 无文档：显示上传区域（仅所有者可见） -->
+          <div v-else-if="isOwner" class="document-upload-area">
+            <div class="upload-placeholder">
+              <span class="upload-icon">📄</span>
+              <p class="upload-text">暂无项目文档</p>
+              <p class="upload-hint">支持 PDF、Word、TXT、Markdown、PPT 格式</p>
+              
+              <div class="file-select-wrapper">
+                <input 
+                  type="file" 
+                  id="document-file-input"
+                  accept=".pdf,.doc,.docx,.txt,.md,.ppt,.pptx"
+                  @change="handleDocumentFileSelect"
+                  class="file-input"
+                />
+                <label for="document-file-input" class="select-file-btn">
+                  选择文件
+                </label>
+              </div>
+              
+              <!-- 显示选中的文件 -->
+              <div v-if="selectedDocumentFile" class="selected-file-info">
+                <p>已选择：{{ selectedDocumentFile.name }}</p>
+                <p class="file-size">{{ (selectedDocumentFile.size / 1024).toFixed(2) }} KB</p>
+                <button 
+                  class="upload-btn"
+                  @click="uploadDocument"
+                  :disabled="isUploadingDocument"
+                >
+                  {{ isUploadingDocument ? '上传中...' : '上传文档' }}
+                </button>
+                
+                <!-- 上传进度条 -->
+                <div v-if="isUploadingDocument" class="progress-bar">
+                  <div 
+                    class="progress-fill" 
+                    :style="{ width: documentUploadProgress + '%' }"
+                  ></div>
+                  <span class="progress-text">{{ documentUploadProgress }}%</span>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 无文档且非所有者 -->
+          <div v-else class="empty-document">
+            <span class="empty-icon">📄</span>
+            <p>该项目暂无文档</p>
+          </div>
         </div>
 
         <!-- 代码内容 -->
@@ -1089,15 +1419,6 @@ onMounted(() => {
                 />
               </template>
             </ul>
-          </div>
-        </div>
-
-        <!-- Issues 内容 -->
-        <div v-if="activeTab === 'issues'" class="content-section issues-content">
-          <div class="empty-issues">
-            <span class="empty-icon">🐛</span>
-            <p>功能待更新</p>
-            <button class="create-issue-btn">创建 Issue</button>
           </div>
         </div>
 
@@ -1742,6 +2063,459 @@ onMounted(() => {
   list-style: none;
   padding: 0;
   margin: 0;
+}
+
+/* 项目文档区域 */
+.document-content {
+  padding: 32px;
+  min-height: 400px;
+}
+
+/* 文档查看器 */
+.document-viewer {
+  width: 100%;
+  position: relative;
+}
+
+.document-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  padding-bottom: 16px;
+  border-bottom: 2px solid #e0e0e0;
+}
+
+.document-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333333;
+  margin: 0;
+}
+
+.btn-delete-document {
+  padding: 8px 16px;
+  background-color: #ff4d4f;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-delete-document:hover {
+  background-color: #ff7875;
+}
+
+/* 浮动删除按钮（不显示文档名时使用） */
+.btn-delete-document-float {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  padding: 8px 16px;
+  background-color: rgba(255, 77, 79, 0.9);
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(255, 77, 79, 0.3);
+}
+
+.btn-delete-document-float:hover {
+  background-color: rgba(255, 120, 117, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 77, 79, 0.4);
+}
+
+.btn-delete-document-float:active {
+  transform: translateY(0);
+}
+
+/* PDF 预览 */
+.pdf-preview {
+  width: 100%;
+  height: 800px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background-color: #f9f9f9;
+}
+
+/* 文档下载区域 */
+.document-download {
+  text-align: center;
+  padding: 60px 20px;
+  background-color: #fafafa;
+  border-radius: 8px;
+  border: 2px dashed #d9d9d9;
+}
+
+.document-download p {
+  font-size: 16px;
+  color: #666666;
+  margin-bottom: 24px;
+}
+
+.download-link {
+  display: inline-block;
+  padding: 12px 32px;
+  background-color: #10b981;
+  color: #ffffff;
+  text-decoration: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.download-link:hover {
+  background-color: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* Word 文档预览 */
+.word-preview {
+  width: 100%;
+}
+
+.rendering-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 60px 20px;
+  color: #666666;
+}
+
+.rendering-loading .loading-spinner {
+  font-size: 48px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 16px;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.rendered-content {
+  max-height: 700px;
+  padding: 32px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  line-height: 1.8;
+  overflow-y: auto;
+  overflow-x: auto;
+}
+
+/* 自定义滚动条样式 */
+.rendered-content::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.rendered-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.rendered-content::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 4px;
+}
+
+.rendered-content::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
+
+.rendered-content h1,
+.rendered-content h2,
+.rendered-content h3,
+.rendered-content h4,
+.rendered-content h5,
+.rendered-content h6 {
+  margin-top: 24px;
+  margin-bottom: 16px;
+  font-weight: 600;
+  line-height: 1.25;
+  color: #333333;
+}
+
+.rendered-content h1 {
+  font-size: 2em;
+  border-bottom: 2px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+
+.rendered-content h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid #eaecef;
+  padding-bottom: 0.3em;
+}
+
+.rendered-content p {
+  margin: 16px 0;
+  color: #333333;
+}
+
+.rendered-content ul,
+.rendered-content ol {
+  margin: 16px 0;
+  padding-left: 2em;
+}
+
+.rendered-content li {
+  margin: 8px 0;
+}
+
+.rendered-content code {
+  padding: 0.2em 0.4em;
+  background-color: #f6f8fa;
+  border-radius: 3px;
+  font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace;
+  font-size: 85%;
+}
+
+.rendered-content pre {
+  padding: 16px;
+  background-color: #f6f8fa;
+  border-radius: 6px;
+  overflow: auto;
+  margin: 16px 0;
+}
+
+.rendered-content pre code {
+  padding: 0;
+  background-color: transparent;
+}
+
+.rendered-content table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 16px 0;
+}
+
+.rendered-content table th,
+.rendered-content table td {
+  padding: 8px 12px;
+  border: 1px solid #dfe2e5;
+}
+
+.rendered-content table tr:nth-child(2n) {
+  background-color: #f6f8fa;
+}
+
+.rendered-content img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+}
+
+.rendered-content blockquote {
+  padding: 0 1em;
+  color: #6a737d;
+  border-left: 0.25em solid #dfe2e5;
+  margin: 16px 0;
+}
+
+.rendered-content a {
+  color: #0366d6;
+  text-decoration: none;
+}
+
+.rendered-content a:hover {
+  text-decoration: underline;
+}
+
+.render-failed {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 60px 20px;
+  text-align: center;
+}
+
+.render-failed p {
+  font-size: 16px;
+  color: #ff6b6b;
+  margin-bottom: 20px;
+}
+
+/* Markdown 预览 */
+.markdown-preview {
+  width: 100%;
+}
+
+.markdown-body {
+  /* GitHub Markdown 风格 */
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  word-wrap: break-word;
+}
+
+/* 文档上传区域 */
+.document-upload-area {
+  width: 100%;
+}
+
+.upload-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80px 20px;
+  background: linear-gradient(135deg, #fafafa 0%, #f5f5f5 100%);
+  border-radius: 8px;
+  border: 2px dashed #d9d9d9;
+}
+
+.upload-placeholder .upload-icon {
+  font-size: 72px;
+  margin-bottom: 20px;
+  opacity: 0.4;
+}
+
+.upload-text {
+  font-size: 18px;
+  color: #333333;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+}
+
+.upload-hint {
+  font-size: 14px;
+  color: #999999;
+  margin: 0 0 32px 0;
+}
+
+/* 文件选择包装器 */
+.file-select-wrapper {
+  position: relative;
+  margin-bottom: 24px;
+}
+
+.file-input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.select-file-btn {
+  display: inline-block;
+  padding: 12px 32px;
+  background-color: #10b981;
+  color: #ffffff;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.select-file-btn:hover {
+  background-color: #059669;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+}
+
+/* 选中文件信息 */
+.selected-file-info {
+  text-align: center;
+  padding: 24px;
+  background-color: #ffffff;
+  border-radius: 8px;
+  border: 1px solid #e0e0e0;
+  width: 100%;
+  max-width: 400px;
+}
+
+.selected-file-info p {
+  font-size: 14px;
+  color: #333333;
+  margin: 8px 0;
+}
+
+.file-size {
+  font-size: 12px;
+  color: #999999;
+}
+
+.upload-btn {
+  margin-top: 16px;
+  padding: 12px 32px;
+  background-color: #10b981;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  width: 100%;
+}
+
+.upload-btn:hover:not(:disabled) {
+  background-color: #059669;
+}
+
+.upload-btn:disabled {
+  background-color: #d9d9d9;
+  cursor: not-allowed;
+}
+
+/* 进度条 */
+.progress-bar {
+  margin-top: 16px;
+  width: 100%;
+  height: 24px;
+  background-color: #f0f0f0;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10b981 0%, #059669 100%);
+  transition: width 0.3s ease;
+  border-radius: 12px;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: 600;
+  color: #333333;
+}
+
+/* 空文档状态 */
+.empty-document {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 80px 20px;
+  color: #999999;
+}
+
+.empty-document .empty-icon {
+  font-size: 72px;
+  margin-bottom: 20px;
+  opacity: 0.4;
+}
+
+.empty-document p {
+  font-size: 16px;
+  color: #666666;
 }
 
 /* Issues */

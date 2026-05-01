@@ -164,6 +164,36 @@ public class ProjectTagService {
     }
     
     /**
+     * 移除项目的所有标签关联（用于删除项目时）
+     * @param projectId 项目 ID
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void removeProjectTags(Integer projectId) {
+        log.info("移除项目的所有标签关联，项目 ID: {}", projectId);
+        
+        if (projectId == null) {
+            throw new IllegalArgumentException("项目 ID 不能为空");
+        }
+        
+        // 获取项目的标签 ID 列表（用于更新使用次数）
+        List<Integer> tagIds = projectTagMapper.selectTagIdsByProjectId(projectId);
+        
+        // 删除项目的所有标签关联
+        int deletedCount = projectTagMapper.deleteByProjectId(projectId);
+        log.info("删除标签关联数量: {}", deletedCount);
+        
+        // 更新标签使用次数（减少）
+        if (tagIds != null && !tagIds.isEmpty()) {
+            for (Integer tagId : tagIds) {
+                tagMapper.decrementUsageCount(tagId);
+            }
+            log.info("更新标签使用次数，标签数量: {}", tagIds.size());
+        }
+        
+        log.info("项目标签关联清理完成，项目 ID: {}", projectId);
+    }
+    
+    /**
      * 更新标签使用次数
      * @param tagIds 标签 ID 列表
      */

@@ -60,4 +60,9 @@
         ORDER BY created_at DESC
     </select>
     
+    <!-- 根据项目 ID 删除所有关注记录 -->
+    <delete id="deleteByProjectId" parameterType="java.lang.Integer">
+        DELETE FROM watch WHERE project_id = #{projectId}
+    </delete>
+    
 </mapper>
