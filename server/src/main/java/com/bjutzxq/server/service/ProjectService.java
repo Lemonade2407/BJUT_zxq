@@ -160,6 +160,15 @@ public class ProjectService {
         if (project.getVisibility() != null) {
             existingProject.setVisibility(project.getVisibility());
         }
+        if (project.getProjectType() != null) {
+            existingProject.setProjectType(project.getProjectType());
+        }
+        if (project.getCourseName() != null) {
+            existingProject.setCourseName(project.getCourseName());
+        }
+        if (project.getThesisType() != null) {
+            existingProject.setThesisType(project.getThesisType());
+        }
             
         // 执行更新
         int rows = projectMapper.updateById(existingProject);

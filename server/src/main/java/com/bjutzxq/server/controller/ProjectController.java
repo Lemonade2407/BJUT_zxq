@@ -120,7 +120,9 @@ public class ProjectController {
             project.setName(projectRequest.getName());
             project.setDescription(projectRequest.getDescription());
             project.setVisibility(projectRequest.getVisibility());
+            project.setProjectType(projectRequest.getProjectType()); // 支持更新项目类型
             project.setCourseName(projectRequest.getCourseName()); // 支持更新课程名称
+            project.setThesisType(projectRequest.getThesisType()); // 支持更新毕设类型
             project.setOwnerId(userId);
             
             // 3. Service 层会验证是否为项目所有者
@@ -448,9 +450,18 @@ public class ProjectController {
         try {
             // 1. 获取当前用户 ID 并验证是否为教师
             Integer userId = getCurrentUserId(request);
+            log.info("批量下载 - 当前用户 ID: {}", userId);
+            
             com.bjutzxq.pojo.User user = projectService.getUserById(userId);
-            if (user == null || !"TEACHER".equals(user.getRole())) {
-                log.warn("批量下载失败：非教师用户，用户 ID: {}", userId);
+            if (user == null) {
+                log.warn("批量下载失败：用户不存在，用户 ID: {}", userId);
+                return ResponseEntity.status(403).build();
+            }
+            
+            log.info("批量下载 - 用户角色: {}", user.getRole());
+            
+            if (user.getRole() != com.bjutzxq.common.Role.TEACHER) {
+                log.warn("批量下载失败：非教师用户，用户 ID: {}, 角色: {}", userId, user.getRole());
                 return ResponseEntity.status(403).build();
             }
             

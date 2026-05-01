@@ -39,25 +39,42 @@ const activeTab = ref('readme') // readme, code, comments, settings
 // 标签列表（按分组）
 const tagsByCategory = ref({
   '技术栈': [],
-  '领域': [],
-  '其他': []
+  '领域': []
 })
 
 // 每个分类显示的标签数量（分页）
 const displayCount = ref({
   '技术栈': 10,
-  '领域': 10,
-  '其他': 10
+  '领域': 10
 })
 
 // 课程列表（从数据库加载）
 const courseList = ref([])
+
+// 项目类型选项
+const projectTypeOptions = [
+  { value: 'COURSE', label: '课程设计' },
+  { value: 'THESIS', label: '毕业设计' },
+  { value: 'COMPETITION', label: '竞赛作品' },
+  { value: 'PERSONAL', label: '个人项目' },
+  { value: 'OTHER', label: '其他' }
+]
+
+// 毕设类型选项
+const thesisTypeOptions = [
+  { value: 'UNDERGRADUATE', label: '本科生毕设' },
+  { value: 'MASTER', label: '研究生毕设' },
+  { value: 'DOCTOR', label: '博士生毕设' }
+]
 
 // 编辑表单
 const editForm = ref({
   name: '',
   description: '',
   visibility: 1,
+  projectType: 'OTHER', // 默认其他
+  courseName: '',
+  thesisType: '',
   tagIds: []
 })
 const isEditing = ref(false)
@@ -566,7 +583,9 @@ const initEditForm = () => {
     name: project.value.name || '',
     description: project.value.description || '',
     visibility: project.value.visibility !== undefined ? project.value.visibility : 1,
-    courseName: project.value.courseName || '', // 添加课程名称
+    projectType: project.value.projectType || 'OTHER',
+    courseName: project.value.courseName || '',
+    thesisType: project.value.thesisType || '',
     tagIds: project.value.tags ? project.value.tags.map(tag => tag.id) : []
   }
 }
@@ -574,11 +593,10 @@ const initEditForm = () => {
 // 加载标签列表（按分组）
 const loadTags = async () => {
   try {
-    // 并行请求三个分组的标签
-    const [techRes, domainRes, otherRes] = await Promise.all([
+    // 并行请求两个分组的标签
+    const [techRes, domainRes] = await Promise.all([
       getTagsByCategory('技术栈'),
-      getTagsByCategory('领域'),
-      getTagsByCategory('其他')
+      getTagsByCategory('领域')
     ])
     
     if (techRes.code === 200) {
@@ -586,9 +604,6 @@ const loadTags = async () => {
     }
     if (domainRes.code === 200) {
       tagsByCategory.value['领域'] = domainRes.data || []
-    }
-    if (otherRes.code === 200) {
-      tagsByCategory.value['其他'] = otherRes.data || []
     }
     
     log('加载标签列表成功')
@@ -659,7 +674,9 @@ const saveChanges = async () => {
       name: editForm.value.name.trim(),
       description: editForm.value.description,
       visibility: editForm.value.visibility,
-      courseName: editForm.value.courseName, // 添加课程名称
+      projectType: editForm.value.projectType,
+      courseName: editForm.value.courseName,
+      thesisType: editForm.value.thesisType,
       tagIds: editForm.value.tagIds
     })
     
@@ -1502,8 +1519,23 @@ onMounted(() => {
               </select>
             </div>
 
+            <!-- 项目类型选择 -->
+            <div class="form-group">
+              <label class="form-label">项目类型</label>
+              <div class="project-type-grid">
+                <div
+                  v-for="option in projectTypeOptions"
+                  :key="option.value"
+                  :class="['type-option', { selected: editForm.projectType === option.value }]"
+                  @click="isEditing && (editForm.projectType = option.value)"
+                >
+                  <span class="type-label">{{ option.label }}</span>
+                </div>
+              </div>
+            </div>
+
             <!-- 课程名称（仅当项目是课程设计时显示） -->
-            <div v-if="project.projectType === 'COURSE'" class="form-group">
+            <div v-if="editForm.projectType === 'COURSE'" class="form-group">
               <label class="form-label">课程名称</label>
               <select 
                 v-model="editForm.courseName"
@@ -1515,6 +1547,21 @@ onMounted(() => {
                   {{ course }}
                 </option>
               </select>
+            </div>
+
+            <!-- 毕设类型（仅当选择毕业设计时显示） -->
+            <div v-if="editForm.projectType === 'THESIS'" class="form-group">
+              <label class="form-label">毕设类型</label>
+              <div class="thesis-type-options">
+                <div
+                  v-for="option in thesisTypeOptions"
+                  :key="option.value"
+                  :class="['thesis-option', { selected: editForm.thesisType === option.value }]"
+                  @click="isEditing && (editForm.thesisType = option.value)"
+                >
+                  {{ option.label }}
+                </div>
+              </div>
             </div>
 
             <!-- 非编辑模式：只显示项目的标签 -->
@@ -1578,29 +1625,6 @@ onMounted(() => {
                   @click="showMoreTags('领域')"
                 >
                   查看更多 ({{ tagsByCategory['领域'].length - displayCount['领域'] }})
-                </button>
-              </div>
-              
-              <!-- 其他标签 -->
-              <div v-if="tagsByCategory['其他'].length > 0" class="tag-category">
-                <h4 class="category-title-small">📌 其他</h4>
-                <div class="tags-grid">
-                  <div
-                    v-for="tag in getDisplayedTags('其他')"
-                    :key="tag.id"
-                    :class="['tag-item', { selected: editForm.tagIds.includes(tag.id) }]"
-                    @click="toggleTag(tag.id)"
-                  >
-                    {{ tag.name }}
-                  </div>
-                </div>
-                <button
-                  v-if="hasMoreTags('其他')"
-                  type="button"
-                  class="show-more-btn"
-                  @click="showMoreTags('其他')"
-                >
-                  查看更多 ({{ tagsByCategory['其他'].length - displayCount['其他'] }})
                 </button>
               </div>
               
@@ -2713,6 +2737,82 @@ onMounted(() => {
 .form-textarea {
   resize: vertical;
   min-height: 100px;
+}
+
+/* 项目类型选择 */
+.project-type-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+}
+
+.type-option {
+  padding: 16px;
+  background-color: #ffffff;
+  border: 2px solid #d9d9d9;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.type-option:hover {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.02);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.1);
+}
+
+.type-option.selected {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.05);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
+}
+
+.type-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333333;
+}
+
+.type-option.selected .type-label {
+  color: #059669;
+}
+
+/* 毕设类型选项 */
+.thesis-type-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.thesis-option {
+  padding: 12px 20px;
+  background-color: #ffffff;
+  border: 2px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #333333;
+  cursor: pointer;
+  transition: all 0.2s;
+  text-align: center;
+  font-weight: 500;
+}
+
+.thesis-option:hover {
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.02);
+}
+
+.thesis-option.selected {
+  background-color: #10b981;
+  color: #ffffff;
+  border-color: #10b981;
+  font-weight: 600;
 }
 
 /* 非编辑模式下的标签显示 */

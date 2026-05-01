@@ -42,15 +42,13 @@ const thesisTypeOptions = [
 // 标签列表（按分组）
 const tagsByCategory = ref({
   '技术栈': [],
-  '领域': [],
-  '其他': []
+  '领域': []
 })
 
 // 每个分类显示的标签数量（分页）
 const displayCount = ref({
   '技术栈': 10,
-  '领域': 10,
-  '其他': 10
+  '领域': 10
 })
 
 // 加载状态
@@ -187,11 +185,10 @@ const displayFiles = computed(() => {
 // 加载标签列表
 const loadTags = async () => {
   try {
-    // 并行请求三个分组的标签
-    const [techRes, domainRes, otherRes] = await Promise.all([
+    // 并行请求两个分组的标签
+    const [techRes, domainRes] = await Promise.all([
       getTagsByCategory('技术栈'),
-      getTagsByCategory('领域'),
-      getTagsByCategory('其他')
+      getTagsByCategory('领域')
     ])
     
     if (techRes.code === 200) {
@@ -199,9 +196,6 @@ const loadTags = async () => {
     }
     if (domainRes.code === 200) {
       tagsByCategory.value['领域'] = domainRes.data || []
-    }
-    if (otherRes.code === 200) {
-      tagsByCategory.value['其他'] = otherRes.data || []
     }
     
     log('加载标签列表成功')
@@ -713,29 +707,6 @@ onMounted(() => {
                 @click="showMoreTags('领域')"
               >
                 查看更多 ({{ tagsByCategory['领域'].length - displayCount['领域'] }})
-              </button>
-            </div>
-            
-            <!-- 其他标签 -->
-            <div v-if="tagsByCategory['其他'].length > 0" class="tag-category">
-              <h4 class="category-title">📌 其他</h4>
-              <div class="tags-grid">
-                <div
-                  v-for="tag in getDisplayedTags('其他')"
-                  :key="tag.id"
-                  :class="['tag-item', { selected: form.tagIds.includes(tag.id) }]"
-                  @click="toggleTag(tag.id)"
-                >
-                  {{ tag.name }}
-                </div>
-              </div>
-              <button
-                v-if="hasMoreTags('其他')"
-                type="button"
-                class="show-more-btn"
-                @click="showMoreTags('其他')"
-              >
-                查看更多 ({{ tagsByCategory['其他'].length - displayCount['其他'] }})
               </button>
             </div>
             
