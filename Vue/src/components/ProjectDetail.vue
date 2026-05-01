@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { getProjectDetail, starProject, unstarProject, watchProject, unwatchProject, downloadProject, updateProject, deleteProject, uploadFiles, overwriteUploadFiles, getProjectFiles, getAllProjectFiles } from '@/api/project'
 import { getProjectComments, createComment } from '@/api/comment'
 import { getTagsByCategory } from '@/api/tag'
+import { getActiveCourses } from '@/api/course'
 import { getUserById } from '@/api/auth'
 import { toast } from '@/utils/toast'
 import { log, error as logError, warn } from '@/utils/logger'
@@ -46,6 +47,9 @@ const displayCount = ref({
   '领域': 10,
   '其他': 10
 })
+
+// 课程列表（从数据库加载）
+const courseList = ref([])
 
 // 编辑表单
 const editForm = ref({
@@ -333,6 +337,7 @@ const initEditForm = () => {
     name: project.value.name || '',
     description: project.value.description || '',
     visibility: project.value.visibility !== undefined ? project.value.visibility : 1,
+    courseName: project.value.courseName || '', // 添加课程名称
     tagIds: project.value.tags ? project.value.tags.map(tag => tag.id) : []
   }
 }
@@ -360,6 +365,26 @@ const loadTags = async () => {
     log('加载标签列表成功')
   } catch (error) {
     logError('加载标签失败:', error)
+  }
+}
+
+// 加载课程列表
+const loadCourses = async () => {
+  try {
+    log('加载课程列表...')
+    const res = await getActiveCourses()
+    
+    if (res.code === 200 && res.data) {
+      // 提取课程名称列表
+      courseList.value = res.data.map(course => course.courseName).sort()
+      log(`加载完成，课程数量: ${courseList.value.length}`)
+    } else {
+      logError('课程 API 返回数据异常:', res)
+      courseList.value = []
+    }
+  } catch (error) {
+    logError('加载课程列表失败:', error)
+    courseList.value = []
   }
 }
 
@@ -405,6 +430,7 @@ const saveChanges = async () => {
       name: editForm.value.name.trim(),
       description: editForm.value.description,
       visibility: editForm.value.visibility,
+      courseName: editForm.value.courseName, // 添加课程名称
       tagIds: editForm.value.tagIds
     })
     
@@ -933,9 +959,11 @@ const uploadProjectFiles = async () => {
   }
 }
 
+// 组件挂载时加载数据
 onMounted(() => {
   loadProjectDetail()
   loadTags()
+  loadCourses() // 加载课程列表
 })
 </script>
 
@@ -1150,6 +1178,21 @@ onMounted(() => {
               >
                 <option :value="1">公开</option>
                 <option :value="0">私有</option>
+              </select>
+            </div>
+
+            <!-- 课程名称（仅当项目是课程设计时显示） -->
+            <div v-if="project.projectType === 'COURSE'" class="form-group">
+              <label class="form-label">课程名称</label>
+              <select 
+                v-model="editForm.courseName"
+                class="form-select"
+                :disabled="!isEditing"
+              >
+                <option value="">请选择课程</option>
+                <option v-for="course in courseList" :key="course" :value="course">
+                  {{ course }}
+                </option>
               </select>
             </div>
 

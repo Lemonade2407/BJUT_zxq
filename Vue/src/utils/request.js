@@ -3,7 +3,7 @@ import tokenManager from './tokenManager'
 
 // 创建 axios 实例
 const request = axios.create({
-  baseURL: '/api', // 使用 Vite 代理，避免跨域问题
+  baseURL: '/api', // Vite 代理配置：/api -> http://localhost:8080/api
   timeout: 60000, // 请求超时时间（1min，文件上传需要更长时间）
   headers: {
     'Content-Type': 'application/json'

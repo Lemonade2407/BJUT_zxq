@@ -224,6 +224,7 @@ public class UserService {
         userInfo.put("username", user.getUsername());
         userInfo.put("email", user.getEmail());
         userInfo.put("avatar", user.getAvatar());
+        userInfo.put("role", user.getRole() != null ? user.getRole().name() : "USER");
         result.put("user", userInfo);
         
         return result;

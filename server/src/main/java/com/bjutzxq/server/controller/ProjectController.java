@@ -119,6 +119,7 @@ public class ProjectController {
             project.setName(projectRequest.getName());
             project.setDescription(projectRequest.getDescription());
             project.setVisibility(projectRequest.getVisibility());
+            project.setCourseName(projectRequest.getCourseName()); // 支持更新课程名称
             project.setOwnerId(userId);
             
             // 3. Service 层会验证是否为项目所有者

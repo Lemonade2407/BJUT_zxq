@@ -24,6 +24,11 @@ public class ProjectRequest {
     private Integer visibility;
     
     /**
+     * 课程名称（仅当项目类型为课程设计时使用）
+     */
+    private String courseName;
+    
+    /**
      * 标签 ID 列表
      */
     private List<Integer> tagIds;

@@ -21,11 +21,8 @@ const searchQuery = ref('')
 // 导航菜单项
 const menuItems = [
   { icon: '🏠', label: '主页', path: '/home' },
-  { icon: '📁', label: '我的仓库', path: '/repository'},
   { icon: '📦', label: '项目广场', path: '/projects' },
-  { icon: '⭐', label: '收藏', path: '/favorites' },
   // { icon: '👥', label: '组队广场', path: '/team' },  // 暂时注释，后续开发
-  { icon: '⚙️', label: '设置', path: '/settings' },
 ]
 
 // 计算导航项的激活状态

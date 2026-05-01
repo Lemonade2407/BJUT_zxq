@@ -13,13 +13,35 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     /**
+     * 处理认证异常（Token 过期、无效等）
+     * @param e 异常对象
+     * @return 统一响应结果
+     */
+    @ExceptionHandler({
+        io.jsonwebtoken.ExpiredJwtException.class,
+        io.jsonwebtoken.MalformedJwtException.class,
+        io.jsonwebtoken.SignatureException.class
+    })
+    public Result<Void> handleAuthException(Exception e) {
+        log.warn("认证异常：{}", e.getMessage());
+        return Result.error(401, "未授权访问，请重新登录");
+    }
+
+    /**
      * 处理运行时异常
      * @param e 异常对象
      * @return 统一响应结果
      */
     @ExceptionHandler(RuntimeException.class)
     public Result<Void> handleRuntimeException(RuntimeException e) {
-        log.warn("运行时异常：{}", e.getMessage());
+        // 判断是否是认证相关的异常
+        String message = e.getMessage();
+        if (message != null && (message.contains("Token") || message.contains("登录") || message.contains("授权"))) {
+            log.warn("认证异常：{}", message);
+            return Result.error(401, "未授权访问，请重新登录");
+        }
+        
+        log.warn("运行时异常：{}", message);
         return Result.error(500, e.getMessage());
     }
     

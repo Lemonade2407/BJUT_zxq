@@ -10,6 +10,8 @@ import ProjectDetail from '@/components/ProjectDetail.vue'
 import Settings from '@/components/Settings.vue'
 import Favorites from '@/components/Favorites.vue'
 import SearchResult from '@/components/SearchResult.vue'
+import UserProfile from '@/components/UserProfile.vue'
+import ClassManagement from '@/components/ClassManagement.vue'
 import { log } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 
@@ -131,6 +133,29 @@ const routes = [
     meta: { 
       title: '搜索结果',
       requiresAuth: true 
+    }
+  },
+  
+  // 个人主页
+  {
+    path: '/profile',
+    name: 'UserProfile',
+    component: UserProfile,
+    meta: { 
+      title: '个人主页',
+      requiresAuth: true 
+    }
+  },
+  
+  // 教学班级管理（仅教师）
+  {
+    path: '/class-management',
+    name: 'ClassManagement',
+    component: ClassManagement,
+    meta: { 
+      title: '教学班级管理',
+      requiresAuth: true,
+      requiresTeacher: true
     }
   },
   

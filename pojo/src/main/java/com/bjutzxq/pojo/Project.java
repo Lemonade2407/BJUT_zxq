@@ -113,4 +113,14 @@ public class Project {
      * 作者名称（非数据库字段，用于前端显示）
      */
     private String author;
+    
+    /**
+     * 项目所有者用户名（非数据库字段，用于教学管理）
+     */
+    private String ownerUsername;
+    
+    /**
+     * 项目所有者班级（非数据库字段，用于教学管理）
+     */
+    private String ownerClassName;
 }

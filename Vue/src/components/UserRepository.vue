@@ -5,6 +5,7 @@ import { getMyProjects } from '@/api/project'
 import { toast } from '@/utils/toast'
 import { log, error as logError, warn } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
+import UserSidebar from '@/components/UserSidebar.vue'
 
 const router = useRouter()
 
@@ -110,93 +111,101 @@ onMounted(() => {
 
 <template>
   <main class="app-main">
-    <div class="user-repository-container">
-      <!-- 页面头部 -->
-      <div class="page-header">
-        <div class="user-info-header">
-          <img :src="userInfo.avatar" alt="User avatar" class="user-avatar" />
-          <div class="user-details">
-            <h1 class="page-title">{{ userInfo.username }} 的仓库</h1>
-            <p class="page-description">管理你的项目和代码仓库</p>
-          </div>
-          <button class="create-project-btn" @click="$router.push('/create-project')">
-            新增项目
-          </button>
-        </div>
-      </div>
+    <div class="repository-layout">
+      <!-- 侧边栏 -->
+      <UserSidebar />
 
-      <!-- 项目列表 -->
-      <div v-if="isLoading" class="loading-state">
-        <span class="loading-spinner">⟳</span>
-        <p>加载中...</p>
-      </div>
-
-      <div v-else-if="projects.length > 0" class="project-grid">
-        <div 
-          v-for="project in projects" 
-          :key="project.id" 
-          class="project-card"
-          @click="handleProjectClick(project.id)"
-        >
-          <div class="project-card-header">
-            <span class="project-name">{{ project.name }}</span>
-          </div>
-          <p class="project-description">{{ project.description }}</p>
-          <div class="project-tags">
-            <span v-for="tag in project.tags" :key="tag.id" class="tech-tag">
-              {{ tag.name }}
-            </span>
-          </div>
-          <div class="project-footer">
-            <div class="project-stats">
-              <span class="stat">
-                ❤️ {{ formatNumber(project.likes) }}
-              </span>
-              <span class="stat">
-                ⭐ {{ formatNumber(project.favorites) }}
-              </span>
+      <!-- 主内容区 -->
+      <div class="repository-main">
+        <div class="user-repository-container">
+          <!-- 页面头部 -->
+          <div class="page-header">
+            <div class="user-info-header">
+              <img :src="userInfo.avatar" alt="User avatar" class="user-avatar" />
+              <div class="user-details">
+                <h1 class="page-title">{{ userInfo.username }} 的仓库</h1>
+                <p class="page-description">管理你的项目和代码仓库</p>
+              </div>
+              <button class="create-project-btn" @click="$router.push('/create-project')">
+                新增项目
+              </button>
             </div>
           </div>
-        </div>
-      </div>
 
-      <!-- 空状态 -->
-      <div v-else class="empty-state">
-        <span class="empty-icon">📭</span>
-        <p class="empty-text">暂无项目</p>
-      </div>
+          <!-- 项目列表 -->
+          <div v-if="isLoading" class="loading-state">
+            <span class="loading-spinner">⟳</span>
+            <p>加载中...</p>
+          </div>
 
-      <!-- 分页控件 -->
-      <div v-if="allProjects.length > 0" class="pagination-container">
-        <div class="pagination">
-          <button 
-            class="page-btn"
-            @click="changePage(currentPageNum - 1)"
-            :disabled="currentPageNum === 1"
-          >
-            ‹ 上一页
-          </button>
-          
-          <button 
-            v-for="page in totalPages" 
-            :key="page"
-            :class="['page-btn', { active: page === currentPageNum }]"
-            @click="changePage(page)"
-          >
-            {{ page }}
-          </button>
-          
-          <button 
-            class="page-btn"
-            @click="changePage(currentPageNum + 1)"
-            :disabled="currentPageNum === totalPages"
-          >
-            下一页 ›
-          </button>
-        </div>
-        
-        <div class="page-info">
-          共 {{ allProjects.length }} 个项目，第 {{ currentPageNum }} / {{ totalPages }} 页
+          <div v-else-if="projects.length > 0" class="project-grid">
+            <div 
+              v-for="project in projects" 
+              :key="project.id" 
+              class="project-card"
+              @click="handleProjectClick(project.id)"
+            >
+              <div class="project-card-header">
+                <span class="project-name">{{ project.name }}</span>
+              </div>
+              <p class="project-description">{{ project.description }}</p>
+              <div class="project-tags">
+                <span v-for="tag in project.tags" :key="tag.id" class="tech-tag">
+                  {{ tag.name }}
+                </span>
+              </div>
+              <div class="project-footer">
+                <div class="project-stats">
+                  <span class="stat">
+                    ❤️ {{ formatNumber(project.likes) }}
+                  </span>
+                  <span class="stat">
+                    ⭐ {{ formatNumber(project.favorites) }}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 空状态 -->
+          <div v-else class="empty-state">
+            <span class="empty-icon">📭</span>
+            <p class="empty-text">暂无项目</p>
+          </div>
+
+          <!-- 分页控件 -->
+          <div v-if="allProjects.length > 0" class="pagination-container">
+            <div class="pagination">
+              <button 
+                class="page-btn"
+                @click="changePage(currentPageNum - 1)"
+                :disabled="currentPageNum === 1"
+              >
+                ‹ 上一页
+              </button>
+              
+              <button 
+                v-for="page in totalPages" 
+                :key="page"
+                :class="['page-btn', { active: page === currentPageNum }]"
+                @click="changePage(page)"
+              >
+                {{ page }}
+              </button>
+              
+              <button 
+                class="page-btn"
+                @click="changePage(currentPageNum + 1)"
+                :disabled="currentPageNum === totalPages"
+              >
+                下一页 ›
+              </button>
+            </div>
+            
+            <div class="page-info">
+              共 {{ allProjects.length }} 个项目，第 {{ currentPageNum }} / {{ totalPages }} 页
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -211,6 +220,21 @@ onMounted(() => {
   min-height: calc(100vh - 200px);
   width: 100%;
   background-color: #f5f7fa;
+}
+
+/* 布局容器 */
+.repository-layout {
+  display: flex;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: calc(100vh - 120px);
+}
+
+/* 主内容区 */
+.repository-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .user-repository-container {

@@ -1,88 +1,96 @@
 <template>
   <div class="favorites-page">
-    <div class="container">
-      <!-- 页面标题 -->
-      <div class="page-header">
-        <h1>⭐ 我的收藏</h1>
-        <p class="subtitle">我关注的项目列表</p>
-      </div>
+    <div class="favorites-layout">
+      <!-- 侧边栏 -->
+      <UserSidebar />
 
-      <!-- 加载状态 -->
-      <div v-if="loading" class="loading-state">
-        <div class="spinner"></div>
-        <p>加载中...</p>
-      </div>
+      <!-- 主内容区 -->
+      <div class="favorites-main">
+        <div class="container">
+          <!-- 页面标题 -->
+          <div class="page-header">
+            <h1>⭐ 我的收藏</h1>
+            <p class="subtitle">我关注的项目列表</p>
+          </div>
 
-      <!-- 空状态 -->
-      <div v-else-if="projects.length === 0" class="empty-state">
-        <div class="empty-icon">⭐</div>
-        <h3>还没有收藏任何项目</h3>
-        <p>去项目广场发现有趣的项目吧！</p>
-        <router-link to="/projects" class="btn-primary">浏览项目广场</router-link>
-      </div>
+          <!-- 加载状态 -->
+          <div v-if="loading" class="loading-state">
+            <div class="spinner"></div>
+            <p>加载中...</p>
+          </div>
 
-      <!-- 项目列表 -->
-      <div v-else>
-        <div class="project-grid">
-          <div 
-            v-for="project in projects" 
-            :key="project.id"
-            class="project-card"
-            @click="goToProject(project.id)"
-          >
-            <div class="project-card-header">
-              <span class="project-name">{{ project.name }}</span>
-            </div>
-            <p class="project-description">{{ project.description || '暂无描述' }}</p>
-            <div class="project-tags">
-              <span v-for="tag in (project.tags || [])" :key="tag.id" class="tech-tag">
-                {{ tag.name }}
-              </span>
-            </div>
-            <div class="project-footer">
-              <div class="project-stats">
-                <span class="stat">
-                  ❤️ {{ formatNumber(project.starCount || 0) }}
-                </span>
-                <span class="stat">
-                  ⭐ {{ formatNumber(project.watchCount || 0) }}
-                </span>
+          <!-- 空状态 -->
+          <div v-else-if="projects.length === 0" class="empty-state">
+            <div class="empty-icon">⭐</div>
+            <h3>还没有收藏任何项目</h3>
+            <p>去项目广场发现有趣的项目吧！</p>
+            <router-link to="/projects" class="btn-primary">浏览项目广场</router-link>
+          </div>
+
+          <!-- 项目列表 -->
+          <div v-else>
+            <div class="project-grid">
+              <div 
+                v-for="project in projects" 
+                :key="project.id"
+                class="project-card"
+                @click="goToProject(project.id)"
+              >
+                <div class="project-card-header">
+                  <span class="project-name">{{ project.name }}</span>
+                </div>
+                <p class="project-description">{{ project.description || '暂无描述' }}</p>
+                <div class="project-tags">
+                  <span v-for="tag in (project.tags || [])" :key="tag.id" class="tech-tag">
+                    {{ tag.name }}
+                  </span>
+                </div>
+                <div class="project-footer">
+                  <div class="project-stats">
+                    <span class="stat">
+                      ❤️ {{ formatNumber(project.starCount || 0) }}
+                    </span>
+                    <span class="stat">
+                      ⭐ {{ formatNumber(project.watchCount || 0) }}
+                    </span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- 分页控件 -->
-        <div v-if="allProjects.length > 0" class="pagination-container">
-          <div class="pagination">
-            <button 
-              class="page-btn"
-              @click="changePage(currentPageNum - 1)"
-              :disabled="currentPageNum === 1"
-            >
-              ‹ 上一页
-            </button>
-            
-            <button 
-              v-for="page in totalPages" 
-              :key="page"
-              :class="['page-btn', { active: page === currentPageNum }]"
-              @click="changePage(page)"
-            >
-              {{ page }}
-            </button>
-            
-            <button 
-              class="page-btn"
-              @click="changePage(currentPageNum + 1)"
-              :disabled="currentPageNum === totalPages"
-            >
-              下一页 ›
-            </button>
-          </div>
-          
-          <div class="page-info">
-            共 {{ allProjects.length }} 个项目，第 {{ currentPageNum }} / {{ totalPages }} 页
+            <!-- 分页控件 -->
+            <div v-if="allProjects.length > 0" class="pagination-container">
+              <div class="pagination">
+                <button 
+                  class="page-btn"
+                  @click="changePage(currentPageNum - 1)"
+                  :disabled="currentPageNum === 1"
+                >
+                  ‹ 上一页
+                </button>
+                
+                <button 
+                  v-for="page in totalPages" 
+                  :key="page"
+                  :class="['page-btn', { active: page === currentPageNum }]"
+                  @click="changePage(page)"
+                >
+                  {{ page }}
+                </button>
+                
+                <button 
+                  class="page-btn"
+                  @click="changePage(currentPageNum + 1)"
+                  :disabled="currentPageNum === totalPages"
+                >
+                  下一页 ›
+                </button>
+              </div>
+              
+              <div class="page-info">
+                共 {{ allProjects.length }} 个项目，第 {{ currentPageNum }} / {{ totalPages }} 页
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -95,6 +103,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getMyWatchedProjects } from '@/api/project'
 import { error as logError } from '@/utils/logger'
+import UserSidebar from '@/components/UserSidebar.vue'
 
 const router = useRouter()
 const loading = ref(false)
@@ -185,6 +194,21 @@ onMounted(() => {
   min-height: calc(100vh - 200px);
   width: 100%;
   background-color: #f5f7fa;
+}
+
+/* 布局容器 */
+.favorites-layout {
+  display: flex;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  min-height: calc(100vh - 120px);
+}
+
+/* 主内容区 */
+.favorites-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .container {

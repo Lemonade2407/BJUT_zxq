@@ -5,6 +5,7 @@ import { getCurrentUser, updateProfile, changePassword, uploadAvatar } from '@/a
 import { toast } from '@/utils/toast'
 import { error as logError } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
+import UserSidebar from '@/components/UserSidebar.vue'
 
 const router = useRouter()
 
@@ -229,131 +230,140 @@ onMounted(() => {
 
 <template>
   <div class="profile-container">
-    <div class="profile-card">
-      <!-- 头部背景 -->
-      <div class="profile-header">
-        <div class="header-bg"></div>
-        <div class="header-content">
-          <div class="avatar-wrapper">
-            <img
-              :src="userInfo.avatar || '/logo.svg'"
-              alt="头像"
-              class="profile-avatar"
-            />
-            <label v-if="isEditing" class="avatar-upload-btn" title="点击更换头像">
-              📷
-              <input
-                type="file"
-                accept="image/*"
-                @change="handleAvatarUpload"
-                style="display: none;"
-              />
-            </label>
+    <div class="profile-layout">
+      <!-- 侧边栏 -->
+      <UserSidebar />
+
+      <!-- 主内容区 -->
+      <main class="profile-main">
+        <div class="profile-card">
+          <!-- 头部背景 -->
+          <div class="profile-header">
+            <div class="header-bg"></div>
+            <div class="header-content">
+              <div class="avatar-wrapper">
+                <img
+                  :src="userInfo.avatar || '/logo.svg'"
+                  alt="头像"
+                  class="profile-avatar"
+                />
+                <label v-if="isEditing" class="avatar-upload-btn" title="点击更换头像">
+                  📷
+                  <input
+                    type="file"
+                    accept="image/*"
+                    @change="handleAvatarUpload"
+                    style="display: none;"
+                  />
+                </label>
+              </div>
+              <div class="profile-basic">
+                <h1 class="profile-name">{{ userInfo.username }}</h1>
+                <p class="profile-role">{{ getRoleText(userInfo.role) }}</p>
+                <p class="profile-id">ID: {{ userInfo.id }}</p>
+              </div>
+            </div>
           </div>
-          <div class="profile-basic">
-            <h1 class="profile-name">{{ userInfo.username }}</h1>
-            <p class="profile-role">{{ getRoleText(userInfo.role) }}</p>
-            <p class="profile-id">ID: {{ userInfo.id }}</p>
+
+          <!-- 用户信息表单 -->
+          <div class="profile-body">
+            <div class="section-title">
+              <span>基本信息</span>
+              <button 
+                v-if="!isEditing" 
+                @click="toggleEdit" 
+                class="edit-btn"
+              >
+                编辑资料
+              </button>
+              <div v-else class="edit-actions">
+                <button @click="toggleEdit" class="cancel-btn">取消</button>
+                <button @click="handleSave" class="save-btn">保存</button>
+              </div>
+            </div>
+
+            <div class="info-grid">
+              <div class="info-item">
+                <label>用户ID</label>
+                <div class="info-value">{{ userInfo.id }}</div>
+              </div>
+
+              <div class="info-item">
+                <label>用户名</label>
+                <input
+                  v-if="isEditing"
+                  v-model="userInfo.username"
+                  type="text"
+                  placeholder="请输入用户名"
+                  class="info-input"
+                />
+                <div v-else class="info-value">{{ userInfo.username }}</div>
+              </div>
+
+              <!-- 隐藏敏感信息：学号/职工号 -->
+              <!-- <div class="info-item">
+                <label>{{ userInfo.role === 'TEACHER' ? '职工号' : '学号' }}</label>
+                <div class="info-value">{{ userInfo.employeeId || '未设置' }}</div>
+              </div>
+
+              <div v-if="userInfo.role === 'USER'" class="info-item">
+                <label>班级</label>
+                <div class="info-value">{{ userInfo.className || '未设置' }}</div>
+              </div> -->
+
+              <div class="info-item">
+                <label>邮箱</label>
+                <div class="info-value">{{ userInfo.email }}</div>
+              </div>
+
+              <div class="info-item">
+                <label>手机号</label>
+                <input
+                  v-if="isEditing"
+                  v-model="userInfo.phone"
+                  type="tel"
+                  placeholder="请输入手机号"
+                  class="info-input"
+                />
+                <div v-else class="info-value">{{ userInfo.phone || '未设置' }}</div>
+              </div>
+
+              <div class="info-item">
+                <label>性别</label>
+                <select
+                  v-if="isEditing"
+                  v-model="userInfo.sex"
+                  class="info-select"
+                >
+                  <option value="男">男</option>
+                  <option value="女">女</option>
+                  <option value="未知">保密</option>
+                </select>
+                <div v-else class="info-value">{{ getSexText(userInfo.sex) }}</div>
+              </div>
+
+              <div class="info-item full-width">
+                <label>个人简介</label>
+                <textarea
+                  v-if="isEditing"
+                  v-model="userInfo.bio"
+                  placeholder="介绍一下自己吧..."
+                  class="info-textarea"
+                  rows="3"
+                ></textarea>
+                <div v-else class="info-value bio-text">{{ userInfo.bio || '暂无简介' }}</div>
+              </div>
+            </div>
+
+            <!-- 操作按钮 -->
+            <div class="action-section">
+              <button @click="openPasswordDialog" class="action-btn password-btn">
+                🔑 修改密码
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-
-      <!-- 用户信息表单 -->
-      <div class="profile-body">
-        <div class="section-title">
-          <span>基本信息</span>
-          <button 
-            v-if="!isEditing" 
-            @click="toggleEdit" 
-            class="edit-btn"
-          >
-            编辑资料
-          </button>
-          <div v-else class="edit-actions">
-            <button @click="toggleEdit" class="cancel-btn">取消</button>
-            <button @click="handleSave" class="save-btn">保存</button>
-          </div>
-        </div>
-
-        <div class="info-grid">
-          <div class="info-item">
-            <label>用户ID</label>
-            <div class="info-value">{{ userInfo.id }}</div>
-          </div>
-
-          <div class="info-item">
-            <label>用户名</label>
-            <input
-              v-if="isEditing"
-              v-model="userInfo.username"
-              type="text"
-              placeholder="请输入用户名"
-              class="info-input"
-            />
-            <div v-else class="info-value">{{ userInfo.username }}</div>
-          </div>
-
-          <div class="info-item">
-            <label>{{ userInfo.role === 'TEACHER' ? '职工号' : '学号' }}</label>
-            <div class="info-value">{{ userInfo.employeeId || '未设置' }}</div>
-          </div>
-
-          <div v-if="userInfo.role === 'USER'" class="info-item">
-            <label>班级</label>
-            <div class="info-value">{{ userInfo.className || '未设置' }}</div>
-          </div>
-
-          <div class="info-item">
-            <label>邮箱</label>
-            <div class="info-value">{{ userInfo.email }}</div>
-          </div>
-
-          <div class="info-item">
-            <label>手机号</label>
-            <input
-              v-if="isEditing"
-              v-model="userInfo.phone"
-              type="tel"
-              placeholder="请输入手机号"
-              class="info-input"
-            />
-            <div v-else class="info-value">{{ userInfo.phone || '未设置' }}</div>
-          </div>
-
-          <div class="info-item">
-            <label>性别</label>
-            <select
-              v-if="isEditing"
-              v-model="userInfo.sex"
-              class="info-select"
-            >
-              <option value="男">男</option>
-              <option value="女">女</option>
-              <option value="未知">保密</option>
-            </select>
-            <div v-else class="info-value">{{ getSexText(userInfo.sex) }}</div>
-          </div>
-
-          <div class="info-item full-width">
-            <label>个人简介</label>
-            <textarea
-              v-if="isEditing"
-              v-model="userInfo.bio"
-              placeholder="介绍一下自己吧..."
-              class="info-textarea"
-              rows="3"
-            ></textarea>
-            <div v-else class="info-value bio-text">{{ userInfo.bio || '暂无简介' }}</div>
-          </div>
-        </div>
-
-        <!-- 操作按钮 -->
-        <div class="action-section">
-          <button @click="openPasswordDialog" class="action-btn password-btn">
-            🔑 修改密码
-          </button>
-        </div>
-      </div>
+      </main>
     </div>
 
     <!-- 修改密码对话框 -->
@@ -403,20 +413,120 @@ onMounted(() => {
 
 <style scoped>
 .profile-container {
+  width: 100%;
   max-width: 100%;
   min-height: 100%;
+  padding: 24px;
+  background-color: #f5f7fa;
+}
+
+/* 布局容器 */
+.profile-layout {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+}
+
+/* 侧边栏 */
+.profile-sidebar {
+  width: 240px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.sidebar-header {
+  padding: 24px 20px;
+  text-align: center;
+  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+  color: #ffffff;
+}
+
+.sidebar-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  margin-bottom: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-username {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 4px 0;
+}
+
+.sidebar-role {
+  font-size: 13px;
+  opacity: 0.9;
+  margin: 0;
+}
+
+.sidebar-nav {
+  padding: 12px 0;
+}
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px;
+  color: #333333;
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+  border-left: 3px solid transparent;
+}
+
+.nav-item:hover {
+  background-color: #f5f5f5;
+  color: #064e3b;
+}
+
+.nav-item.active {
+  background-color: #ecfdf5;
+  color: #064e3b;
+  border-left-color: #064e3b;
+  font-weight: 600;
+}
+
+.nav-icon {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+}
+
+.nav-label {
+  flex: 1;
+}
+
+/* 主内容区 */
+.profile-main {
+  flex: 1;
+  min-width: 0;
 }
 
 .profile-card {
   background: #ffffff;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
   overflow: hidden;
+  transition: box-shadow 0.3s ease;
+}
+
+.profile-card:hover {
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.12);
 }
 
 /* 头部样式 */
 .profile-header {
   position: relative;
-  height: 200px;
+  height: 220px;
+  overflow: hidden;
 }
 
 .header-bg {
@@ -425,7 +535,15 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+  background: linear-gradient(135deg, #064e3b 0%, #047857 50%, #10b981 100%);
+  background-size: 200% 200%;
+  animation: gradientShift 8s ease infinite;
+}
+
+@keyframes gradientShift {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
 }
 
 .header-content {
@@ -433,8 +551,8 @@ onMounted(() => {
   height: 100%;
   display: flex;
   align-items: flex-end;
-  padding: 0 40px 20px;
-  gap: 20px;
+  padding: 0 48px 24px;
+  gap: 24px;
 }
 
 .avatar-wrapper {
@@ -443,35 +561,42 @@ onMounted(() => {
 }
 
 .profile-avatar {
-  width: 120px;
-  height: 120px;
+  width: 130px;
+  height: 130px;
   border-radius: 50%;
-  border: 4px solid #ffffff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  border: 5px solid #ffffff;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
   background: #ffffff;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.profile-avatar:hover {
+  transform: scale(1.05);
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.3);
 }
 
 .avatar-upload-btn {
   position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 36px;
-  height: 36px;
-  background: #064e3b;
+  bottom: 4px;
+  right: 4px;
+  width: 40px;
+  height: 40px;
+  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  font-size: 18px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
-  transition: all 0.2s;
+  font-size: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  transition: all 0.3s ease;
   border: 3px solid #ffffff;
 }
 
 .avatar-upload-btn:hover {
-  background: #047857;
-  transform: scale(1.1);
+  background: linear-gradient(135deg, #047857 0%, #10b981 100%);
+  transform: scale(1.15) rotate(15deg);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.4);
 }
 
 .profile-basic {
@@ -480,9 +605,11 @@ onMounted(() => {
 }
 
 .profile-name {
-  font-size: 28px;
-  font-weight: 600;
+  font-size: 32px;
+  font-weight: 700;
   margin: 0 0 8px 0;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+  letter-spacing: -0.5px;
 }
 
 .profile-role {
@@ -504,61 +631,70 @@ onMounted(() => {
 
 /* 主体内容 */
 .profile-body {
-  padding: 30px 40px;
+  padding: 40px 48px;
 }
 
 .section-title {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
-  padding-bottom: 12px;
+  margin-bottom: 32px;
+  padding-bottom: 16px;
   border-bottom: 2px solid #f0f0f0;
 }
 
 .section-title span {
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
+  font-size: 22px;
+  font-weight: 700;
+  color: #064e3b;
+  letter-spacing: -0.3px;
 }
 
 .edit-btn,
 .save-btn,
 .cancel-btn {
-  padding: 8px 20px;
+  padding: 10px 24px;
   border: none;
-  border-radius: 6px;
+  border-radius: 8px;
   font-size: 14px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .edit-btn {
-  background: #064e3b;
+  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
   color: #ffffff;
 }
 
 .edit-btn:hover {
-  background: #047857;
+  background: linear-gradient(135deg, #047857 0%, #10b981 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(6, 78, 59, 0.3);
 }
 
 .save-btn {
-  background: #52c41a;
+  background: linear-gradient(135deg, #52c41a 0%, #73d13d 100%);
   color: #ffffff;
   margin-left: 8px;
 }
 
 .save-btn:hover {
-  background: #73d13d;
+  background: linear-gradient(135deg, #73d13d 0%, #95de64 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(82, 196, 26, 0.3);
 }
 
 .cancel-btn {
-  background: #f0f0f0;
+  background: #f5f5f5;
   color: #666;
 }
 
 .cancel-btn:hover {
-  background: #e0e0e0;
+  background: #e8e8e8;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .edit-actions {
@@ -570,7 +706,7 @@ onMounted(() => {
 .info-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
-  gap: 20px;
+  gap: 24px;
 }
 
 .info-item {
@@ -586,13 +722,17 @@ onMounted(() => {
 .info-item label {
   font-size: 14px;
   color: #666;
-  font-weight: 500;
+  font-weight: 600;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
 
 .info-value {
-  font-size: 15px;
+  font-size: 16px;
   color: #333;
-  padding: 8px 0;
+  padding: 10px 0;
+  line-height: 1.6;
 }
 
 .bio-text {
@@ -603,11 +743,12 @@ onMounted(() => {
 .info-input,
 .info-select,
 .info-textarea {
-  padding: 8px 12px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 14px;
-  transition: all 0.2s;
+  padding: 10px 14px;
+  border: 2px solid #e8e8e8;
+  border-radius: 8px;
+  font-size: 15px;
+  transition: all 0.3s ease;
+  background-color: #fafafa;
 }
 
 .info-input:focus,
@@ -615,7 +756,9 @@ onMounted(() => {
 .info-textarea:focus {
   border-color: #064e3b;
   outline: none;
-  box-shadow: 0 0 0 2px rgba(6, 78, 59, 0.1);
+  background-color: #ffffff;
+  box-shadow: 0 0 0 4px rgba(6, 78, 59, 0.1);
+  transform: translateY(-1px);
 }
 
 .info-textarea {
@@ -625,33 +768,37 @@ onMounted(() => {
 
 /* 操作区域 */
 .action-section {
-  margin-top: 30px;
-  padding-top: 20px;
+  margin-top: 40px;
+  padding-top: 32px;
   border-top: 2px solid #f0f0f0;
   display: flex;
-  gap: 12px;
+  gap: 16px;
 }
 
 .action-btn {
-  padding: 10px 20px;
+  padding: 12px 24px;
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s;
+  transition: all 0.3s ease;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .password-btn {
-  background: #fff7e6;
+  background: linear-gradient(135deg, #fff7e6 0%, #ffe7ba 100%);
   color: #fa8c16;
-  border: 1px solid #ffd591;
+  border: 2px solid #ffd591;
 }
 
 .password-btn:hover {
-  background: #ffe7ba;
+  background: linear-gradient(135deg, #ffe7ba 0%, #ffd591 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(250, 140, 22, 0.25);
 }
 
 /* 模态框 */

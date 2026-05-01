@@ -3,6 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { createProject, uploadFiles } from '@/api/project'
 import { getTagsByCategory } from '@/api/tag'
+import { getActiveCourses } from '@/api/course'
 import { toast } from '@/utils/toast'
 import { log, error as logError } from '@/utils/logger'
 
@@ -28,16 +29,8 @@ const projectTypeOptions = [
   { value: 'OTHER', label: '其他' }
 ]
 
-// 课程列表
-const courseList = [
-  '软件工程课程设计',
-  '数据库课程设计',
-  '操作系统课程设计',
-  '计算机网络课程设计',
-  '编译原理课程设计',
-  '数据结构课程设计',
-  '算法设计课程设计'
-]
+// 课程列表（从数据库加载）
+const courseList = ref([])
 
 // 毕设类型选项
 const thesisTypeOptions = [
@@ -214,6 +207,26 @@ const loadTags = async () => {
     log('加载标签列表成功')
   } catch (error) {
     logError('加载标签列表失败:', error)
+  }
+}
+
+// 加载课程列表
+const loadCourses = async () => {
+  try {
+    log('加载课程列表...')
+    const res = await getActiveCourses()
+    
+    if (res.code === 200 && res.data) {
+      // 提取课程名称列表
+      courseList.value = res.data.map(course => course.courseName).sort()
+      log(`加载完成，课程数量: ${courseList.value.length}`)
+    } else {
+      logError('课程 API 返回数据异常:', res)
+      courseList.value = []
+    }
+  } catch (error) {
+    logError('加载课程列表失败:', error)
+    courseList.value = []
   }
 }
 
@@ -541,7 +554,10 @@ const formatFileSize = (bytes) => {
 // 组件挂载时加载数据
 onMounted(() => {
   isLoading.value = true
-  loadTags().finally(() => {
+  Promise.all([
+    loadTags(),
+    loadCourses()
+  ]).finally(() => {
     isLoading.value = false
   })
 })

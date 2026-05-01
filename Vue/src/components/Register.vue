@@ -323,7 +323,8 @@ const clearError = (field) => {
   if (errors[field]) {
     errors[field] = ''
   }
-  errorMessage.value = ''
+  // 不要在这里清空 errorMessage，让它保持显示直到用户重新提交或手动关闭
+  // errorMessage.value = ''
 }
 
 // 组件挂载时加载验证码

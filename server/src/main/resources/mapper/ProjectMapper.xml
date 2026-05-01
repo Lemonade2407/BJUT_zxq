@@ -19,6 +19,9 @@
         <result column="view_count" property="viewCount"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
+        <!-- 非数据库字段，用于教学管理 -->
+        <result column="owner_username" property="ownerUsername"/>
+        <result column="owner_class_name" property="ownerClassName"/>
     </resultMap>
     
     <!-- 基础列 -->
@@ -86,17 +89,25 @@
     <!-- 根据名称查询项目 -->
     <select id="selectByName" resultMap="BaseResultMap">
         SELECT 
-            <include refid="Base_Column_List"/>
-        FROM project
-        WHERE name LIKE CONCAT('%', #{name}, '%')
+            p.*,
+            u.username AS owner_username,
+            u.class_name AS owner_class_name
+        FROM project p
+        LEFT JOIN user u ON p.owner_id = u.id
+        WHERE p.name LIKE CONCAT('%', #{name}, '%')
+        ORDER BY p.created_at DESC
     </select>
     
     <!-- 根据用户 ID 查询项目 -->
     <select id="selectByUserId" resultMap="BaseResultMap">
         SELECT 
-            <include refid="Base_Column_List"/>
-        FROM project
-        WHERE owner_id = #{userId}
+            p.*,
+            u.username AS owner_username,
+            u.class_name AS owner_class_name
+        FROM project p
+        LEFT JOIN user u ON p.owner_id = u.id
+        WHERE p.owner_id = #{userId}
+        ORDER BY p.created_at DESC
     </select>
     
     <!-- 统计项目总数 -->
@@ -113,9 +124,12 @@
 
     <!-- 根据标签 ID 查询项目 -->
     <select id="selectByTagId" resultMap="BaseResultMap">
-        SELECT DISTINCT p.*
+        SELECT DISTINCT p.*,
+            u.username AS owner_username,
+            u.class_name AS owner_class_name
         FROM project p
         INNER JOIN project_tag pt ON p.id = pt.project_id
+        LEFT JOIN user u ON p.owner_id = u.id
         WHERE pt.tag_id = #{tagId}
         ORDER BY p.created_at DESC
     </select>
@@ -123,19 +137,25 @@
     <!-- 查询所有公开项目 -->
     <select id="selectPublicProjects" resultMap="BaseResultMap">
         SELECT 
-            <include refid="Base_Column_List"/>
-        FROM project
-        WHERE visibility = 1
-        ORDER BY created_at DESC
+            p.*,
+            u.username AS owner_username,
+            u.class_name AS owner_class_name
+        FROM project p
+        LEFT JOIN user u ON p.owner_id = u.id
+        WHERE p.visibility = 1
+        ORDER BY p.created_at DESC
     </select>
     
     <!-- 获取热门项目（按浏览量排序） -->
     <select id="selectTrendingProjects" resultMap="BaseResultMap">
         SELECT 
-            <include refid="Base_Column_List"/>
-        FROM project
-        WHERE visibility = 1
-        ORDER BY view_count DESC, star_count DESC
+            p.*,
+            u.username AS owner_username,
+            u.class_name AS owner_class_name
+        FROM project p
+        LEFT JOIN user u ON p.owner_id = u.id
+        WHERE p.visibility = 1
+        ORDER BY p.view_count DESC, p.star_count DESC
         LIMIT #{limit}
     </select>
     
@@ -209,19 +229,22 @@
     <!-- 根据项目类型查询项目 -->
     <select id="selectByProjectType" resultMap="BaseResultMap">
         SELECT 
-            <include refid="Base_Column_List"/>
-        FROM project
-        WHERE visibility = 1
+            p.*,
+            u.username AS owner_username,
+            u.class_name AS owner_class_name
+        FROM project p
+        LEFT JOIN user u ON p.owner_id = u.id
+        WHERE p.visibility = 1
         <if test="projectType != null and projectType != ''">
-            AND project_type = #{projectType}
+            AND p.project_type = #{projectType}
         </if>
         <if test="courseName != null and courseName != ''">
-            AND course_name = #{courseName}
+            AND p.course_name = #{courseName}
         </if>
         <if test="thesisType != null and thesisType != ''">
-            AND thesis_type = #{thesisType}
+            AND p.thesis_type = #{thesisType}
         </if>
-        ORDER BY updated_at DESC, created_at DESC
+        ORDER BY p.updated_at DESC, p.created_at DESC
     </select>
     
 </mapper>

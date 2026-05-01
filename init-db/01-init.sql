@@ -202,6 +202,19 @@ CREATE TABLE IF NOT EXISTS `download_log` (
 ) ENGINE=InnoDB COMMENT='下载日志表';
 
 -- ===========================================
+-- 课程字典表
+-- ===========================================
+CREATE TABLE IF NOT EXISTS `course` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '课程ID',
+  `course_name` VARCHAR(100) NOT NULL UNIQUE COMMENT '课程名称',
+  `is_active` TINYINT DEFAULT 1 COMMENT '是否启用: 0-禁用, 1-启用',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  INDEX idx_course_name (`course_name`),
+  INDEX idx_is_active (`is_active`)
+) ENGINE=InnoDB COMMENT='课程字典表';
+
+-- ===========================================
 -- 插入初始数据
 -- ===========================================
 
@@ -252,6 +265,17 @@ INSERT INTO `tag` (`name`, `category`) VALUES
 ('微服务', '其他'),
 ('单体应用', '其他')
 ON DUPLICATE KEY UPDATE `name`=`name`;
+
+-- 插入常用课程
+INSERT INTO `course` (`course_name`) VALUES
+('高级语言程序设计'),
+('面向对象程序设计(C++)'),
+('数据结构与算法'),
+('数据库原理'),
+('JAVA程序设计'),
+('PYTHON程序开发'),
+('移动软件开发')
+ON DUPLICATE KEY UPDATE `course_name`=`course_name`;
 
 -- ===========================================
 -- 完成提示
