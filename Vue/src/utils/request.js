@@ -35,11 +35,16 @@ request.interceptors.response.use(
     if (res.code !== 200) {
       console.error('API 错误:', res.message)
       
-      // 401: 未授权，跳转到登录页
+      // 401: 未授权，跳转到登录页（排除公开接口）
       if (res.code === 401) {
-        // TODO: 使用路由跳转代替 window.location.href，保持 SPA 体验
-        tokenManager.removeToken()
-        window.location.href = '/login'
+        // 检查是否是公开接口（不需要登录）
+        const publicApis = ['/captcha/', '/auth/login', '/auth/register']
+        const isPublicApi = publicApis.some(api => response.config.url.includes(api))
+        
+        if (!isPublicApi) {
+          tokenManager.removeToken()
+          window.location.href = '/login'
+        }
       }
       
       return Promise.reject(new Error(res.message || '请求失败'))
@@ -59,10 +64,17 @@ request.interceptors.response.use(
       
       switch (status) {
         case 401:
-          errorMessage = '未授权，请重新登录'
-          // TODO: 使用路由跳转代替 window.location.href
-          tokenManager.removeToken()
-          window.location.href = '/login'
+          // 检查是否是公开接口
+          const publicApis = ['/captcha/', '/auth/login', '/auth/register']
+          const isPublicApi = publicApis.some(api => error.config?.url?.includes(api))
+          
+          if (!isPublicApi) {
+            errorMessage = '未授权，请重新登录'
+            tokenManager.removeToken()
+            window.location.href = '/login'
+          } else {
+            errorMessage = data?.message || '请求失败'
+          }
           break
         case 403:
           errorMessage = '拒绝访问'
