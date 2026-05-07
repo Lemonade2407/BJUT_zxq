@@ -12,7 +12,7 @@ import { formatDate, formatNumber } from '@/utils/helpers'
 // TODO: 添加筛选条件持久化（记住用户选择）
 
 // 每页显示的项目数量
-const PAGE_SIZE = 5
+const PAGE_SIZE = 12
 const currentPageNum = ref(1)
 
 // 筛选条件
@@ -28,6 +28,7 @@ const sortBy = ref('updatedAt')  // updatedAt | viewCount | starCount
 // 项目列表（从后端 API 获取）
 const allProjects = ref([])
 const isLoading = ref(false)
+const total = ref(0)  // 总记录数
 
 // 筛选选项
 const projectTypes = ref([])
@@ -43,8 +44,8 @@ const fetchProjects = async () => {
     // 如果有标签筛选，使用标签查询接口
     if (filters.value.tagId) {
       response = await getProjectsByTag(filters.value.tagId, {
-        pageNum: 1,
-        pageSize: 100
+        pageNum: currentPageNum.value,
+        pageSize: PAGE_SIZE
       })
     }
     // 如果有其他筛选条件，使用 filterProjects 接口
@@ -52,25 +53,24 @@ const fetchProjects = async () => {
       response = await filterProjects({
         projectType: filters.value.projectType,
         courseName: filters.value.courseName,
-        pageNum: 1,
-        pageSize: 100
+        pageNum: currentPageNum.value,
+        pageSize: PAGE_SIZE
       })
     } else {
       // 否则使用 getProjectList 接口
       response = await getProjectList({
-        pageNum: 1,
-        pageSize: 100
+        pageNum: currentPageNum.value,
+        pageSize: PAGE_SIZE
       })
     }
     
     if (response.code === 200 && response.data) {
-      // 后端返回的是 PageResult 对象，需要从 records 获取数组
-      const dataList = response.data.records || response.data
+      // 后端返回的是 PageResult 对象
+      const { records = [], total: totalCount = 0 } = response.data
+      total.value = totalCount
       
-      // 按选定的方式排序
-      const sortedData = sortProjects(dataList)
-      
-      allProjects.value = sortedData.map(project => ({
+      // 按选定的方式排序（后端已排序，前端只需展示）
+      allProjects.value = records.map(project => ({
         id: project.id,
         name: project.name,
         description: project.description || '暂无描述',
@@ -85,7 +85,7 @@ const fetchProjects = async () => {
         isStarred: project.isStarred || false,
         isWatched: project.isWatched || false
       }))
-      log('项目列表加载成功，数量：', allProjects.value.length)
+      log('项目列表加载成功，数量：', allProjects.value.length, '总数：', total.value)
     } else {
       logError('获取项目列表失败：', response.message)
       toast.error(response.message || '获取项目列表失败')
@@ -164,7 +164,7 @@ const resetFilters = () => {
 // 监听筛选条件变化
 watch([() => filters.value.projectType, () => filters.value.courseName, () => filters.value.tagId, sortBy], () => {
   currentPageNum.value = 1
-  fetchProjects()
+  fetchProjects()  // 重新从后端获取数据
 })
 
 // 组件挂载时获取数据
@@ -176,14 +176,10 @@ onMounted(() => {
 })
 
 // 计算总页数
-const totalPages = computed(() => Math.ceil(allProjects.value.length / PAGE_SIZE))
+const totalPages = computed(() => Math.ceil(total.value / PAGE_SIZE))
 
-// 计算当前页的项目列表
-const projects = computed(() => {
-  const start = (currentPageNum.value - 1) * PAGE_SIZE
-  const end = start + PAGE_SIZE
-  return allProjects.value.slice(start, end)
-})
+// 计算当前页的项目列表（后端已分页，直接返回）
+const projects = computed(() => allProjects.value)
 
 // 点赞功能
 const handleLikeProject = (project) => {
