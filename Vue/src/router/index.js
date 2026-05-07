@@ -230,10 +230,11 @@ router.beforeEach((to) => {
     }
   }
   
-  if ((to.path === '/login' || to.path === '/register') && isLoggedIn) {
-    // 已登录用户访问登录/注册页，跳转到主页
+  if (to.path === '/login' && isLoggedIn) {
+    // 已登录用户访问登录页，跳转到主页
     return '/home'
   }
+  // 注意：不限制已登录用户访问注册页，因为可能需要注册其他账号
   // 默认允许导航
 })
 
