@@ -93,7 +93,7 @@ const loadFilteredProjects = async () => {
       currentPageProjects.value = records
       total.value = totalCount
       
-      log(`加载完成，当前页项目数量: ${projects.length}, 总数: ${totalCount}`)
+      log(`加载完成，当前页项目数量: ${currentPageProjects.value.length}, 总数: ${totalCount}`)
     } else {
       logError('API 返回数据异常:', res)
       currentPageProjects.value = []
