@@ -3,6 +3,7 @@ import { ref, onMounted } from 'vue'
 import { toast } from '@/utils/toast'
 import { log } from '@/utils/logger'
 
+
 // 统计数据
 const stats = ref({
   totalProjects: 0,

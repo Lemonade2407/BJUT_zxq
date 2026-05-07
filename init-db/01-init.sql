@@ -118,19 +118,15 @@ CREATE TABLE IF NOT EXISTS `comment` (
   `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '评论ID',
   `user_id` INT NOT NULL COMMENT '用户ID',
   `project_id` INT NOT NULL COMMENT '项目ID',
-  `parent_id` INT DEFAULT NULL COMMENT '父评论ID(回复)',
   `content` TEXT NOT NULL COMMENT '评论内容',
   `like_count` INT DEFAULT 0 COMMENT '点赞数',
-  `reply_count` INT DEFAULT 0 COMMENT '回复数',
   `status` TINYINT DEFAULT 1 COMMENT '状态: 0-删除, 1-正常',
   `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
   `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
   FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE,
   FOREIGN KEY (`project_id`) REFERENCES `project`(`id`) ON DELETE CASCADE,
-  FOREIGN KEY (`parent_id`) REFERENCES `comment`(`id`) ON DELETE CASCADE,
   INDEX idx_user_id (`user_id`),
-  INDEX idx_project_id (`project_id`),
-  INDEX idx_parent_id (`parent_id`)
+  INDEX idx_project_id (`project_id`)
 ) ENGINE=InnoDB COMMENT='评论表';
 
 -- ===========================================
@@ -206,12 +202,7 @@ CREATE TABLE IF NOT EXISTS `download_log` (
 -- ===========================================
 CREATE TABLE IF NOT EXISTS `course` (
   `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '课程ID',
-  `course_name` VARCHAR(100) NOT NULL UNIQUE COMMENT '课程名称',
-  `is_active` TINYINT DEFAULT 1 COMMENT '是否启用: 0-禁用, 1-启用',
-  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
-  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
-  INDEX idx_course_name (`course_name`),
-  INDEX idx_is_active (`is_active`)
+  `course_name` VARCHAR(100) NOT NULL UNIQUE COMMENT '课程名称'
 ) ENGINE=InnoDB COMMENT='课程字典表';
 
 -- ===========================================
@@ -276,6 +267,11 @@ INSERT INTO `course` (`course_name`) VALUES
 ('PYTHON程序开发'),
 ('移动软件开发')
 ON DUPLICATE KEY UPDATE `course_name`=`course_name`;
+
+-- 插入默认管理员账号 (用户名: admin, 密码: 123456)
+INSERT INTO `user` (`username`, `password`, `employee_id`, `real_name`, `email`, `role`, `status`) VALUES
+('admin', '$2a$10$N.zmdr9k7uOCQb376NoUnuTJ8iAt6Z5EHsM8lE9lBOsl7iKTVKIUi', 'ADMIN001', '系统管理员', 'admin@bjut.edu.cn', 'ADMIN', 1)
+ON DUPLICATE KEY UPDATE `username`=`username`;
 
 -- ===========================================
 -- 完成提示

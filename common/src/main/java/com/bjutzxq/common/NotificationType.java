@@ -1,8 +1,11 @@
 package com.bjutzxq.common;
 
+import lombok.Getter;
+
 /**
  * 通知类型枚举
  */
+@Getter
 public enum NotificationType {
     /**
      * 点赞通知
@@ -31,15 +34,7 @@ public enum NotificationType {
         this.code = code;
         this.description = description;
     }
-    
-    public int getCode() {
-        return code;
-    }
-    
-    public String getDescription() {
-        return description;
-    }
-    
+
     /**
      * 根据 code 获取通知类型
      * @param code 类型代码

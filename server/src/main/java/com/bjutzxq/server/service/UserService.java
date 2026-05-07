@@ -1,28 +1,23 @@
 package com.bjutzxq.server.service;
 import com.bjutzxq.common.Constants;
 import com.bjutzxq.common.Role;
-import com.bjutzxq.pojo.ProjectFile;
-import com.bjutzxq.pojo.User;
+import com.bjutzxq.pojo.vo.LoginVO;
+import com.bjutzxq.pojo.entity.ProjectFile;
+import com.bjutzxq.pojo.entity.User;
 import com.bjutzxq.server.mapper.CommentMapper;
 import com.bjutzxq.server.mapper.ProjectFileMapper;
 import com.bjutzxq.server.mapper.ProjectMapper;
 import com.bjutzxq.server.mapper.UserMapper;
+import com.bjutzxq.server.util.DtoConverter;
 import com.bjutzxq.server.util.JwtUtil;
 import com.bjutzxq.server.util.OssUtil;
 import com.bjutzxq.server.util.PasswordUtil;
+import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.List;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
  * 用户服务类
@@ -45,6 +40,7 @@ public class UserService {
     @Autowired
     private OssUtil ossUtil;
     
+
     /**
      * 用户注册
      * @param user 用户对象
@@ -54,39 +50,32 @@ public class UserService {
     public User register(User user) {
         log.info("开始注册用户，用户名：{}", user.getUsername());
         
-        // 1. 参数验证
-        validateRegisterUser(user);
-        
-        // 2. 检查用户名是否已存在
+        // 1. 检查用户名是否已存在
         User existingUser = userMapper.selectByUsername(user.getUsername());
         if (existingUser != null) {
             log.warn("用户名已存在：{}", user.getUsername());
             throw new RuntimeException("用户名已存在");
         }
         
-        // 3. 检查身份标识号是否已存在（学生为学号，教师为职工号）
-        if (user.getEmployeeId() == null || user.getEmployeeId().trim().isEmpty()) {
-            log.warn("注册失败：身份标识号为空");
-            throw new RuntimeException("身份标识号不能为空");
-        }
+        // 2. 检查身份标识号是否已存在（学生为学号，教师为职工号）
         existingUser = userMapper.selectByEmployeeId(user.getEmployeeId().trim());
         if (existingUser != null) {
             log.warn("身份标识号已被使用：{}", user.getEmployeeId());
             throw new RuntimeException("身份标识号已被使用");
         }
         
-        // 4. 检查邮箱是否已存在
+        // 3. 检查邮箱是否已存在
         existingUser = userMapper.selectByEmail(user.getEmail());
         if (existingUser != null) {
             log.warn("邮箱已被使用：{}", user.getEmail());
             throw new RuntimeException("邮箱已被使用");
         }
         
-        // 5. 密码加密（BCrypt）
+        // 4. 密码加密（BCrypt）
         String encodedPassword = PasswordUtil.encode(user.getPassword());
         user.setPassword(encodedPassword);
         
-        // 6. 设置默认值
+        // 5. 设置默认值
         if (user.getStatus() == null) {
             user.setStatus(Constants.User.STATUS_NORMAL);
         }
@@ -102,7 +91,7 @@ public class UserService {
             user.setAvatar("/logo.svg");
         }
         
-        // 7. 插入用户
+        // 6. 插入用户
         userMapper.insert(user);
         
         log.info("用户注册成功，ID：{}", user.getId());
@@ -110,76 +99,12 @@ public class UserService {
     }
     
     /**
-     * 验证注册用户信息
-     * @param user 用户对象
-     */
-    private void validateRegisterUser(User user) {
-        if (user == null) {
-            throw new IllegalArgumentException("用户信息不能为空");
-        }
-        
-        // 验证用户名
-        if (user.getUsername() == null || user.getUsername().trim().isEmpty()) {
-            throw new IllegalArgumentException("用户名不能为空");
-        }
-        if (user.getUsername().length() < 2 || user.getUsername().length() > 20) {
-            throw new IllegalArgumentException("用户名长度应为 2-20 位");
-        }
-        
-        // 验证密码
-        if (user.getPassword() == null || user.getPassword().trim().isEmpty()) {
-            throw new IllegalArgumentException("密码不能为空");
-        }
-        if (user.getPassword().length() < 6 || user.getPassword().length() > 20) {
-            throw new IllegalArgumentException("密码长度应为 6-20 位");
-        }
-        // 密码必须包含字母和数字
-        if (!user.getPassword().matches("^(?=.*[a-zA-Z])(?=.*\\d).+$")) {
-            throw new IllegalArgumentException("密码必须包含字母和数字");
-        }
-        
-        // 验证身份标识号（学生为学号，教师为职工号）
-        if (user.getEmployeeId() == null || user.getEmployeeId().trim().isEmpty()) {
-            throw new IllegalArgumentException("身份标识号不能为空");
-        }
-        
-        // 根据角色验证不同格式
-        if (user.getRole() == Role.TEACHER) {
-            // 教师职工号：5位数字
-            if (!user.getEmployeeId().matches("^\\d{5}$")) {
-                throw new IllegalArgumentException("教师职工号格式不正确");
-            }
-        } else {
-            // 学生学号：8位数字 或 1位字母(S或B)+8位数字
-            if (!user.getEmployeeId().matches("^(S|B)?\\d{8}$")) {
-                throw new IllegalArgumentException("学生学号格式不正确");
-            }
-        }
-        
-        // 验证邮箱
-        if (user.getEmail() == null || user.getEmail().trim().isEmpty()) {
-            throw new IllegalArgumentException("邮箱不能为空");
-        }
-        // 简单的邮箱格式验证
-        if (!user.getEmail().matches("^[A-Za-z0-9+_.-]+@[A-Za-z0-9.-]+$")) {
-            throw new IllegalArgumentException("邮箱格式不正确");
-        }
-        
-        // 验证手机号（如果提供）
-        if (user.getPhone() != null && !user.getPhone().trim().isEmpty()) {
-            if (!user.getPhone().matches("^1[3-9]\\d{9}$")) {
-                throw new IllegalArgumentException("手机号格式不正确");
-            }
-        }
-    }
-    
-    /**
      * 用户登录
      * @param username 用户名或邮箱
      * @param password 密码
-     * @return 登录信息（包含 token 和用户信息）
+     * @return 登录响应 DTO（包含 token 和用户信息）
      */
-    public Map<String, Object> login(String username, String password) {
+    public LoginVO login(String username, String password) {
         log.info("用户登录，用户名/邮箱/学号：{}", username);
         
         // 查询用户（可能是用户名、邮箱或学号）
@@ -211,31 +136,13 @@ public class UserService {
         // 生成 Token
         String token = JwtUtil.generateToken(user.getId(), user.getUsername(), user.getAvatar());
         
+        // 清除用户的刷新计数（重新登录后重置）
+        JwtUtil.clearRefreshCount(user.getId());
+        
         log.info("用户登录成功：{}, ID: {}", username, user.getId());
         
-        // 返回登录信息
-        Map<String, Object> result = new HashMap<>();
-        result.put("token", token);
-        result.put("expiresIn", Constants.JWT.TOKEN_EXPIRE_TIME / 1000); // 秒
-        
-        // 返回脱敏的用户信息
-        Map<String, Object> userInfo = new HashMap<>();
-        userInfo.put("id", user.getId());
-        userInfo.put("username", user.getUsername());
-        userInfo.put("email", user.getEmail());
-        userInfo.put("avatar", user.getAvatar());
-        userInfo.put("role", user.getRole() != null ? user.getRole().name() : "USER");
-        result.put("user", userInfo);
-        
-        return result;
-    }
-    
-    /**
-     * 退出登录
-     * （JWT 无状态，前端删除 token 即可）
-     */
-    public void logout() {
-        // JWT 不需要服务端处理退出
+        // 使用工具类构建 LoginResponse DTO
+        return DtoConverter.buildLoginResponse(user, token);
     }
     
     /**
@@ -275,11 +182,14 @@ public class UserService {
     /**
      * 更新用户信息
      * @param userId 用户 ID
-     * @param user 新的用户信息
+     * @param avatar 头像 URL
+     * @param phone 手机号
+     * @param sex 性别
+     * @param bio 个人简介
      * @return 更新后的用户
      */
     @Transactional(rollbackFor = Exception.class)
-    public User updateProfile(Integer userId, User user) {
+    public User updateProfile(Integer userId, String avatar, String phone, String sex, String bio) {
         log.info("更新用户信息，ID：{}", userId);
         
         User existingUser = userMapper.selectById(userId);
@@ -289,23 +199,22 @@ public class UserService {
         }
         
         // 只允许更新部分字段
-        if (user.getAvatar() != null) {
-            existingUser.setAvatar(user.getAvatar());
+        if (avatar != null) {
+            existingUser.setAvatar(avatar);
         }
-        if (user.getPhone() != null) {
-            existingUser.setPhone(user.getPhone());
+        if (phone != null) {
+            existingUser.setPhone(phone);
         }
-        if (user.getSex() != null) {
-            existingUser.setSex(user.getSex());
+        if (sex != null) {
+            existingUser.setSex(sex);
         }
-        if (user.getBio() != null) {
-            existingUser.setBio(user.getBio());
+        if (bio != null) {
+            existingUser.setBio(bio);
         }
         
         userMapper.update(existingUser);
         
         log.info("用户信息更新成功，ID：{}", userId);
-        existingUser.setPassword(null);
         return existingUser;
     }
     
@@ -338,16 +247,6 @@ public class UserService {
         userMapper.update(user);
         
         log.info("密码修改成功，ID：{}", userId);
-    }
-    
-    /**
-     * 检查用户是否为管理员
-     * @param userId 用户 ID
-     * @return true-是管理员，false-非管理员
-     */
-    public boolean isAdmin(Integer userId) {
-        User user = userMapper.selectById(userId);
-        return user != null && user.getRole() == Role.ADMIN;
     }
     
     /**
@@ -412,14 +311,96 @@ public class UserService {
     }
     
     /**
+     * 管理员更新用户信息（可更新所有字段）
+     * @param userId 用户 ID
+     * @param username 用户名
+     * @param employeeId 身份标识号
+     * @param realName 真实姓名
+     * @param email 邮箱
+     * @param password 密码（可选，为空则不修改）
+     * @param gender 性别
+     * @param bio 简介
+     * @param className 班级
+     * @param role 角色
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void updateUserByAdmin(Integer userId, String username, String employeeId, 
+                                   String realName, String email, String password,
+                                   Integer gender, String bio, String className, Role role) {
+        log.info("管理员开始更新用户信息，ID: {}", userId);
+        
+        User user = userMapper.selectById(userId);
+        if (user == null) {
+            log.warn("更新失败：用户不存在，ID: {}", userId);
+            throw new RuntimeException("用户不存在");
+        }
+        
+        // 检查用户名是否已被其他用户使用
+        if (username != null && !username.equals(user.getUsername())) {
+            User existingUser = userMapper.selectByUsername(username);
+            if (existingUser != null && !existingUser.getId().equals(userId)) {
+                throw new RuntimeException("用户名已被使用");
+            }
+            user.setUsername(username);
+        }
+        
+        // 检查身份标识号是否已被其他用户使用
+        if (employeeId != null && !employeeId.equals(user.getEmployeeId())) {
+            User existingUser = userMapper.selectByEmployeeId(employeeId);
+            if (existingUser != null && !existingUser.getId().equals(userId)) {
+                throw new RuntimeException("身份标识号已被使用");
+            }
+            user.setEmployeeId(employeeId);
+        }
+        
+        // 检查邮箱是否已被其他用户使用
+        if (email != null && !email.equals(user.getEmail())) {
+            User existingUser = userMapper.selectByEmail(email);
+            if (existingUser != null && !existingUser.getId().equals(userId)) {
+                throw new RuntimeException("邮箱已被使用");
+            }
+            user.setEmail(email);
+        }
+        
+        // 更新其他字段
+        if (realName != null) {
+            user.setRealName(realName);
+        }
+        
+        // 密码处理：如果提供了新密码，则加密后更新
+        if (password != null && !password.trim().isEmpty()) {
+            String encodedPassword = PasswordUtil.encode(password);
+            user.setPassword(encodedPassword);
+        }
+        
+        if (gender != null) {
+            user.setSex(gender == 1 ? Constants.User.SEX_MALE : Constants.User.SEX_FEMALE);
+        }
+        
+        if (bio != null) {
+            user.setBio(bio);
+        }
+        
+        if (className != null) {
+            user.setClassName(className);
+        }
+        
+        if (role != null) {
+            user.setRole(role);
+        }
+        
+        userMapper.update(user);
+        
+        log.info("用户信息更新成功，ID: {}", userId);
+    }
+    
+    /**
      * 删除用户（级联删除相关数据）
      * @param userId 要删除的用户 ID
      */
     @Transactional(rollbackFor = Exception.class)
     public void deleteUser(Integer userId) {
         log.info("开始删除用户，ID: {}", userId);
-        
-        // TODO: 考虑软删除而非硬删除，保留审计日志
         
         // 1. 检查用户是否存在
         User user = userMapper.selectById(userId);
@@ -452,11 +433,11 @@ public class UserService {
     }
     
     /**
-     * 清理用户上传的所有文件（OSS + 本地存储）
+     * 清理用户上传的所有 OSS 文件
      * @param userId 用户 ID
      */
     private void cleanupUserFiles(Integer userId) {
-        log.info("开始清理用户上传的文件，用户 ID: {}", userId);
+        log.info("开始清理用户上传的 OSS 文件，用户 ID: {}", userId);
         
         try {
             // 查询该用户上传的所有文件
@@ -467,8 +448,7 @@ public class UserService {
                 return;
             }
             
-            int ossDeletedCount = 0;
-            int localDeletedCount = 0;
+            int deletedCount = 0;
             
             for (ProjectFile file : userFiles) {
                 // 跳过目录
@@ -476,40 +456,19 @@ public class UserService {
                     continue;
                 }
                 
-                // 根据存储类型清理
-                if (file.getStorageType() != null && Integer.valueOf(2).equals(file.getStorageType())) {
-                    // OSS 存储
-                    if (file.getStorageUrl() != null && file.getStorageUrl().startsWith("http")) {
-                        try {
-                            ossUtil.delete(file.getStorageUrl());
-                            ossDeletedCount++;
-                            log.debug("已删除 OSS 文件: {}", file.getStorageUrl());
-                        } catch (Exception e) {
-                            log.error("删除 OSS 文件失败: {}, 错误: {}", file.getStorageUrl(), e.getMessage());
-                        }
-                    }
-                } else {
-                    // 本地存储
-                    if (file.getStorageUrl() != null) {
-                        try {
-                            // 构建物理文件路径
-                            String physicalPath = System.getProperty("java.io.tmpdir") + "/project_files/" + 
-                                file.getProjectId() + "/" + new File(file.getStorageUrl()).getName();
-                            Path path = Paths.get(physicalPath);
-                            
-                            if (Files.exists(path)) {
-                                Files.delete(path);
-                                localDeletedCount++;
-                                log.debug("已删除本地文件: {}", physicalPath);
-                            }
-                        } catch (IOException e) {
-                            log.error("删除本地文件失败: {}, 错误: {}", file.getStorageUrl(), e.getMessage());
-                        }
+                // 只处理 OSS 文件（有 storageUrl 的文件）
+                if (file.getStorageUrl() != null && file.getStorageUrl().startsWith("http")) {
+                    try {
+                        ossUtil.delete(file.getStorageUrl());
+                        deletedCount++;
+                        log.debug("已删除 OSS 文件: {}", file.getStorageUrl());
+                    } catch (Exception e) {
+                        log.error("删除 OSS 文件失败: {}, 错误: {}", file.getStorageUrl(), e.getMessage());
                     }
                 }
             }
             
-            log.info("文件清理完成，OSS 文件: {}, 本地文件: {}", ossDeletedCount, localDeletedCount);
+            log.info("OSS 文件清理完成，共删除: {} 个文件", deletedCount);
             
         } catch (Exception e) {
             log.error("清理用户文件失败，用户 ID: {}, 错误: {}", userId, e.getMessage(), e);
@@ -606,5 +565,53 @@ public class UserService {
             log.error("头像上传失败: {}", e.getMessage(), e);
             throw new RuntimeException("头像上传失败: " + e.getMessage());
         }
+    }
+    
+    /**
+     * 查询用户列表（支持按角色和关键词筛选）
+     * @param role 角色（null-不限制角色）
+     * @param keyword 搜索关键词（null或空-不搜索）
+     * @param pageNum 页码
+     * @param pageSize 每页数量
+     * @return 用户列表
+     */
+    public java.util.List<User> queryUsers(Role role, String keyword, Integer pageNum, Integer pageSize) {
+        log.info("查询用户列表，角色：{}, 关键词：{}, 页码：{}, 每页数量：{}", 
+                 role != null ? role.getDescription() : "全部", 
+                 keyword != null ? keyword : "无", 
+                 pageNum, pageSize);
+        
+        // 参数验证
+        if (pageNum == null || pageNum < 1) {
+            pageNum = 1;
+        }
+        if (pageSize == null || pageSize < 1 || pageSize > 100) {
+            pageSize = 20;
+        }
+        
+        PageHelper.startPage(pageNum, pageSize);
+        
+        java.util.List<User> users;
+        
+        // 根据参数选择不同的查询方式
+        if (role != null && keyword != null && !keyword.trim().isEmpty()) {
+            // 按角色 + 关键词搜索
+            users = userMapper.searchByRoleAndKeyword(role, keyword.trim());
+        } else if (role != null) {
+            // 仅按角色查询
+            users = userMapper.selectByRole(role);
+        } else if (keyword != null && !keyword.trim().isEmpty()) {
+            // 仅按关键词搜索
+            users = userMapper.searchByKeyword(keyword.trim());
+        } else {
+            // 查询所有用户
+            users = userMapper.selectAll();
+        }
+        
+        // 清除密码
+        users.forEach(user -> user.setPassword(null));
+        
+        log.info("查询用户列表成功，数量：{}", users.size());
+        return users;
     }
 }

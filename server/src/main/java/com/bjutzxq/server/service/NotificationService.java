@@ -1,20 +1,29 @@
 package com.bjutzxq.server.service;
 
 import com.bjutzxq.common.Constants;
-import com.bjutzxq.pojo.Notification;
-import com.bjutzxq.pojo.User;
+import com.bjutzxq.common.NotificationType;
+import com.bjutzxq.pojo.vo.NotificationVO;
+import com.bjutzxq.pojo.entity.Notification;
+import com.bjutzxq.pojo.entity.User;
+import com.bjutzxq.pojo.entity.Project;
 import com.bjutzxq.server.mapper.NotificationMapper;
 import com.bjutzxq.server.mapper.UserMapper;
+import com.bjutzxq.server.mapper.ProjectMapper;
+import com.bjutzxq.server.util.DtoConverter;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
+import com.bjutzxq.server.handler.NotificationWebSocketHandler;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * 通知服务类
@@ -30,34 +39,24 @@ public class NotificationService {
     private UserMapper userMapper;
     
     @Autowired
-    private com.bjutzxq.server.handler.NotificationWebSocketHandler webSocketHandler;
+    private ProjectMapper projectMapper;
     
-    /**
-     * 通知类型常量
-     */
-    public static class NotificationType {
-        public static final int LIKE = 1;      // 点赞
-        public static final int COMMENT = 2;   // 评论
-        public static final int WATCH = 3;     // 关注
-        public static final int SYSTEM = 4;    // 系统通知
-    }
+    @Autowired
+    private NotificationWebSocketHandler webSocketHandler;
     
+
     /**
      * 创建通知
      * @param userId 接收用户 ID
      * @param senderId 发送用户 ID
      * @param projectId 相关项目 ID
-     * @param type 通知类型
+     * @param type 通知类型枚举
      * @param content 通知内容
-     * @return 创建的通知对象
      */
     @Transactional(rollbackFor = Exception.class)
-    public Notification createNotification(Integer userId, Integer senderId, Integer projectId, 
-                                          Integer type, String content) {
+    public void createNotification(Integer userId, Integer senderId, Integer projectId, 
+                                  NotificationType type, String content) {
         log.info("创建通知，接收用户 ID: {}, 类型：{}", userId, type);
-        
-        // TODO: 添加通知聚合功能（同一类型的多条通知合并显示）
-        // TODO: 添加通知优先级设置
         
         // 参数验证
         if (userId == null) {
@@ -75,7 +74,7 @@ public class NotificationService {
         notification.setUserId(userId);
         notification.setSenderId(senderId);
         notification.setProjectId(projectId);
-        notification.setType(type);
+        notification.setType(type.getCode());  // 存储枚举的 code 值
         notification.setContent(content.trim());
         notification.setIsRead(0); // 默认为未读
         notification.setCreatedAt(LocalDateTime.now());
@@ -92,62 +91,20 @@ public class NotificationService {
             // WebSocket 推送失败不应影响通知创建
             log.error("WebSocket 推送通知失败，但不影响通知创建", e);
         }
-        
-        return notification;
     }
-    
-    /**
-     * 获取用户的通知列表（分页）
-     * @param userId 用户 ID
-     * @param pageNum 页码
-     * @param pageSize 每页数量
-     * @param isRead 是否已读（null-全部，0-未读，1-已读）
-     * @return 通知列表
-     */
-    public List<Notification> getUserNotifications(Integer userId, Integer pageNum, 
-                                                   Integer pageSize, Integer isRead) {
-        log.info("获取用户通知列表，用户 ID: {}, 页码：{}, 每页数量：{}, 是否已读：{}", 
-                   userId, pageNum, pageSize, isRead);
-        
-        // 参数验证
-        if (userId == null) {
-            throw new IllegalArgumentException("用户 ID 不能为空");
-        }
-        
-        // 分页参数验证
-        if (pageNum < 1) {
-            pageNum = 1;
-        }
-        if (pageSize < 1 || pageSize > 100) {
-            pageSize = 20; // 默认每页 20 条，最多 100 条
-        }
-        
-        // 设置分页
-        PageHelper.startPage(pageNum, pageSize);
-        
-        // 查询通知列表
-        List<Notification> notifications = notificationMapper.selectByUserId(userId, isRead);
-        
-        log.info("通知列表获取成功，数量：{}", notifications.size());
-        
-        return notifications;
-    }
-    
+
     /**
      * 获取用户的通知列表（包含发送者信息）
      * @param userId 用户 ID
      * @param pageNum 页码
      * @param pageSize 每页数量
      * @param isRead 是否已读（null-全部，0-未读，1-已读）
-     * @return 通知列表（包含发送者信息的 Map）
+     * @return 通知列表（包含发送者信息的 NotificationVO）
      */
-    public List<Map<String, Object>> getUserNotificationsWithSender(Integer userId, Integer pageNum, 
-                                                                     Integer pageSize, Integer isRead) {
+    public List<NotificationVO> getUserNotificationsWithSender(
+            Integer userId, Integer pageNum, Integer pageSize, Integer isRead) {
         log.info("获取用户通知列表（含发送者信息），用户 ID: {}, 页码：{}, 每页数量：{}, 是否已读：{}", 
                    userId, pageNum, pageSize, isRead);
-        
-        // TODO: 优化性能 - 使用批量查询替代 N+1 查询问题
-        // TODO: 考虑缓存发送者信息，减少数据库查询
         
         // 参数验证
         if (userId == null) {
@@ -168,36 +125,60 @@ public class NotificationService {
         // 查询通知列表
         List<Notification> notifications = notificationMapper.selectByUserId(userId, isRead);
         
-        // 构建包含发送者信息的结果列表
-        List<Map<String, Object>> result = new java.util.ArrayList<>();
+        if (notifications.isEmpty()) {
+            return List.of();
+        }
+        
+        // 批量查询所有发送者信息（优化 N+1 查询）
+        Set<Integer> senderIds = notifications.stream()
+            .map(Notification::getSenderId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        
+        Map<Integer, User> userMap = new HashMap<>();
+        if (!senderIds.isEmpty()) {
+            List<User> users = userMapper.selectBatchIds(new ArrayList<>(senderIds));
+            userMap = users.stream()
+                .collect(Collectors.toMap(User::getId, u -> u));
+            log.debug("批量查询发送者信息，共 {} 个用户", userMap.size());
+        }
+        
+        // 批量查询所有项目名称（优化 N+1 查询）
+        Set<Integer> projectIds = notifications.stream()
+            .map(Notification::getProjectId)
+            .filter(Objects::nonNull)
+            .collect(Collectors.toSet());
+        
+        Map<Integer, String> projectNameMap = new HashMap<>();
+        if (!projectIds.isEmpty()) {
+            List<Project> projects = projectMapper.selectByIds(new ArrayList<>(projectIds));
+            projectNameMap = projects.stream()
+                .collect(Collectors.toMap(Project::getId, Project::getName));
+            log.debug("批量查询项目信息，共 {} 个项目", projectNameMap.size());
+        }
+        
+        // 构建包含发送者和项目信息的结果列表
+        List<NotificationVO> result = new java.util.ArrayList<>();
         for (Notification notification : notifications) {
-            Map<String, Object> notificationMap = new HashMap<>();
-            
-            // 通知基本信息
-            notificationMap.put("id", notification.getId());
-            notificationMap.put("type", notification.getType());
-            notificationMap.put("content", notification.getContent());
-            notificationMap.put("projectId", notification.getProjectId());
-            notificationMap.put("isRead", notification.getIsRead());
-            notificationMap.put("createdAt", notification.getCreatedAt());
-            
-            // 获取发送者信息
+            // 获取发送者用户名
+            String senderUsername = null;
             if (notification.getSenderId() != null) {
-                User sender = userMapper.selectById(notification.getSenderId());
+                User sender = userMap.get(notification.getSenderId());
                 if (sender != null) {
-                    Map<String, Object> senderInfo = new HashMap<>();
-                    senderInfo.put("id", sender.getId());
-                    senderInfo.put("username", sender.getUsername());
-                    senderInfo.put("avatar", sender.getAvatar());
-                    notificationMap.put("sender", senderInfo);
-                } else {
-                    notificationMap.put("sender", null);
+                    senderUsername = sender.getUsername();
                 }
-            } else {
-                notificationMap.put("sender", null);
+            }
+
+            // 获取项目名称
+            String projectName = null;
+            if (notification.getProjectId() != null) {
+                projectName = projectNameMap.get(notification.getProjectId());
             }
             
-            result.add(notificationMap);
+            // 转换为 NotificationVO
+            NotificationVO vo = 
+                DtoConverter.toNotificationVO(notification, senderUsername, projectName);
+            result.add(vo);
         }
         
         log.info("通知列表获取成功（含发送者信息），数量：{}", result.size());
@@ -221,6 +202,25 @@ public class NotificationService {
         log.debug("未读通知数量：{}", count);
         
         return count;
+    }
+    
+    /**
+     * 统计用户的通知总数
+     * @param userId 用户 ID
+     * @param isRead 是否已读（null-全部，0-未读，1-已读）
+     * @return 通知总数
+     */
+    public long countByUserId(Integer userId, Integer isRead) {
+        log.debug("统计通知总数，用户 ID: {}, 是否已读: {}", userId, isRead);
+        
+        if (userId == null) {
+            throw new IllegalArgumentException("用户 ID 不能为空");
+        }
+        
+        // PageHelper 会自动从上次分页查询中获取 total
+        com.github.pagehelper.PageInfo<Notification> pageInfo = 
+            new com.github.pagehelper.PageInfo<>(notificationMapper.selectByUserId(userId, isRead));
+        return pageInfo.getTotal();
     }
     
     /**
@@ -379,7 +379,6 @@ public class NotificationService {
                 Map<String, Object> senderInfo = new HashMap<>();
                 senderInfo.put("id", sender.getId());
                 senderInfo.put("username", sender.getUsername());
-                senderInfo.put("avatar", sender.getAvatar());
                 pushData.put("sender", senderInfo);
             }
         }

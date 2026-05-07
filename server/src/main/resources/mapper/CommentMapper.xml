@@ -3,14 +3,12 @@
 <mapper namespace="com.bjutzxq.server.mapper.CommentMapper">
     
     <!-- 结果映射 -->
-    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.Comment">
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.entity.Comment">
         <id column="id" property="id"/>
         <result column="user_id" property="userId"/>
         <result column="project_id" property="projectId"/>
-        <result column="parent_id" property="parentId"/>
         <result column="content" property="content"/>
         <result column="like_count" property="likeCount"/>
-        <result column="reply_count" property="replyCount"/>
         <result column="created_at" property="createdAt"/>
         <result column="updated_at" property="updatedAt"/>
         <result column="status" property="status"/>
@@ -18,27 +16,23 @@
     
     <!-- 基础列 -->
     <sql id="Base_Column_List">
-        id, user_id, project_id, parent_id, content, like_count, reply_count, created_at, updated_at, status
+        id, user_id, project_id, content, like_count, created_at, updated_at, status
     </sql>
 
     <!-- 新增评论 -->
-    <insert id="insert" parameterType="com.bjutzxq.pojo.Comment" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.bjutzxq.pojo.entity.Comment" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO comment (
             user_id,
             project_id,
-            parent_id,
             content,
             like_count,
-            reply_count,
             created_at,
             updated_at,
             status
         ) VALUES (
             #{userId},
             #{projectId},
-            #{parentId},
             #{content},
-            0,
             0,
             NOW(),
             NOW(),
@@ -63,21 +57,11 @@
         ORDER BY created_at DESC
     </select>
     
-    <!-- 根据父评论 ID 查询回复列表 -->
-    <select id="selectReplies" resultMap="BaseResultMap">
-        SELECT 
-            <include refid="Base_Column_List"/>
-        FROM comment
-        WHERE parent_id = #{parentId} AND status = 1
-        ORDER BY created_at ASC
-    </select>
-    
     <!-- 更新评论信息 -->
-    <update id="updateById" parameterType="com.bjutzxq.pojo.Comment">
+    <update id="updateById" parameterType="com.bjutzxq.pojo.entity.Comment">
         <set>
             <if test="content != null">content = #{content},</if>
             <if test="likeCount != null">like_count = #{likeCount},</if>
-            <if test="replyCount != null">reply_count = #{replyCount},</if>
             <if test="status != null">status = #{status},</if>
             updated_at = NOW()
         </set>
@@ -106,5 +90,29 @@
         DELETE FROM comment
         WHERE user_id = #{userId}
     </delete>
+    
+    <!-- 批量查询评论的用户信息（优化 N+1 问题） -->
+    <select id="selectUserBatch" resultType="java.util.HashMap">
+        SELECT id, username, avatar
+        FROM user
+        WHERE id IN
+        <foreach collection="userIds" item="userId" open="(" separator="," close=")">
+            #{userId}
+        </foreach>
+        <!-- 如果 userIds 为空，返回空结果 -->
+        <if test="userIds == null or userIds.size() == 0">
+            AND 1 = 0
+        </if>
+    </select>
+    
+    <!-- 获取项目所有者ID -->
+    <select id="getProjectOwnerId" resultType="java.lang.Integer">
+        SELECT owner_id FROM project WHERE id = #{projectId}
+    </select>
+    
+    <!-- 获取项目名称 -->
+    <select id="getProjectName" resultType="java.lang.String">
+        SELECT name FROM project WHERE id = #{projectId}
+    </select>
     
 </mapper>

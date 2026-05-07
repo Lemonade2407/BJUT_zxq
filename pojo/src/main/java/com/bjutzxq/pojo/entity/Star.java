@@ -1,13 +1,13 @@
-package com.bjutzxq.pojo;
+package com.bjutzxq.pojo.entity;
 
 import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 关注记录实体类
+ * 点赞记录实体类
  */
 @Data
-public class Watch {
+public class Star {
     /**
      * 主键 ID
      */
@@ -24,12 +24,7 @@ public class Watch {
     private Integer projectId;
     
     /**
-     * 通知类型：1-全部，2-仅重要更新
-     */
-    private Integer notificationType;
-    
-    /**
-     * 关注时间
+     * 点赞时间
      */
     private LocalDateTime createdAt;
 }

@@ -1,14 +1,14 @@
-package com.bjutzxq.pojo;
+package com.bjutzxq.pojo.vo;
 
-import com.bjutzxq.common.Role;
 import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * 用户实体类
+ * 用户视图对象 VO（用于展示层，排除敏感字段）
  */
 @Data
-public class User {
+public class UserVO {
+    
     /**
      * 用户 ID
      */
@@ -20,12 +20,7 @@ public class User {
     private String username;
     
     /**
-     * 密码 (加密)
-     */
-    private String password;
-    
-    /**
-     * 身份标识号（学生为学号，教师为职工号）
+     * 身份标识号（学号/职工号）
      */
     private String employeeId;
     
@@ -65,7 +60,17 @@ public class User {
     private String bio;
     
     /**
-     * 注册时间
+     * 角色
+     */
+    private String role;
+    
+    /**
+     * 状态
+     */
+    private Integer status;
+    
+    /**
+     * 创建时间
      */
     private LocalDateTime createdAt;
     
@@ -74,13 +79,5 @@ public class User {
      */
     private LocalDateTime updatedAt;
     
-    /**
-     * 状态:0-禁用，1-正常
-     */
-    private Integer status;
-    
-    /**
-     * 用户角色
-     */
-    private Role role;
+    // 注意：不包含 password 字段，保证安全性
 }

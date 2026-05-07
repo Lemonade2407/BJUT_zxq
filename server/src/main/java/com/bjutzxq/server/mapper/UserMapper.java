@@ -1,6 +1,6 @@
 package com.bjutzxq.server.mapper;
 
-import com.bjutzxq.pojo.User;
+import com.bjutzxq.pojo.entity.User;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -73,8 +73,33 @@ public interface UserMapper {
     java.util.List<User> searchByKeyword(@Param("keyword") String keyword);
     
     /**
+     * 根据角色查询用户列表
+     * @param role 角色
+     * @return 用户列表
+     */
+    java.util.List<User> selectByRole(@Param("role") com.bjutzxq.common.Role role);
+    
+    /**
+     * 根据角色和关键词搜索用户
+     * @param role 角色
+     * @param keyword 搜索关键词
+     * @return 用户列表
+     */
+    java.util.List<User> searchByRoleAndKeyword(
+        @Param("role") com.bjutzxq.common.Role role,
+        @Param("keyword") String keyword
+    );
+    
+    /**
      * 统计用户总数
      * @return 用户总数
      */
     int countAll();
+    
+    /**
+     * 批量查询用户信息（用于优化 N+1 查询）
+     * @param ids 用户 ID 列表
+     * @return 用户列表
+     */
+    java.util.List<User> selectBatchIds(@Param("ids") java.util.List<Integer> ids);
 }

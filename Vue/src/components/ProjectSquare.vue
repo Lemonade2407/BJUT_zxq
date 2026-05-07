@@ -1,8 +1,12 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { getProjectList } from '@/api/project'
+import { ref, computed, onMounted, watch } from 'vue'
+import { getProjectList, filterProjects, getProjectTypes, getProjectsByTag } from '@/api/project'
+import { getActiveCourses } from '@/api/course'
+import { getTags } from '@/api/tag'
 import { toast } from '@/utils/toast'
 import { log, error as logError } from '@/utils/logger'
+import { formatDate, formatNumber } from '@/utils/helpers'
+
 
 // TODO: 添加搜索防抖功能（避免频繁请求）
 // TODO: 添加筛选条件持久化（记住用户选择）
@@ -11,26 +15,60 @@ import { log, error as logError } from '@/utils/logger'
 const PAGE_SIZE = 5
 const currentPageNum = ref(1)
 
+// 筛选条件
+const filters = ref({
+  projectType: '',  // 项目类型
+  courseName: '',   // 课程名称
+  tagId: null       // 标签ID
+})
+
+// 排序方式
+const sortBy = ref('updatedAt')  // updatedAt | viewCount | starCount
+
 // 项目列表（从后端 API 获取）
 const allProjects = ref([])
 const isLoading = ref(false)
+
+// 筛选选项
+const projectTypes = ref([])
+const courseList = ref([])
+const tagList = ref([])
 
 // 获取项目列表
 const fetchProjects = async () => {
   isLoading.value = true
   try {
-    const response = await getProjectList({
-      pageNum: 1,
-      pageSize: 100 // 获取更多项目用于前端分页
-    })
+    let response
+    
+    // 如果有标签筛选，使用标签查询接口
+    if (filters.value.tagId) {
+      response = await getProjectsByTag(filters.value.tagId, {
+        pageNum: 1,
+        pageSize: 100
+      })
+    }
+    // 如果有其他筛选条件，使用 filterProjects 接口
+    else if (filters.value.projectType || filters.value.courseName) {
+      response = await filterProjects({
+        projectType: filters.value.projectType,
+        courseName: filters.value.courseName,
+        pageNum: 1,
+        pageSize: 100
+      })
+    } else {
+      // 否则使用 getProjectList 接口
+      response = await getProjectList({
+        pageNum: 1,
+        pageSize: 100
+      })
+    }
     
     if (response.code === 200 && response.data) {
-      // 按更新时间由新到旧排序
-      const sortedData = response.data.sort((a, b) => {
-        const timeA = new Date(a.updatedAt || a.createdAt).getTime()
-        const timeB = new Date(b.updatedAt || b.createdAt).getTime()
-        return timeB - timeA // 降序排列
-      })
+      // 后端返回的是 PageResult 对象，需要从 records 获取数组
+      const dataList = response.data.records || response.data
+      
+      // 按选定的方式排序
+      const sortedData = sortProjects(dataList)
       
       allProjects.value = sortedData.map(project => ({
         id: project.id,
@@ -40,10 +78,12 @@ const fetchProjects = async () => {
         avatar: '👤',
         author: project.author || '未知用户',
         updatedAt: formatDate(project.updatedAt),
-        likes: project.likes || project.starCount || 0,
-        favorites: project.favorites || project.watchCount || 0,
-        isLiked: project.isLiked || false,
-        isFavorited: project.isFavorited || false
+        starCount: project.starCount || 0,
+        watchCount: project.watchCount || 0,
+        viewCount: project.viewCount || 0,
+        projectType: project.projectType || 'OTHER',
+        isStarred: project.isStarred || false,
+        isWatched: project.isWatched || false
       }))
       log('项目列表加载成功，数量：', allProjects.value.length)
     } else {
@@ -58,49 +98,82 @@ const fetchProjects = async () => {
   }
 }
 
-// 格式化日期
-const formatDate = (dateString) => {
-  if (!dateString) return '未知时间'
-  const date = new Date(dateString)
-  const now = new Date()
-  const diff = now - date
-  
-  // 小于 1 分钟
-  if (diff < 60000) {
-    return '刚刚'
-  }
-  // 小于 1 小时
-  if (diff < 3600000) {
-    return Math.floor(diff / 60000) + '分钟前'
-  }
-  // 小于 1 天
-  if (diff < 86400000) {
-    return Math.floor(diff / 3600000) + '小时前'
-  }
-  // 小于 7 天
-  if (diff < 604800000) {
-    return Math.floor(diff / 86400000) + '天前'
-  }
-  
-  // 超过 7 天，显示具体日期
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+// 排序项目
+const sortProjects = (projects) => {
+  return [...projects].sort((a, b) => {
+    switch (sortBy.value) {
+      case 'viewCount':
+        return (b.viewCount || 0) - (a.viewCount || 0)
+      case 'starCount':
+        return (b.starCount || 0) - (a.starCount || 0)
+      case 'updatedAt':
+      default:
+        const timeA = new Date(a.updatedAt || a.createdAt).getTime()
+        const timeB = new Date(b.updatedAt || b.createdAt).getTime()
+        return timeB - timeA
+    }
+  })
 }
+
+// 加载项目类型字典
+const loadProjectTypes = async () => {
+  try {
+    const res = await getProjectTypes()
+    if (res.code === 200 && res.data) {
+      projectTypes.value = res.data
+    }
+  } catch (error) {
+    logError('加载项目类型失败:', error)
+  }
+}
+
+// 加载课程列表
+const loadCourseList = async () => {
+  try {
+    const res = await getActiveCourses()
+    if (res.code === 200 && res.data) {
+      courseList.value = res.data.map(course => course.courseName).sort()
+    }
+  } catch (error) {
+    logError('加载课程列表失败:', error)
+  }
+}
+
+// 加载标签列表
+const loadTags = async () => {
+  try {
+    const res = await getTags()
+    if (res.code === 200 && res.data) {
+      tagList.value = res.data
+    }
+  } catch (error) {
+    logError('加载标签列表失败:', error)
+  }
+}
+
+// 重置筛选条件
+const resetFilters = () => {
+  filters.value.projectType = ''
+  filters.value.courseName = ''
+  filters.value.tagId = null
+  sortBy.value = 'updatedAt'
+  currentPageNum.value = 1
+  fetchProjects()
+}
+
+// 监听筛选条件变化
+watch([() => filters.value.projectType, () => filters.value.courseName, () => filters.value.tagId, sortBy], () => {
+  currentPageNum.value = 1
+  fetchProjects()
+})
 
 // 组件挂载时获取数据
 onMounted(() => {
   fetchProjects()
+  loadProjectTypes()
+  loadCourseList()
+  loadTags()
 })
-
-// TODO: 实现真实的筛选和搜索功能
-const formatNumber = (num) => {
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'k'
-  }
-  return num.toString()
-}
 
 // 计算总页数
 const totalPages = computed(() => Math.ceil(allProjects.value.length / PAGE_SIZE))
@@ -114,14 +187,14 @@ const projects = computed(() => {
 
 // 点赞功能
 const handleLikeProject = (project) => {
-  project.isLiked = !project.isLiked
-  project.likes += project.isLiked ? 1 : -1
+  project.isStarred = !project.isStarred
+  project.starCount += project.isStarred ? 1 : -1
 }
 
 // 收藏功能
 const handleFavoriteProject = (project) => {
-  project.isFavorited = !project.isFavorited
-  project.favorites += project.isFavorited ? 1 : -1
+  project.isWatched = !project.isWatched
+  project.watchCount += project.isWatched ? 1 : -1
 }
 
 // 切换页码
@@ -148,6 +221,56 @@ const handleProjectClick = (project) => {
         <p class="page-description">探索优秀项目，发现创新灵感</p>
       </div>
 
+      <!-- 筛选栏 -->
+      <div class="filter-bar">
+        <div class="filter-row">
+          <div class="filter-item">
+            <label class="filter-label">项目类型</label>
+            <select v-model="filters.projectType" class="filter-select">
+              <option value="">全部类型</option>
+              <option v-for="type in projectTypes" :key="type.typeCode" :value="type.typeCode">
+                {{ type.typeName }}
+              </option>
+            </select>
+          </div>
+
+          <div class="filter-item">
+            <label class="filter-label">课程</label>
+            <select v-model="filters.courseName" class="filter-select">
+              <option value="">全部课程</option>
+              <option v-for="course in courseList" :key="course" :value="course">
+                {{ course }}
+              </option>
+            </select>
+          </div>
+
+          <div class="filter-item">
+            <label class="filter-label">标签</label>
+            <select v-model="filters.tagId" class="filter-select">
+              <option :value="null">全部标签</option>
+              <option v-for="tag in tagList" :key="tag.id" :value="tag.id">
+                {{ tag.name }}
+              </option>
+            </select>
+          </div>
+
+          <div class="filter-item">
+            <label class="filter-label">排序方式</label>
+            <select v-model="sortBy" class="filter-select">
+              <option value="updatedAt">按更新时间</option>
+              <option value="viewCount">按浏览量</option>
+              <option value="starCount">按点赞数</option>
+            </select>
+          </div>
+
+          <div class="filter-actions">
+            <button @click="resetFilters" class="reset-btn">
+              🔄 重置
+            </button>
+          </div>
+        </div>
+      </div>
+
       <!-- 项目网格 -->
       <div v-if="projects.length > 0" class="project-grid">
         <div 
@@ -172,10 +295,10 @@ const handleProjectClick = (project) => {
           <div class="project-footer">
             <div class="project-stats">
               <span class="stat">
-                ❤️ {{ formatNumber(project.likes) }}
+                ❤️ {{ formatNumber(project.starCount) }}
               </span>
               <span class="stat">
-                ⭐ {{ formatNumber(project.favorites) }}
+                ⭐ {{ formatNumber(project.watchCount) }}
               </span>
             </div>
           </div>
@@ -190,7 +313,7 @@ const handleProjectClick = (project) => {
 
       <!-- 空状态提示 -->
       <div v-if="allProjects.length === 0 && !isLoading" class="empty-state">
-        <span class="empty-icon">📭</span>
+        <span class="empty-icon">📥</span>
         <p class="empty-text">暂无项目</p>
       </div>
 
@@ -251,6 +374,14 @@ const handleProjectClick = (project) => {
   margin-bottom: 24px;
 }
 
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
 .page-title {
   font-size: 28px;
   font-weight: 600;
@@ -266,9 +397,6 @@ const handleProjectClick = (project) => {
 
 /* 筛选栏 */
 .filter-bar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
   background-color: #ffffff;
   border: 1px solid #d9d9d9;
   border-radius: 6px;
@@ -277,66 +405,70 @@ const handleProjectClick = (project) => {
   box-shadow: 0 2px 4px rgba(0, 51, 102, 0.05);
 }
 
-.filter-left {
-  flex: 1;
+.filter-row {
+  display: flex;
+  gap: 16px;
+  align-items: flex-end;
+  flex-wrap: wrap;
 }
 
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.filter-item {
+  flex: 1;
+  min-width: 150px;
 }
 
 .filter-label {
-  font-size: 14px;
+  display: block;
+  font-size: 13px;
+  color: #666666;
+  margin-bottom: 6px;
   font-weight: 500;
-  color: #333333;
 }
 
-.filter-tag {
-  padding: 6px 12px;
-  background-color: #f5f5f5;
+.filter-select {
+  width: 100%;
+  padding: 8px 12px;
   border: 1px solid #d9d9d9;
-  border-radius: 4px;
-  color: #666666;
-  font-size: 13px;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #333333;
+  background-color: #ffffff;
   cursor: pointer;
   transition: all 0.2s;
 }
 
-.filter-tag:hover {
-  background-color: #e6e6e6;
-}
-
-.filter-tag.active {
-  background-color: #10b981;
+.filter-select:hover {
   border-color: #10b981;
-  color: #ffffff;
 }
 
-.search-box {
-  margin-left: 16px;
-}
-
-.search-input {
-  padding: 8px 12px;
-  background-color: #ffffff;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  color: #333333;
-  font-size: 14px;
-  width: 250px;
+.filter-select:focus {
   outline: none;
-  transition: all 0.2s;
-}
-
-.search-input::placeholder {
-  color: #999999;
-}
-
-.search-input:focus {
   border-color: #10b981;
   box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
+}
+
+.filter-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.reset-btn {
+  padding: 8px 16px;
+  background-color: #f5f5f5;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  color: #666666;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.reset-btn:hover {
+  background-color: #e8e8e8;
+  border-color: #10b981;
+  color: #10b981;
 }
 
 /* 项目网格 */
@@ -481,105 +613,6 @@ const handleProjectClick = (project) => {
   color: #666666;
 }
 
-/* 响应式设计 */
-@media (max-width: 768px) {
-  .filter-bar {
-    flex-direction: column;
-    gap: 12px;
-  }
-  
-  .search-box {
-    margin-left: 0;
-    width: 100%;
-  }
-  
-  .search-input {
-    width: 100%;
-  }
-  
-  .project-item {
-    flex-direction: column;
-  }
-  
-  .project-info {
-    margin-right: 0;
-    margin-bottom: 16px;
-  }
-  
-  .project-actions {
-    flex-direction: row;
-    width: 100%;
-  }
-  
-  .action-btn {
-    flex: 1;
-  }
-  
-  /* 分页控件响应式 */
-  .pagination-container {
-    flex-direction: column;
-    gap: 12px;
-    width: 100%;
-  }
-  
-  .pagination-btn {
-    padding: 10px;
-  }
-  
-  .pagination-info {
-    font-size: 14px;
-  }
-}
-
-/* 分页控件样式 */
-.pagination-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 16px;
-  margin-top: 16px;
-}
-
-.pagination-btn {
-  padding: 8px 16px;
-  background-color: #ffffff;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  color: #10b981;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.pagination-btn:hover:not(:disabled) {
-  background-color: #ecfdf5;
-  border-color: #10b981;
-}
-
-.pagination-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.pagination-info {
-  font-size: 14px;
-  color: #666666;
-  white-space: nowrap;
-}
-
-/* 点赞和收藏按钮样式 */
-.like-btn.active,
-.favorite-btn.active {
-  color: #e74c3c;
-  font-weight: bold;
-}
-
-.like-btn:hover,
-.favorite-btn:hover {
-  cursor: pointer;
-  text-decoration: underline;
-}
-
 /* 空状态 */
 .empty-state {
   display: flex;
@@ -639,6 +672,21 @@ const handleProjectClick = (project) => {
 @media (max-width: 768px) {
   .page-title {
     font-size: 24px;
+  }
+  
+  .filter-row {
+    flex-direction: column;
+    gap: 12px;
+  }
+  
+  .filter-item {
+    width: 100%;
+    min-width: 0;
+  }
+  
+  .filter-actions {
+    width: 100%;
+    justify-content: flex-end;
   }
   
   .project-grid {

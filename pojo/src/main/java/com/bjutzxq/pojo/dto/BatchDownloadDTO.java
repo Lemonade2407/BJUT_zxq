@@ -1,16 +1,18 @@
-package com.bjutzxq.pojo;
+package com.bjutzxq.pojo.dto;
 
 import lombok.Data;
+import javax.validation.constraints.NotEmpty;
 import java.util.List;
 
 /**
  * 批量下载请求 DTO
  */
 @Data
-public class BatchDownloadRequest {
+public class BatchDownloadDTO {
     /**
      * 项目 ID 列表
      */
+    @NotEmpty(message = "项目 ID 列表不能为空")
     private List<Integer> projectIds;
     
     /**

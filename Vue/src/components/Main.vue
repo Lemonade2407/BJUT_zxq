@@ -2,11 +2,12 @@
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getTrendingProjects } from '@/api/project'
-import { getNotifications, markAsRead as markNotificationRead, batchDeleteNotifications } from '@/api/notification'
+import { getNotifications, markAsRead as markNotificationRead, batchDeleteNotifications, markAllAsRead } from '@/api/notification'
 import { toast } from '@/utils/toast'
 import { error as logError, log } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 import notificationWS from '@/utils/websocket'
+
 
 const router = useRouter()
 
@@ -38,9 +39,9 @@ const getNotificationIcon = (type) => {
     1: '❤️',   // 点赞
     2: '💬',   // 评论
     3: '👁️',   // 关注
-    4: '🔔'    // 系统通知
+    4: 'ℹ️'    // 系统通知
   }
-  return icons[type] || '📢'
+  return icons[type] || 'ℹ️'
 }
 
 // 格式化时间
@@ -100,9 +101,9 @@ const loadNotifications = async () => {
   isLoadingNotifications.value = true
   try {
     const res = await getNotifications({ pageNum: 1, pageSize: 50 })
-    if (res.code === 200 && res.data) {
+    if (res.code === 200 && res.data && res.data.records) {
       // 转换数据格式
-      notifications.value = res.data.map(notification => ({
+      notifications.value = res.data.records.map(notification => ({
         id: notification.id,
         type: notification.type,
         icon: getNotificationIcon(notification.type),
@@ -220,6 +221,28 @@ const markAsRead = async (id) => {
   }
 }
 
+// 将所有通知标记为已读
+const markAllAsReadHandler = async () => {
+  if (unreadCount.value === 0) {
+    toast.info('没有未读消息')
+    return
+  }
+  
+  try {
+    const res = await markAllAsRead()
+    if (res.code === 200) {
+      // 将所有通知标记为已读
+      notifications.value.forEach(n => {
+        n.unread = false
+      })
+      toast.success(`已将 ${res.data.count} 条消息标记为已读`)
+    }
+  } catch (error) {
+    logError('全部标记为已读失败:', error)
+    toast.error(error.message || '操作失败')
+  }
+}
+
 // 点击整个消息项时标记为已读
 const handleNotificationClick = (id) => {
   markAsRead(id)
@@ -232,7 +255,6 @@ const handleProjectClick = (projectId) => {
 
 // 处理 WebSocket 接收到的新通知
 const handleNewNotification = (data) => {
-  log('收到实时通知:', data)
   
   // 构建通知对象
   const newNotification = {
@@ -258,19 +280,12 @@ const handleNewNotification = (data) => {
   // 通过 WebSocket 发送确认（标记为已读）
   if (newNotification.unread) {
     notificationWS.ackNotification(data.id)
-    log('已发送通知确认:', data.id)
   }
-  
-  // 显示提示
-  toast.info(`收到新通知：${newNotification.content}`)
-  
-  log('通知已添加到列表，当前通知数量:', notifications.value.length)
 }
 
 // 注册 WebSocket 消息监听器
 const registerWebSocketListener = () => {
   notificationWS.on('notification', handleNewNotification)
-  log('已注册 WebSocket 通知监听器')
 }
 
 // 组件挂载时加载数据并注册监听器
@@ -294,11 +309,11 @@ onMounted(() => {
           
           <div class="trending-list">
             <div v-if="isLoadingTrending" class="loading-state">
-              <span class="loading-spinner">⟳</span>
+              <span class="loading-spinner">⏳</span>
               <span>加载中...</span>
             </div>
             <div v-else-if="trendingRepos.length === 0" class="empty-state">
-              <span class="empty-icon">📭</span>
+              <span class="empty-icon">📥</span>
               <p class="empty-text">暂无热门项目</p>
             </div>
             <div v-for="repo in trendingRepos" :key="repo.id" class="trending-item" @click="handleProjectClick(repo.id)">
@@ -324,9 +339,24 @@ onMounted(() => {
         <section class="dashboard-section">
           <div class="section-header">
             <h2 class="section-title">消息通知</h2>
-            <button v-if="displayedNotifications.length > 0" @click="clearAllMessages" class="clear-btn" title="清除所有消息">
-              清除所有
-            </button>
+            <div class="notification-actions">
+              <button 
+                v-if="unreadCount > 0" 
+                @click="markAllAsReadHandler" 
+                class="mark-all-read-btn" 
+                title="全部标记为已读"
+              >
+                全部已读
+              </button>
+              <button 
+                v-if="displayedNotifications.length > 0" 
+                @click="clearAllMessages" 
+                class="clear-btn" 
+                title="清除所有消息"
+              >
+                清除所有
+              </button>
+            </div>
           </div>
           
           <div class="notification-list-container">
@@ -336,7 +366,7 @@ onMounted(() => {
               @scroll="handleScroll"
             >
               <div v-if="displayedNotifications.length === 0" class="empty-state">
-                <span class="empty-icon">📭</span>
+                <span class="empty-icon">📥</span>
                 <p class="empty-text">暂无消息</p>
               </div>
               <div v-for="notice in displayedNotifications" :key="notice.id" 
@@ -362,7 +392,7 @@ onMounted(() => {
               </div>
               
               <div v-if="isLoading" class="loading-indicator">
-                <span class="loading-spinner">⟳</span>
+                <span class="loading-spinner">⏳</span>
                 <span>加载中...</span>
               </div>
               
@@ -430,6 +460,33 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
+}
+
+.notification-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.mark-all-read-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4px 12px;
+  background-color: transparent;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  color: #999999;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.mark-all-read-btn:hover {
+  background-color: #f5f5f5;
+  color: #10b981;
+  border-color: #10b981;
 }
 
 .clear-btn {

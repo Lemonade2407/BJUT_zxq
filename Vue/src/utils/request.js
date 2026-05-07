@@ -11,8 +11,6 @@ const request = axios.create({
 })
 
 // 请求拦截器
-// TODO: 添加请求重试机制（网络波动时自动重试）
-// TODO: 添加请求取消功能（避免重复请求）
 request.interceptors.request.use(
   config => {
     // 使用 tokenManager 获取 token

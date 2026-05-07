@@ -9,7 +9,6 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
-
 import java.io.IOException;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -22,8 +21,8 @@ import java.util.concurrent.ConcurrentHashMap;
 @Component
 public class NotificationWebSocketHandler extends TextWebSocketHandler {
     
-    // 存储用户 ID 与 WebSocket Session 的映射关系
-    private static final Map<Integer, WebSocketSession> userSessions = new ConcurrentHashMap<>();
+    // 存储用户 ID 与 WebSocket Session 的映射关系（包级可见，供定时任务访问）
+    static final Map<Integer, WebSocketSession> userSessions = new ConcurrentHashMap<>();
     
     // 存储用户最后心跳时间
     private static final Map<Integer, LocalDateTime> lastHeartbeatTimes = new ConcurrentHashMap<>();
@@ -55,7 +54,7 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
      * 接收到客户端消息时调用
      */
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) throws Exception {
+    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
         Integer userId = getUserIdFromSession(session);
         String payload = message.getPayload();
         
@@ -294,6 +293,23 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
      */
     public int getOnlineUserCount() {
         return userSessions.size();
+    }
+    
+    /**
+     * 获取所有在线用户 ID（供定时任务使用）
+     * @return 在线用户 ID 集合
+     */
+    public java.util.Set<Integer> getOnlineUserIds() {
+        return userSessions.keySet();
+    }
+    
+    /**
+     * 获取用户的 WebSocket 会话（供定时任务使用）
+     * @param userId 用户 ID
+     * @return WebSocket 会话
+     */
+    public WebSocketSession getUserSession(Integer userId) {
+        return userSessions.get(userId);
     }
     
     /**

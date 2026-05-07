@@ -6,6 +6,8 @@ import { toast } from '@/utils/toast'
 import { log, error as logError, warn } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 import UserSidebar from '@/components/UserSidebar.vue'
+import { formatNumber } from '@/utils/helpers'
+
 
 const router = useRouter()
 
@@ -47,17 +49,6 @@ const changePage = (page) => {
   }
 }
 
-// 格式化数字
-const formatNumber = (num) => {
-  if (num === undefined || num === null) {
-    return '0'
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'k'
-  }
-  return num.toString()
-}
-
 // 打开项目详情
 const handleProjectClick = (projectId) => {
   router.push(`/project/${projectId}`)
@@ -87,8 +78,8 @@ const loadUserProjects = async () => {
     })
     
     if (res.code === 200 && res.data) {
-      // 后端已按更新时间降序排列，直接使用
-      allProjects.value = res.data
+      // 后端返回的是 PageResult 对象，需要从 records 获取数组
+      allProjects.value = res.data.records || []
       log('加载完成，项目数量:', allProjects.value.length)
     } else {
       warn('API 返回数据异常:', res)
@@ -134,7 +125,7 @@ onMounted(() => {
 
           <!-- 项目列表 -->
           <div v-if="isLoading" class="loading-state">
-            <span class="loading-spinner">⟳</span>
+            <span class="loading-spinner">⏳</span>
             <p>加载中...</p>
           </div>
 
@@ -157,10 +148,10 @@ onMounted(() => {
               <div class="project-footer">
                 <div class="project-stats">
                   <span class="stat">
-                    ❤️ {{ formatNumber(project.likes) }}
+                    ❤️ {{ formatNumber(project.starCount) }}
                   </span>
                   <span class="stat">
-                    ⭐ {{ formatNumber(project.favorites) }}
+                    ⭐ {{ formatNumber(project.watchCount) }}
                   </span>
                 </div>
               </div>
@@ -169,7 +160,7 @@ onMounted(() => {
 
           <!-- 空状态 -->
           <div v-else class="empty-state">
-            <span class="empty-icon">📭</span>
+            <span class="empty-icon">📥</span>
             <p class="empty-text">暂无项目</p>
           </div>
 

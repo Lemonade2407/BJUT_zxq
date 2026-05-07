@@ -3,16 +3,48 @@ import request from '@/utils/request'
 /**
  * 项目相关 API
  */
-
-// TODO: 添加项目列表缓存策略（避免频繁请求）
-// TODO: 添加搜索防抖功能
-
 // 获取项目列表（所有公开项目）
 export function getProjectList(params) {
   return request({
     url: '/projects/list',
     method: 'get',
     params
+  })
+}
+
+// 获取所有项目类型（字典）
+export function getProjectTypes() {
+  return request({
+    url: '/projects/types',
+    method: 'get'
+  })
+}
+
+// 筛选项目（按班级、课程等，用于教学管理）
+export function filterProjects(params = {}) {
+  return request({
+    url: '/projects/filter',
+    method: 'get',
+    params: {
+      className: params.className || '',
+      courseName: params.courseName || '',
+      projectType: params.projectType || '',
+      pageNum: params.pageNum || 1,
+      pageSize: params.pageSize || 10
+    }
+  })
+}
+
+// 获取筛选条件下的所有项目ID（用于批量下载）
+export function getFilteredProjectIds(params = {}) {
+  return request({
+    url: '/projects/filter/ids',
+    method: 'get',
+    params: {
+      className: params.className || '',
+      courseName: params.courseName || '',
+      projectType: params.projectType || ''
+    }
   })
 }
 
@@ -69,18 +101,6 @@ export function searchProjects(name, params = {}) {
     method: 'get',
     params: {
       name,
-      pageNum: params.pageNum || 1,
-      pageSize: params.pageSize || 10
-    }
-  })
-}
-
-// 根据分类查询项目
-export function getProjectsByCategory(categoryId, params = {}) {
-  return request({
-    url: `/projects/category/${categoryId}`,
-    method: 'get',
-    params: {
       pageNum: params.pageNum || 1,
       pageSize: params.pageSize || 10
     }
@@ -250,25 +270,6 @@ export function batchDownloadProjects(data) {
   })
 }
 
-// 上传单个文件
-export function uploadFile(projectId, file, parentId = null) {
-  const formData = new FormData()
-  formData.append('file', file)
-  if (parentId !== null) {
-    formData.append('parentId', parentId)
-  }
-  
-  return request({
-    url: `/projects/${projectId}/files/upload`,
-    method: 'post',
-    data: formData,
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    },
-    timeout: 60000 // 文件上传超时时间设置为60秒
-  })
-}
-
 // 批量上传文件
 export function uploadFiles(projectId, files, parentId = null, onProgress = null) {
   const formData = new FormData()
@@ -321,15 +322,6 @@ export function overwriteUploadFiles(projectId, files, parentId = null, onProgre
   })
 }
 
-// 获取项目文件列表
-export function getProjectFiles(projectId, parentId = null) {
-  return request({
-    url: `/projects/${projectId}/files`,
-    method: 'get',
-    params: parentId !== null ? { parentId } : {}
-  })
-}
-
 // 获取项目的所有文件（用于构建完整的树形结构）
 export function getAllProjectFiles(projectId) {
   return request({
@@ -346,7 +338,7 @@ export function uploadProjectDocument(projectId, file, onProgress = null) {
   formData.append('file', file)
   
   return request({
-    url: `/projects/${projectId}/document/upload`,
+    url: `/projects/${projectId}/files/document/upload`,
     method: 'post',
     data: formData,
     headers: {
@@ -363,7 +355,7 @@ export function uploadProjectDocument(projectId, file, onProgress = null) {
 // 删除项目文档
 export function deleteProjectDocument(projectId) {
   return request({
-    url: `/projects/${projectId}/document`,
+    url: `/projects/${projectId}/files/document`,
     method: 'delete'
   })
 }
@@ -371,7 +363,7 @@ export function deleteProjectDocument(projectId) {
 // 获取项目文档 URL
 export function getProjectDocument(projectId) {
   return request({
-    url: `/projects/${projectId}/document`,
+    url: `/projects/${projectId}/files/document`,
     method: 'get'
   })
 }

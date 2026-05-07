@@ -4,7 +4,7 @@
       <!-- 页面标题 -->
       <div class="page-header">
         <h1>🔍 搜索结果</h1>
-        <p class="subtitle">关键词: "{{ searchKeyword }}" - 找到 {{ filteredProjects.length }} 个相关项目</p>
+        <p class="subtitle">关键词: "{{ searchKeyword }}" - 找到 {{ filteredProjects.length }} 个项目</p>
       </div>
 
       <!-- 加载状态 -->
@@ -91,52 +91,36 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
-import { getProjectList } from '@/api/project'
+import { searchProjects } from '@/api/project'
 import { error as logError } from '@/utils/logger'
+import { formatNumber } from '@/utils/helpers'
+
 
 const router = useRouter()
 const route = useRoute()
 
 const loading = ref(false)
-const allProjects = ref([])
+const filteredProjects = ref([])
 const searchKeyword = ref('')
+const total = ref(0) // 总记录数
 
 // 每页显示的项目数量
 const PAGE_SIZE = 6
 const currentPageNum = ref(1)
 
-// 计算过滤后的项目
-const filteredProjects = computed(() => {
-  if (!searchKeyword.value.trim()) {
-    return []
-  }
-  
-  const keyword = searchKeyword.value.toLowerCase().trim()
-  return allProjects.value.filter(project => {
-    // 搜索项目名称、描述、标签、作者
-    const nameMatch = project.name?.toLowerCase().includes(keyword)
-    const descMatch = project.description?.toLowerCase().includes(keyword)
-    const tagsMatch = project.tags?.some(tag => tag.name?.toLowerCase().includes(keyword))
-    const authorMatch = project.author?.toLowerCase().includes(keyword)
-    
-    return nameMatch || descMatch || tagsMatch || authorMatch
-  })
-})
-
 // 计算总页数
-const totalPages = computed(() => Math.ceil(filteredProjects.value.length / PAGE_SIZE))
+const totalPages = computed(() => Math.ceil(total.value / PAGE_SIZE))
 
-// 计算当前页的项目列表
+// 计算当前页的项目列表（直接使用后端返回的数据）
 const paginatedProjects = computed(() => {
-  const start = (currentPageNum.value - 1) * PAGE_SIZE
-  const end = start + PAGE_SIZE
-  return filteredProjects.value.slice(start, end)
+  return filteredProjects.value
 })
 
 // 切换页码
 const changePage = (page) => {
   if (page >= 1 && page <= totalPages.value) {
     currentPageNum.value = page
+    loadSearchResults() // 重新加载数据
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 }
@@ -146,30 +130,30 @@ const goToProject = (projectId) => {
   router.push(`/project/${projectId}`)
 }
 
-// 格式化数字
-const formatNumber = (num) => {
-  if (num === undefined || num === null) {
-    return '0'
+// 加载搜索结果
+const loadSearchResults = async () => {
+  if (!searchKeyword.value.trim()) {
+    filteredProjects.value = []
+    total.value = 0
+    return
   }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'k'
-  }
-  return num.toString()
-}
 
-// 加载所有项目
-const loadProjects = async () => {
   loading.value = true
   try {
-    const res = await getProjectList({
-      pageNum: 1,
-      pageSize: 100
+    const res = await searchProjects(searchKeyword.value, {
+      pageNum: currentPageNum.value,
+      pageSize: PAGE_SIZE
     })
     if (res.code === 200) {
-      allProjects.value = res.data || []
+      const data = res.data || {}
+      // 后端返回的是 PageResult 对象，项目列表在 records 字段中
+      filteredProjects.value = data.records || []
+      total.value = data.total || 0
     }
   } catch (error) {
-    logError('加载项目列表失败:', error)
+    logError('搜索失败:', error)
+    filteredProjects.value = []
+    total.value = 0
   } finally {
     loading.value = false
   }
@@ -180,11 +164,12 @@ watch(() => route.query.keyword, (newKeyword) => {
   if (newKeyword) {
     searchKeyword.value = newKeyword
     currentPageNum.value = 1 // 重置到第一页
+    loadSearchResults() // 重新加载搜索结果
   }
 }, { immediate: true })
 
 onMounted(() => {
-  loadProjects()
+  // 初始加载由 watch 处理
 })
 </script>
 

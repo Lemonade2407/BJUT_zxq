@@ -2,7 +2,7 @@ package com.bjutzxq.server.aspect;
 
 import com.bjutzxq.common.Constants;
 import com.bjutzxq.common.Role;
-import com.bjutzxq.pojo.User;
+import com.bjutzxq.pojo.entity.User;
 import com.bjutzxq.server.annotation.RequireRole;
 import com.bjutzxq.server.mapper.UserMapper;
 import com.bjutzxq.server.util.JwtUtil;
@@ -11,14 +11,11 @@ import org.aspectj.lang.ProceedingJoinPoint;
 import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.reflect.MethodSignature;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
-
 import jakarta.servlet.http.HttpServletRequest;
 import java.lang.reflect.Method;
 
@@ -65,9 +62,11 @@ public class PermissionAspect {
             token = token.substring(7);
         }
         
-        Integer userId = JwtUtil.getUserIdFromToken(token);
-        if (userId == null) {
-            log.warn("权限验证失败：Token 无效");
+        Integer userId;
+        try {
+            userId = JwtUtil.getUserIdFromToken(token);
+        } catch (Exception e) {
+            log.warn("权限验证失败：Token 无效，错误: {}", e.getMessage());
             throw new RuntimeException("Token 无效");
         }
         

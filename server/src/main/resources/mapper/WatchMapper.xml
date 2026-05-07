@@ -3,7 +3,7 @@
 <mapper namespace="com.bjutzxq.server.mapper.WatchMapper">
     
     <!-- 结果映射 -->
-    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.Watch">
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.entity.Watch">
         <id column="id" property="id"/>
         <result column="user_id" property="userId"/>
         <result column="project_id" property="projectId"/>
@@ -17,7 +17,7 @@
     </sql>
 
     <!-- 新增关注 -->
-    <insert id="insert" parameterType="com.bjutzxq.pojo.Watch" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.bjutzxq.pojo.entity.Watch" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO watch (
             user_id,
             project_id,

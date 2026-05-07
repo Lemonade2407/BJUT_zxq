@@ -1,10 +1,12 @@
 package com.bjutzxq.server.service;
 
 import com.bjutzxq.common.NotificationType;
-import com.bjutzxq.pojo.Project;
-import com.bjutzxq.pojo.Star;
+import com.bjutzxq.pojo.entity.Project;
+import com.bjutzxq.pojo.entity.Star;
+import com.bjutzxq.pojo.entity.User;
 import com.bjutzxq.server.mapper.ProjectMapper;
 import com.bjutzxq.server.mapper.StarMapper;
+import com.bjutzxq.server.mapper.UserMapper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,9 @@ public class StarService {
     
     @Autowired
     private ProjectMapper projectMapper;
+    
+    @Autowired
+    private UserMapper userMapper;
     
     @Autowired
     private NotificationService notificationService;
@@ -57,10 +62,14 @@ public class StarService {
         // 5. 创建通知（通知项目所有者）
         try {
             if (project != null && !project.getOwnerId().equals(userId)) {
-                String content = "点赞了你的项目：" + project.getName();
+                // 获取点赞用户的名称
+                User sender = userMapper.selectById(userId);
+                String senderName = sender != null ? sender.getUsername() : "未知用户";
+                
+                String content = senderName + " 点赞了你的项目：" + project.getName();
                 notificationService.createNotification(
                     project.getOwnerId(), userId, projectId,
-                    NotificationType.LIKE.getCode(), content);
+                    NotificationType.LIKE, content);
             }
         } catch (Exception e) {
             log.warn("创建通知失败：{}", e.getMessage());
@@ -101,14 +110,5 @@ public class StarService {
         log.info("取消点赞成功，当前点赞数：{}", starCount);
         
         return starCount;
-    }
-    
-    /**
-     * 获取项目点赞数
-     * @param projectId 项目 ID
-     * @return 点赞数
-     */
-    public Integer getStarCount(Integer projectId) {
-        return starMapper.countByProjectId(projectId);
     }
 }

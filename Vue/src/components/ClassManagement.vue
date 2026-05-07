@@ -1,21 +1,17 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { getProjectList, batchDownloadProjects } from '@/api/project'
+import { filterProjects, getFilteredProjectIds, batchDownloadProjects } from '@/api/project'
 import { getActiveCourses } from '@/api/course'
 import { toast } from '@/utils/toast'
 import { log, error as logError } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 import UserSidebar from '@/components/UserSidebar.vue'
+import { formatNumber } from '@/utils/helpers'
+
+import { getProjectTypeText } from '@/constants/project'
 
 const router = useRouter()
-
-// 用户信息
-const userInfo = ref({
-  id: null,
-  username: '',
-  role: ''
-})
 
 // 筛选条件
 const filters = ref({
@@ -26,8 +22,11 @@ const filters = ref({
 // 课程列表（从课程字典获取）
 const courseList = ref([])
 
-// 所有项目
-const allProjects = ref([])
+// 当前页的项目列表
+const currentPageProjects = ref([])
+
+// 总记录数
+const total = ref(0)
 
 // 是否已执行查询
 const hasSearched = ref(false)
@@ -40,73 +39,15 @@ const PAGE_SIZE = 12
 const currentPageNum = ref(1)
 
 // 计算总页数
-const totalPages = computed(() => Math.ceil(filteredProjects.value.length / PAGE_SIZE))
-
-// 计算当前页的项目
-const paginatedProjects = computed(() => {
-  const start = (currentPageNum.value - 1) * PAGE_SIZE
-  const end = start + PAGE_SIZE
-  return filteredProjects.value.slice(start, end)
-})
-
-// 根据筛选条件过滤项目
-const filteredProjects = computed(() => {
-  // 如果未执行查询，返回空数组
-  if (!hasSearched.value) {
-    return []
-  }
-
-  let result = allProjects.value
-
-  // 按班级筛选
-  if (filters.value.className) {
-    result = result.filter(project => 
-      project.ownerClassName && 
-      project.ownerClassName.includes(filters.value.className)
-    )
-  }
-
-  // 按课程筛选
-  if (filters.value.courseName) {
-    result = result.filter(project => 
-      project.projectType === 'COURSE' && 
-      project.courseName === filters.value.courseName
-    )
-  }
-
-  return result
-})
-
-// 格式化数字
-const formatNumber = (num) => {
-  if (num === undefined || num === null) return '0'
-  if (num >= 1000) return (num / 1000).toFixed(1) + 'k'
-  return num.toString()
-}
-
-// 获取项目类型文本
-const getProjectTypeText = (type) => {
-  const typeMap = {
-    'COURSE': '课程设计',
-    'THESIS': '毕业设计',
-    'COMPETITION': '竞赛作品',
-    'PERSONAL': '个人项目',
-    'OTHER': '其他'
-  }
-  return typeMap[type] || '未知'
-}
+const totalPages = computed(() => Math.ceil(total.value / PAGE_SIZE))
 
 // 切换页码
 const changePage = (page) => {
   if (page >= 1 && page <= totalPages.value) {
     currentPageNum.value = page
+    loadFilteredProjects() // 重新加载数据
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
-}
-
-// 跳转到项目详情
-const handleProjectClick = (projectId) => {
-  router.push(`/project/${projectId}`)
 }
 
 // 重置筛选
@@ -117,17 +58,60 @@ const resetFilters = () => {
   }
   currentPageNum.value = 1
   hasSearched.value = false
+  currentPageProjects.value = []
+  total.value = 0
 }
 
 // 执行查询
 const handleSearch = () => {
   hasSearched.value = true
   currentPageNum.value = 1
+  loadFilteredProjects()
+}
+
+// 加载筛选后的项目
+const loadFilteredProjects = async () => {
+  if (!hasSearched.value) {
+    return
+  }
+
+  loading.value = true
+  try {
+    log('加载筛选项目，页码:', currentPageNum.value)
+
+    const res = await filterProjects({
+      className: filters.value.className,
+      courseName: filters.value.courseName,
+      projectType: 'COURSE', // 固定为课程设计
+      pageNum: currentPageNum.value,
+      pageSize: PAGE_SIZE
+    })
+
+    if (res.code === 200 && res.data) {
+      // 解构响应数据 - 后端返回的是 PageResult 对象，项目列表在 records 字段中
+      const { records = [], total: totalCount = 0 } = res.data
+      currentPageProjects.value = records
+      total.value = totalCount
+      
+      log(`加载完成，当前页项目数量: ${projects.length}, 总数: ${totalCount}`)
+    } else {
+      logError('API 返回数据异常:', res)
+      currentPageProjects.value = []
+      total.value = 0
+    }
+  } catch (error) {
+    logError('加载筛选项目失败:', error)
+    toast.error(error.message || '加载项目失败，请稍后重试')
+    currentPageProjects.value = []
+    total.value = 0
+  } finally {
+    loading.value = false
+  }
 }
 
 // 批量下载学生项目
 const handleBatchDownload = async () => {
-  if (!hasSearched.value || filteredProjects.value.length === 0) {
+  if (!hasSearched.value || total.value === 0) {
     toast.warning('请先查询并筛选出要下载的项目')
     return
   }
@@ -139,65 +123,43 @@ const handleBatchDownload = async () => {
   }
   
   try {
-    log('开始批量下载，项目数量:', filteredProjects.value.length)
-    toast.info(`正在打包 ${filteredProjects.value.length} 个项目...`)
+    log('开始获取所有项目ID...')
+    toast.info('正在获取项目列表...')
     
-    // 提取所有项目 ID
-    const projectIds = filteredProjects.value.map(p => p.id)
+    // 获取所有符合条件的项目ID
+    const res = await getFilteredProjectIds({
+      className: filters.value.className,
+      courseName: filters.value.courseName,
+      projectType: 'COURSE'
+    })
+    
+    if (res.code !== 200 || !res.data) {
+      logError('获取项目ID失败:', res)
+      toast.error('获取项目列表失败，请稍后重试')
+      return
+    }
+    
+    const projectIds = res.data
+    
+    if (projectIds.length === 0) {
+      toast.warning('当前没有可下载的项目')
+      return
+    }
+    
+    log(`获取到 ${projectIds.length} 个项目ID，开始批量下载...`)
+    toast.info(`正在打包 ${projectIds.length} 个项目...`)
     
     // 调用批量下载 API
-    await batchDownloadProjects({
+    batchDownloadProjects({
       projectIds: projectIds,
       className: filters.value.className || '未知班级',
       courseName: filters.value.courseName || '未知课程'
     })
     
-    toast.success('批量下载成功！')
+    toast.success(`成功下载 ${projectIds.length} 个项目！`)
   } catch (error) {
     logError('批量下载失败:', error)
     toast.error(error.message || '批量下载失败，请稍后重试')
-  }
-}
-
-// 加载学生项目
-const loadStudentProjects = async () => {
-  loading.value = true
-  try {
-    // 获取当前用户信息
-    const userInfoFromToken = tokenManager.getUserInfo()
-    if (userInfoFromToken) {
-      userInfo.value = userInfoFromToken
-    }
-
-    // 检查是否为教师
-    if (userInfo.value.role !== 'TEACHER') {
-      toast.warning('只有教师可以访问此页面')
-      router.push('/profile')
-      return
-    }
-
-    log('加载学生项目列表...')
-
-    // 获取所有公开的课程设计项目
-    const res = await getProjectList({
-      pageNum: 1,
-      pageSize: 1000, // 获取尽可能多的数据用于筛选
-      projectType: 'COURSE'
-    })
-
-    if (res.code === 200 && res.data) {
-      allProjects.value = res.data
-      log(`加载完成，项目数量: ${allProjects.value.length}`)
-    } else {
-      logError('API 返回数据异常:', res)
-      allProjects.value = []
-    }
-  } catch (error) {
-    logError('加载学生项目失败:', error)
-    toast.error(error.message || '加载项目失败，请稍后重试')
-    allProjects.value = []
-  } finally {
-    loading.value = false
   }
 }
 
@@ -223,7 +185,14 @@ const loadCourseList = async () => {
 
 // 组件挂载时加载数据
 onMounted(() => {
-  loadStudentProjects()
+  // 检查是否为教师
+  const userInfoFromToken = tokenManager.getUserInfo()
+  if (!userInfoFromToken || userInfoFromToken.role !== 'TEACHER') {
+    toast.warning('只有教师可以访问此页面')
+    router.push('/profile')
+    return
+  }
+
   loadCourseList()
 })
 </script>
@@ -279,18 +248,18 @@ onMounted(() => {
                   🔄 重置
                 </button>
                 <button 
-                  v-if="hasSearched && filteredProjects.length > 0"
+                  v-if="hasSearched && total > 0"
                   @click="handleBatchDownload" 
                   class="batch-download-btn"
                 >
-                  📦 批量下载 ({{ filteredProjects.length }})
+                  📁 批量下载
                 </button>
               </div>
             </div>
 
             <div class="filter-summary">
-              <span v-if="!hasSearched">请输入筛选条件后点击“查询”按钮</span>
-              <span v-else>共找到 <strong>{{ filteredProjects.length }}</strong> 个项目</span>
+              <span v-if="!hasSearched">请输入筛选条件后点击"查询"按钮</span>
+              <span v-else>共找到 <strong>{{ total }}</strong> 个项目，当前第 {{ currentPageNum }} / {{ totalPages }} 页</span>
             </div>
           </div>
 
@@ -298,7 +267,7 @@ onMounted(() => {
           <div v-if="!hasSearched" class="initial-state">
             <div class="empty-icon">🔍</div>
             <h3>开始查询学生项目</h3>
-            <p>输入班级名称或选择课程，然后点击“查询”按钮</p>
+            <p>输入班级名称或选择课程，然后点击"查询"按钮</p>
           </div>
 
           <!-- 加载状态 -->
@@ -308,8 +277,8 @@ onMounted(() => {
           </div>
 
           <!-- 空状态 -->
-          <div v-else-if="filteredProjects.length === 0" class="empty-state">
-            <div class="empty-icon">📭</div>
+          <div v-else-if="currentPageProjects.length === 0" class="empty-state">
+            <div class="empty-icon">📥</div>
             <h3>未找到相关项目</h3>
             <p>尝试调整筛选条件或等待学生提交项目</p>
           </div>
@@ -317,10 +286,10 @@ onMounted(() => {
           <!-- 项目列表 -->
           <div v-else class="project-grid">
             <div
-              v-for="project in paginatedProjects"
+              v-for="project in currentPageProjects"
               :key="project.id"
               class="project-card"
-              @click="handleProjectClick(project.id)"
+              @click="router.push(`/project/${project.id}`)"
             >
               <div class="project-card-header">
                 <span class="project-name">{{ project.name }}</span>
@@ -332,14 +301,14 @@ onMounted(() => {
               <div class="project-info">
                 <div class="info-item">
                   <span class="info-label">👤 作者:</span>
-                  <span class="info-value">{{ project.ownerUsername || '未知' }}</span>
+                  <span class="info-value">{{ project.ownerUsername || project.author || '未知' }}</span>
                 </div>
                 <div class="info-item">
                   <span class="info-label">🏫 班级:</span>
                   <span class="info-value">{{ project.ownerClassName || '未设置' }}</span>
                 </div>
                 <div class="info-item">
-                  <span class="info-label">📖 课程:</span>
+                  <span class="info-label">📚 课程:</span>
                   <span class="info-value">{{ project.courseName || '未设置' }}</span>
                 </div>
               </div>
@@ -361,7 +330,7 @@ onMounted(() => {
           </div>
 
           <!-- 分页控件 -->
-          <div v-if="filteredProjects.length > 0" class="pagination-container">
+          <div v-if="currentPageProjects.length > 0" class="pagination-container">
             <div class="pagination">
               <button
                 class="page-btn"
@@ -390,7 +359,7 @@ onMounted(() => {
             </div>
 
             <div class="page-info">
-              共 {{ filteredProjects.length }} 个项目，第 {{ currentPageNum }} / {{ totalPages }} 页
+              共 {{ total }} 个项目，第 {{ currentPageNum }} / {{ totalPages }} 页
             </div>
           </div>
         </div>
@@ -714,6 +683,7 @@ onMounted(() => {
   text-overflow: ellipsis;
   display: -webkit-box;
   -webkit-line-clamp: 2;
+  line-clamp: 2;
   -webkit-box-orient: vertical;
 }
 

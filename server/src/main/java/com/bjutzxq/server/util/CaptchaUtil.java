@@ -90,14 +90,14 @@ public class CaptchaUtil {
         
         // 检查是否过期
         long currentTime = System.currentTimeMillis();
-        if (currentTime - captchaInfo.getCreateTime() > CAPTCHA_EXPIRE_TIME * 1000) {
+        if (currentTime - captchaInfo.createTime() > CAPTCHA_EXPIRE_TIME * 1000) {
             log.warn("验证码已过期，会话 ID: {}", sessionId);
             CAPTCHA_STORE.remove(sessionId);
             return false;
         }
         
         // 验证验证码（不区分大小写）
-        boolean valid = captchaInfo.getCode().equalsIgnoreCase(userCode.trim());
+        boolean valid = captchaInfo.code().equalsIgnoreCase(userCode.trim());
         
         // 验证成功后删除验证码（一次性使用）
         CAPTCHA_STORE.remove(sessionId);
@@ -212,25 +212,10 @@ public class CaptchaUtil {
             throw new RuntimeException("生成验证码失败");
         }
     }
-    
+
     /**
-     * 验证码信息内部类
-     */
-    private static class CaptchaInfo {
-        private String code;
-        private long createTime;
-        
-        public CaptchaInfo(String code, long createTime) {
-            this.code = code;
-            this.createTime = createTime;
-        }
-        
-        public String getCode() {
-            return code;
-        }
-        
-        public long getCreateTime() {
-            return createTime;
-        }
+         * 验证码信息内部类
+         */
+        private record CaptchaInfo(String code, long createTime) {
     }
 }

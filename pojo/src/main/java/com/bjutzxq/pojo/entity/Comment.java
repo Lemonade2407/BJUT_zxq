@@ -1,4 +1,4 @@
-package com.bjutzxq.pojo;
+package com.bjutzxq.pojo.entity;
 
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -24,11 +24,6 @@ public class Comment {
     private Integer projectId;
     
     /**
-     * 父评论 ID（用于回复）
-     */
-    private Integer parentId;
-    
-    /**
      * 评论内容
      */
     private String content;
@@ -37,11 +32,6 @@ public class Comment {
      * 点赞数
      */
     private Integer likeCount;
-    
-    /**
-     * 回复数
-     */
-    private Integer replyCount;
     
     /**
      * 评论时间

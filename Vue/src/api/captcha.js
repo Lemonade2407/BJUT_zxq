@@ -12,15 +12,6 @@ export function getCaptcha() {
   })
 }
 
-// 验证图形验证码
-export function verifyCaptcha(data) {
-  return request({
-    url: '/captcha/verify',
-    method: 'post',
-    data
-  })
-}
-
 // 评估密码强度
 export function checkPasswordStrength(password) {
   return request({

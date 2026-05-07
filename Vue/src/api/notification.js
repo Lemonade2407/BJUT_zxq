@@ -16,15 +16,6 @@ export function getNotifications(params = {}) {
     }
   })
 }
-
-// 获取未读通知数量
-export function getUnreadCount() {
-  return request({
-    url: '/notifications/unread/count',
-    method: 'get'
-  })
-}
-
 // 标记单个通知为已读
 export function markAsRead(notificationId) {
   return request({
@@ -40,15 +31,6 @@ export function markAllAsRead() {
     method: 'put'
   })
 }
-
-// 删除单个通知
-export function deleteNotification(notificationId) {
-  return request({
-    url: `/notifications/${notificationId}`,
-    method: 'delete'
-  })
-}
-
 // 批量删除通知
 export function batchDeleteNotifications(ids) {
   return request({

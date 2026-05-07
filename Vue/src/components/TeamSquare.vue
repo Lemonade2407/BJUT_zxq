@@ -115,7 +115,7 @@ const handleViewDetail = (project) => {
               class="detail-btn"
               @click="handleViewDetail(project)"
             >
-              📋 查看详情
+              📄 查看详情
             </button>
           </div>
         </div>
@@ -157,7 +157,7 @@ const handleViewDetail = (project) => {
 
       <!-- 空状态提示 -->
       <div v-if="allTeamProjects.length === 0" class="empty-state">
-        <span class="empty-icon">📭</span>
+        <span class="empty-icon">📥</span>
         <p class="empty-text">暂无组队项目</p>
       </div>
     </div>

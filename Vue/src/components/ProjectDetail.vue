@@ -1,17 +1,19 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getProjectDetail, starProject, unstarProject, watchProject, unwatchProject, downloadProject, updateProject, deleteProject, uploadFiles, overwriteUploadFiles, getProjectFiles, getAllProjectFiles, uploadProjectDocument, deleteProjectDocument, getProjectDocument } from '@/api/project'
+import { getProjectDetail, starProject, unstarProject, watchProject, unwatchProject, downloadProject, updateProject, deleteProject, uploadFiles, overwriteUploadFiles, getAllProjectFiles, uploadProjectDocument, deleteProjectDocument, getProjectDocument, getProjectTypes } from '@/api/project'
 import { getProjectComments, createComment } from '@/api/comment'
 import { getTagsByCategory } from '@/api/tag'
 import { getActiveCourses } from '@/api/course'
 import { getUserById } from '@/api/auth'
 import { toast } from '@/utils/toast'
-import { log, error as logError, warn } from '@/utils/logger'
+import { error as logError, warn } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 import FileTreeItem from './FileTreeItem.vue'
 import mammoth from 'mammoth'
 import { marked } from 'marked'
+import { formatNumber, formatDateShort } from '@/utils/helpers'
+
 
 const route = useRoute()
 const router = useRouter()
@@ -51,14 +53,8 @@ const displayCount = ref({
 // 课程列表（从数据库加载）
 const courseList = ref([])
 
-// 项目类型选项
-const projectTypeOptions = [
-  { value: 'COURSE', label: '课程设计' },
-  { value: 'THESIS', label: '毕业设计' },
-  { value: 'COMPETITION', label: '竞赛作品' },
-  { value: 'PERSONAL', label: '个人项目' },
-  { value: 'OTHER', label: '其他' }
-]
+// 项目类型选项（从后端动态获取）
+const projectTypeOptions = ref([])
 
 // 毕设类型选项
 const thesisTypeOptions = [
@@ -112,8 +108,6 @@ const loadProjectDetail = async () => {
 
   isLoading.value = true
   try {
-    log('加载项目详情，项目 ID:', projectId.value)
-    
     // 调用真实 API 获取项目详情（后端会自动增加浏览量）
     const res = await getProjectDetail(projectId.value)
     
@@ -122,13 +116,11 @@ const loadProjectDetail = async () => {
       
       // 格式化时间字段
       if (project.value.createdAt) {
-        project.value.createdAt = formatDateTime(project.value.createdAt)
+        project.value.createdAt = formatDateShort(project.value.createdAt)
       }
       if (project.value.updatedAt) {
-        project.value.updatedAt = formatDateTime(project.value.updatedAt)
+        project.value.updatedAt = formatDateShort(project.value.updatedAt)
       }
-      
-      log('项目详情加载成功:', project.value.name)
       
       // 加载评论数据
       await loadComments()
@@ -159,9 +151,8 @@ const loadProjectDetail = async () => {
 const loadComments = async () => {
   try {
     const res = await getProjectComments(projectId.value)
-    if (res.code === 200 && res.data) {
-      comments.value = res.data
-      log('评论加载成功，数量:', comments.value.length)
+    if (res.code === 200 && res.data && res.data.records) {
+      comments.value = res.data.records
       
       // 批量加载评论者的用户信息
       await loadCommentUsers()
@@ -202,7 +193,6 @@ const loadCommentUsers = async () => {
       }
     })
     
-    log('评论用户信息加载成功')
   } catch (error) {
     logError('加载评论用户信息失败:', error)
   }
@@ -216,12 +206,6 @@ const loadProjectFiles = async () => {
     const res = await getAllProjectFiles(projectId.value)
     if (res.code === 200 && res.data) {
       projectFiles.value = res.data
-      log('项目文件加载成功，数量:', projectFiles.value.length)
-      
-      // 打印前3个文件的详细信息用于调试
-      if (projectFiles.value.length > 0) {
-        log('文件数据示例（前3个）:', JSON.stringify(projectFiles.value.slice(0, 3), null, 2))
-      }
     }
   } catch (error) {
     logError('加载项目文件失败:', error)
@@ -240,8 +224,6 @@ const loadProjectDocument = async () => {
       // 从 URL 提取文件名作为显示名称
       const urlParts = res.data.split('/')
       documentName.value = urlParts[urlParts.length - 1] || '未知文档'
-      log('项目文档加载成功:', documentUrl.value)
-      log('文档显示名称:', documentName.value)
       
       // 自动渲染 Word 或 Markdown 文档
       if (isWordDocument()) {
@@ -282,7 +264,6 @@ const handleDocumentFileSelect = (event) => {
   }
   
   selectedDocumentFile.value = file
-  log('选择的文档文件:', file.name, file.size, 'bytes')
 }
 
 // 上传项目文档
@@ -296,7 +277,6 @@ const uploadDocument = async () => {
   documentUploadProgress.value = 0
   
   try {
-    log('开始上传项目文档...')
     const res = await uploadProjectDocument(
       projectId.value,
       selectedDocumentFile.value,
@@ -311,8 +291,6 @@ const uploadDocument = async () => {
       documentName.value = selectedDocumentFile.value.name
       selectedDocumentFile.value = null
       toast.success('文档上传成功！')
-      log('文档上传成功:', documentUrl.value)
-      log('文档显示名称:', documentName.value)
       
       // 自动渲染 Word 或 Markdown 文档
       if (isWordDocument()) {
@@ -348,8 +326,7 @@ const deleteDocument = async () => {
       documentUrl.value = ''
       documentName.value = ''
       documentContent.value = ''
-      toast.success('文档删除成功！')
-      log('项目文档删除成功')
+      toast.success('文档删除成功')
     }
   } catch (error) {
     logError('删除项目文档失败:', error)
@@ -394,8 +371,6 @@ const renderWordDocument = async () => {
   
   isRenderingDocument.value = true
   try {
-    log('开始渲染 Word 文档...')
-    
     // 下载 Word 文件
     const response = await fetch(documentUrl.value)
     const arrayBuffer = await response.arrayBuffer()
@@ -403,15 +378,6 @@ const renderWordDocument = async () => {
     // 使用 mammoth 转换为 HTML
     const result = await mammoth.convertToHtml({ arrayBuffer })
     documentContent.value = result.value
-    
-    log('Word 转换后的 HTML 长度:', result.value?.length || 0)
-    log('Word 转换后的 HTML 内容预览:', result.value?.substring(0, 200))
-    
-    if (result.messages && result.messages.length > 0) {
-      log('Word 转换警告:', result.messages)
-    }
-    
-    log('Word 文档渲染成功')
   } catch (error) {
     logError('渲染 Word 文档失败:', error)
     toast.error('Word 文档渲染失败，请下载后查看')
@@ -427,16 +393,12 @@ const renderMarkdownDocument = async () => {
   
   isRenderingDocument.value = true
   try {
-    log('开始渲染 Markdown 文档...')
-    
     // 下载 Markdown 文件
     const response = await fetch(documentUrl.value)
     const markdownText = await response.text()
     
     // 使用 marked 转换为 HTML
     documentContent.value = marked(markdownText)
-    
-    log('Markdown 文档渲染成功')
   } catch (error) {
     logError('渲染 Markdown 文档失败:', error)
     toast.error('Markdown 文档渲染失败，请下载后查看')
@@ -469,7 +431,6 @@ const submitComment = async () => {
       comments.value.unshift(res.data)
       newComment.value = ''
       toast.success('评论成功！')
-      log('评论提交成功')
     }
   } catch (error) {
     logError('提交评论失败:', error)
@@ -480,52 +441,56 @@ const submitComment = async () => {
 // 点赞项目
 const toggleLike = async () => {
   try {
-    if (project.value.isLiked) {
+    if (project.value.isStarred) {
       // 取消点赞
       const res = await unstarProject(project.value.id)
-      // 使用后端返回的实际数量
+      // 使用后端返回的实际数量更新状态
       if (res.code === 200 && res.data !== undefined) {
-        project.value.likes = res.data
+        project.value.starCount = res.data
+        project.value.isStarred = false
       }
-      project.value.isLiked = false
     } else {
       // 点赞
       const res = await starProject(project.value.id)
-      // 使用后端返回的实际数量
+      // 使用后端返回的实际数量更新状态
       if (res.code === 200 && res.data !== undefined) {
-        project.value.likes = res.data
+        project.value.starCount = res.data
+        project.value.isStarred = true
       }
-      project.value.isLiked = true
     }
   } catch (error) {
     logError('点赞操作失败:', error)
     toast.error(error.message || '操作失败，请稍后重试')
+    // 失败时重新加载项目数据以恢复正确状态
+    await loadProjectDetail()
   }
 }
 
 // 收藏项目
 const toggleFavorite = async () => {
   try {
-    if (project.value.isFavorited) {
+    if (project.value.isWatched) {
       // 取消收藏
       const res = await unwatchProject(project.value.id)
-      // 使用后端返回的实际数量
+      // 使用后端返回的实际数量更新状态
       if (res.code === 200 && res.data !== undefined) {
-        project.value.favorites = res.data
+        project.value.watchCount = res.data
+        project.value.isWatched = false
       }
-      project.value.isFavorited = false
     } else {
       // 收藏
       const res = await watchProject(project.value.id)
-      // 使用后端返回的实际数量
+      // 使用后端返回的实际数量更新状态
       if (res.code === 200 && res.data !== undefined) {
-        project.value.favorites = res.data
+        project.value.watchCount = res.data
+        project.value.isWatched = true
       }
-      project.value.isFavorited = true
     }
   } catch (error) {
     logError('收藏操作失败:', error)
     toast.error(error.message || '操作失败，请稍后重试')
+    // 失败时重新加载项目数据以恢复正确状态
+    await loadProjectDetail()
   }
 }
 
@@ -538,33 +503,10 @@ const downloadProjectHandler = async () => {
     await downloadProject(projectId.value)
     
     toast.success('下载成功！')
-    log('项目下载成功，项目 ID:', projectId.value)
   } catch (error) {
     logError('下载项目失败:', error)
     toast.error(error.message || '下载失败，请稍后重试')
   }
-}
-
-// 格式化数字
-const formatNumber = (num) => {
-  if (num === undefined || num === null) {
-    return '0'
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'k'
-  }
-  return num.toString()
-}
-
-// 格式化时间(只保留年月日)
-const formatDateTime = (dateTime) => {
-  if (!dateTime) return '-'
-  const date = new Date(dateTime)
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit'
-  })
 }
 
 // 获取作者名称（从标签或分类中推断）
@@ -605,8 +547,6 @@ const loadTags = async () => {
     if (domainRes.code === 200) {
       tagsByCategory.value['领域'] = domainRes.data || []
     }
-    
-    log('加载标签列表成功')
   } catch (error) {
     logError('加载标签失败:', error)
   }
@@ -615,13 +555,11 @@ const loadTags = async () => {
 // 加载课程列表
 const loadCourses = async () => {
   try {
-    log('加载课程列表...')
     const res = await getActiveCourses()
     
     if (res.code === 200 && res.data) {
       // 提取课程名称列表
       courseList.value = res.data.map(course => course.courseName).sort()
-      log(`加载完成，课程数量: ${courseList.value.length}`)
     } else {
       logError('课程 API 返回数据异常:', res)
       courseList.value = []
@@ -825,8 +763,6 @@ const ossFileTree = computed(() => {
     return []
   }
   
-  log('构建文件树，总文件数:', projectFiles.value.length)
-  
   // 构建树形结构
   const tree = []
   const fileMap = new Map()
@@ -848,15 +784,12 @@ const ossFileTree = computed(() => {
       const parent = fileMap.get(file.parentId)
       node.level = parent.level + 1
       parent.children.push(node)
-      log(`文件 "${file.fileName}" 是 "${parent.fileName}" 的子节点`)
     } else {
       // 根节点
       tree.push(node)
-      log(`文件 "${file.fileName}" 是根节点`)
     }
   })
   
-  log('文件树构建完成，根节点数量:', tree.length)
   return tree
 })
 
@@ -882,10 +815,8 @@ const toggleFolder = (fileId) => {
   const newSet = new Set(expandedFolders.value)
   if (newSet.has(fileId)) {
     newSet.delete(fileId)
-    log('折叠文件夹 ID:', fileId)
   } else {
     newSet.add(fileId)
-    log('展开文件夹 ID:', fileId)
   }
   expandedFolders.value = newSet
 }
@@ -895,12 +826,12 @@ const handleFileSelect = (event) => {
   const files = Array.from(event.target.files)
   if (files.length === 0) return
   
-  // 验证文件大小（单个文件不超过 50MB）
-  const maxSize = 50 * 1024 * 1024
+  // 验证文件大小（单个文件不超过 100MB）
+  const maxSize = 100 * 1024 * 1024
   const oversizedFiles = files.filter(file => file.size > maxSize)
   
   if (oversizedFiles.length > 0) {
-    toast.warning(`以下文件超过 50MB，无法上传：${oversizedFiles.map(f => f.name).join(', ')}`)
+    toast.warning(`以下文件超过 100MB，无法上传：${oversizedFiles.map(f => f.name).join(', ')}`)
   }
   
   // 过滤出符合要求的文件
@@ -911,19 +842,11 @@ const handleFileSelect = (event) => {
     // webkitRelativePath 包含文件夹路径，如 "folder/subfolder/file.txt"
     if (file.webkitRelativePath) {
       file.relativePath = file.webkitRelativePath
-      if (index < 3) { // 只打印前3个文件的日志
-        log(`文件 ${index + 1}:`, file.name, '路径:', file.webkitRelativePath)
-      }
-    } else {
-      if (index < 3) {
-        log(`文件 ${index + 1}:`, file.name, '(无路径信息)')
-      }
     }
   })
   
   // 添加到待上传列表
   selectedFiles.value.push(...validFiles)
-  log('已选择文件:', validFiles.length, '个')
 }
 
 // 拖拽处理
@@ -1003,8 +926,6 @@ const handleDrop = (event) => {
 const processFiles = (files) => {
   if (files.length === 0) return
   
-  log('拖拽的文件数量:', files.length)
-  
   // 验证文件大小
   const maxSize = 50 * 1024 * 1024
   const validFiles = files.filter(file => file.size <= maxSize)
@@ -1017,15 +938,11 @@ const processFiles = (files) => {
   validFiles.forEach((file, index) => {
     if (index < 3) {
       if (file.relativePath || file.webkitRelativePath) {
-        log(`文件 ${index + 1}:`, file.name, '路径:', file.relativePath || file.webkitRelativePath)
-      } else {
-        log(`文件 ${index + 1}:`, file.name, '(无路径信息)')
       }
     }
   })
   
   selectedFiles.value.push(...validFiles)
-  log('拖拽添加文件:', validFiles.length, '个')
 }
 
 // 按路径移除文件
@@ -1036,7 +953,6 @@ const removeFileByPath = (path) => {
   })
   if (index > -1) {
     selectedFiles.value.splice(index, 1)
-    log('移除文件，剩余:', selectedFiles.value.length, '个')
   }
 }
 
@@ -1095,7 +1011,6 @@ const uploadProjectFiles = async () => {
     })
     
     if (!confirmUpload) {
-      log('用户取消覆盖上传')
       return
     }
   }
@@ -1109,8 +1024,6 @@ const uploadProjectFiles = async () => {
   uploadProgress.value = 0
   
   try {
-    log('开始上传文件，数量:', selectedFiles.value.length, '总大小:', totalSizeMB, 'MB', '模式:', isOverwriteMode.value ? '覆盖' : '追加')
-    
     // 分批上传，每批50个文件
     const batchSize = 50
     const totalBatches = Math.ceil(selectedFiles.value.length / batchSize)
@@ -1121,8 +1034,6 @@ const uploadProjectFiles = async () => {
       const start = i * batchSize
       const end = Math.min(start + batchSize, selectedFiles.value.length)
       const batch = selectedFiles.value.slice(start, end)
-      
-      log(`上传第 ${i + 1}/${totalBatches} 批，文件数: ${batch.length}`)
       
       if (isOverwriteMode.value && i === 0) {
         // 覆盖模式：第一批使用覆盖上传接口（会先删除旧文件）
@@ -1135,11 +1046,6 @@ const uploadProjectFiles = async () => {
             const batchProgress = progress / 100
             const overallProgress = ((uploadedCount + batch.length * batchProgress) / selectedFiles.value.length) * 100
             uploadProgress.value = Math.round(overallProgress)
-            
-            // 每10%记录一次日志
-            if (Math.round(overallProgress) % 10 === 0 && Math.round(overallProgress) > 0) {
-              log('总体进度:', Math.round(overallProgress) + '%')
-            }
           }
         )
       } else {
@@ -1153,17 +1059,11 @@ const uploadProjectFiles = async () => {
             const batchProgress = progress / 100
             const overallProgress = ((uploadedCount + batch.length * batchProgress) / selectedFiles.value.length) * 100
             uploadProgress.value = Math.round(overallProgress)
-            
-            // 每10%记录一次日志
-            if (Math.round(overallProgress) % 10 === 0 && Math.round(overallProgress) > 0) {
-              log('总体进度:', Math.round(overallProgress) + '%')
-            }
           }
         )
       }
       
       uploadedCount += batch.length
-      log(`第 ${i + 1} 批上传完成，已上传: ${uploadedCount}/${selectedFiles.value.length}`)
     }
     
     uploadProgress.value = 100
@@ -1174,8 +1074,6 @@ const uploadProjectFiles = async () => {
     } else {
       toast.success(`成功上传 ${selectedFiles.value.length} 个文件`)
     }
-    
-    log('文件上传成功')
     
     // 清空已选择的文件
     selectedFiles.value = []
@@ -1205,9 +1103,45 @@ const uploadProjectFiles = async () => {
   }
 }
 
+// 加载项目类型列表
+const loadProjectTypes = async () => {
+  try {
+    const res = await getProjectTypes()
+    
+    if (res.code === 200 && res.data) {
+      // 转换为前端需要的格式
+      projectTypeOptions.value = res.data.map(type => ({
+        value: type.typeCode,
+        label: type.typeName
+      }))
+    } else {
+      logError('项目类型 API 返回数据异常:', res)
+      // 降级：使用默认值
+      projectTypeOptions.value = [
+        { value: 'COURSE', label: '课程设计' },
+        { value: 'THESIS', label: '毕业设计' },
+        { value: 'COMPETITION', label: '竞赛作品' },
+        { value: 'PERSONAL', label: '个人项目' },
+        { value: 'OTHER', label: '其他' }
+      ]
+    }
+  } catch (error) {
+    logError('加载项目类型列表失败:', error)
+    // 降级：使用默认值
+    projectTypeOptions.value = [
+      { value: 'COURSE', label: '课程设计' },
+      { value: 'THESIS', label: '毕业设计' },
+      { value: 'COMPETITION', label: '竞赛作品' },
+      { value: 'PERSONAL', label: '个人项目' },
+      { value: 'OTHER', label: '其他' }
+    ]
+  }
+}
+
 // 组件挂载时加载数据
 onMounted(() => {
   loadProjectDetail()
+  loadProjectTypes()
   loadTags()
   loadCourses() // 加载课程列表
 })
@@ -1225,16 +1159,18 @@ onMounted(() => {
 
         <div class="project-actions-bar">
           <button 
-            :class="['action-btn', { active: project.isLiked }]"
+            :class="['action-btn', { active: project.isStarred }]"
             @click="toggleLike"
           >
-            {{ project.isLiked ? '❤️' : '🤍' }} {{ formatNumber(project.likes) }}
+            ❤️
+            {{ formatNumber(project.starCount) }}
           </button>
           <button 
-            :class="['action-btn', { active: project.isFavorited }]"
+            :class="['action-btn', { active: project.isWatched }]"
             @click="toggleFavorite"
           >
-            {{ project.isFavorited ? '⭐' : '☆' }} {{ formatNumber(project.favorites) }}
+            ⭐
+            {{ formatNumber(project.watchCount) }}
           </button>
           <button class="action-btn primary" @click="downloadProjectHandler">
             下载代码
@@ -1260,7 +1196,7 @@ onMounted(() => {
 
       <!-- 加载状态 -->
       <div v-if="isLoading" class="loading-state">
-        <span class="loading-spinner">⟳</span>
+        <span class="loading-spinner">⏳</span>
         <p>加载中...</p>
       </div>
 
@@ -1321,7 +1257,7 @@ onMounted(() => {
             <!-- Word 文档预览 -->
             <div v-else-if="isWordDocument()" class="word-preview">
               <div v-if="isRenderingDocument" class="rendering-loading">
-                <span class="loading-spinner">⟳</span>
+                <span class="loading-spinner">⏳</span>
                 <p>正在渲染 Word 文档...</p>
               </div>
               <div v-else-if="documentContent" class="rendered-content" v-html="documentContent"></div>
@@ -1336,7 +1272,7 @@ onMounted(() => {
             <!-- Markdown 文档预览 -->
             <div v-else-if="isMarkdownDocument()" class="markdown-preview">
               <div v-if="isRenderingDocument" class="rendering-loading">
-                <span class="loading-spinner">⟳</span>
+                <span class="loading-spinner">⏳</span>
                 <p>正在渲染 Markdown 文档...</p>
               </div>
               <div v-else-if="documentContent" class="rendered-content markdown-body" v-html="documentContent"></div>
@@ -1415,7 +1351,7 @@ onMounted(() => {
             
             <!-- 加载状态 -->
             <div v-if="isLoadingFiles" class="loading-files">
-              <span class="loading-spinner">⟳</span>
+              <span class="loading-spinner">⏳</span>
               <p>加载文件中...</p>
             </div>
             
@@ -1584,7 +1520,7 @@ onMounted(() => {
               
               <!-- 技术栈标签 -->
               <div v-if="tagsByCategory['技术栈'].length > 0" class="tag-category">
-                <h4 class="category-title-small">🛠️ 技术栈</h4>
+                <h4 class="category-title-small">🔧 技术栈</h4>
                 <div class="tags-grid">
                   <div
                     v-for="tag in getDisplayedTags('技术栈')"
@@ -1656,7 +1592,7 @@ onMounted(() => {
                 />
                 <div class="upload-icon">📁</div>
                 <p class="upload-text">点击选择文件或文件夹，或直接拖拽到此处</p>
-                <p class="upload-hint">支持批量上传文件和整个文件夹，单个文件不超过 50MB</p>
+                <p class="upload-hint">支持批量上传文件和整个文件夹，单个文件不超过 100MB（大文件自动分片上传）</p>
               </div>
 
               <!-- 覆盖模式选项（始终显示） -->
@@ -1701,7 +1637,9 @@ onMounted(() => {
                   :style="{ paddingLeft: (item.level * 20 + 12) + 'px' }"
                 >
                   <div class="file-info">
-                    <span class="file-icon">{{ item.isFolder ? '📁' : '📄' }}</span>
+                    <span class="file-icon">
+                      {{ item.isFolder ? '📁' : '📄' }}
+                    </span>
                     <div class="file-details">
                       <span class="file-name">{{ item.name }}</span>
                       <span v-if="!item.isFolder" class="file-size">{{ formatFileSize(item.size) }}</span>
@@ -2016,8 +1954,14 @@ onMounted(() => {
 }
 
 .file-tree h3::before {
-  content: '📂';
-  font-size: 20px;
+  content: '';
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  margin-right: 8px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23666'%3E%3Cpath d='M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
 }
 
 /* 加载状态 */

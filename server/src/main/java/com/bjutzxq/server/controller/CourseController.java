@@ -1,7 +1,7 @@
 package com.bjutzxq.server.controller;
 
 import com.bjutzxq.common.Result;
-import com.bjutzxq.pojo.Course;
+import com.bjutzxq.pojo.entity.Course;
 import com.bjutzxq.server.service.CourseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,17 +22,12 @@ public class CourseController {
     private final CourseService courseService;
 
     /**
-     * 获取所有启用的课程（用于前端下拉框）
+     * 获取所有课程（用于前端下拉框）
      */
     @GetMapping("/active")
     public Result<List<Course>> getActiveCourses() {
-        try {
-            List<Course> courses = courseService.getActiveCourses();
-            return Result.success(courses);
-        } catch (Exception e) {
-            log.error("获取启用课程失败", e);
-            return Result.error("获取课程列表失败");
-        }
+        List<Course> courses = courseService.getAllCourses();
+        return Result.success(courses);
     }
 
     /**
@@ -40,13 +35,8 @@ public class CourseController {
      */
     @GetMapping("/all")
     public Result<List<Course>> getAllCourses() {
-        try {
-            List<Course> courses = courseService.getAllCourses();
-            return Result.success(courses);
-        } catch (Exception e) {
-            log.error("获取所有课程失败", e);
-            return Result.error("获取课程列表失败");
-        }
+        List<Course> courses = courseService.getAllCourses();
+        return Result.success(courses);
     }
 
     /**
@@ -54,13 +44,8 @@ public class CourseController {
      */
     @GetMapping("/search")
     public Result<List<Course>> searchCourses(@RequestParam String keyword) {
-        try {
-            List<Course> courses = courseService.searchCourses(keyword);
-            return Result.success(courses);
-        } catch (Exception e) {
-            log.error("搜索课程失败", e);
-            return Result.error("搜索课程失败");
-        }
+        List<Course> courses = courseService.searchCourses(keyword);
+        return Result.success(courses);
     }
 
     /**
@@ -68,21 +53,9 @@ public class CourseController {
      */
     @PostMapping
     public Result<Course> createCourse(@RequestBody Map<String, String> request) {
-        try {
-            String courseName = request.get("courseName");
-            if (courseName == null || courseName.trim().isEmpty()) {
-                return Result.error("课程名称不能为空");
-            }
-
-            Course course = courseService.createCourse(courseName.trim());
-            return Result.success(course);
-        } catch (RuntimeException e) {
-            log.warn("创建课程失败: {}", e.getMessage());
-            return Result.error(e.getMessage());
-        } catch (Exception e) {
-            log.error("创建课程失败", e);
-            return Result.error("创建课程失败");
-        }
+        String courseName = request.get("courseName");
+        Course course = courseService.createCourse(courseName);
+        return Result.success(course);
     }
 
     /**
@@ -91,25 +64,11 @@ public class CourseController {
     @PutMapping("/{id}")
     public Result<Course> updateCourse(
             @PathVariable Integer id,
-            @RequestBody Map<String, Object> request
+            @RequestBody Map<String, String> request
     ) {
-        try {
-            String courseName = (String) request.get("courseName");
-            Integer isActive = (Integer) request.get("isActive");
-
-            if (courseName == null || courseName.trim().isEmpty()) {
-                return Result.error("课程名称不能为空");
-            }
-
-            Course course = courseService.updateCourse(id, courseName.trim(), isActive);
-            return Result.success(course);
-        } catch (RuntimeException e) {
-            log.warn("更新课程失败: {}", e.getMessage());
-            return Result.error(e.getMessage());
-        } catch (Exception e) {
-            log.error("更新课程失败", e);
-            return Result.error("更新课程失败");
-        }
+        String courseName = request.get("courseName");
+        Course course = courseService.updateCourse(id, courseName);
+        return Result.success(course);
     }
 
     /**
@@ -117,15 +76,7 @@ public class CourseController {
      */
     @DeleteMapping("/{id}")
     public Result<Void> deleteCourse(@PathVariable Integer id) {
-        try {
-            courseService.deleteCourse(id);
-            return Result.success(null);
-        } catch (RuntimeException e) {
-            log.warn("删除课程失败: {}", e.getMessage());
-            return Result.error(e.getMessage());
-        } catch (Exception e) {
-            log.error("删除课程失败", e);
-            return Result.error("删除课程失败");
-        }
+        courseService.deleteCourse(id);
+        return Result.success(null);
     }
 }

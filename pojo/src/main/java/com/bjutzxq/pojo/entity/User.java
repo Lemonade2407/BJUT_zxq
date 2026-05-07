@@ -1,12 +1,18 @@
-package com.bjutzxq.pojo;
+package com.bjutzxq.pojo.entity;
 
+import com.bjutzxq.common.Role;
 import lombok.Data;
+import java.time.LocalDateTime;
 
 /**
- * 用户注册请求 DTO
+ * 用户实体类
  */
 @Data
-public class RegisterRequest {
+public class User {
+    /**
+     * 用户 ID
+     */
+    private Integer id;
     
     /**
      * 用户名
@@ -14,24 +20,14 @@ public class RegisterRequest {
     private String username;
     
     /**
-     * 密码
+     * 密码 (加密)
      */
     private String password;
-    
-    /**
-     * 确认密码
-     */
-    private String confirmPassword;
     
     /**
      * 身份标识号（学生为学号，教师为职工号）
      */
     private String employeeId;
-    
-    /**
-     * 用户角色（USER-学生, TEACHER-教师）
-     */
-    private String role;
     
     /**
      * 真实姓名
@@ -49,27 +45,42 @@ public class RegisterRequest {
     private String email;
     
     /**
-     * 手机号（可选）
+     * 头像 URL
+     */
+    private String avatar;
+    
+    /**
+     * 手机号
      */
     private String phone;
     
     /**
-     * 性别（可选）
+     * 性别
      */
     private String sex;
     
     /**
-     * 个人简介（可选）
+     * 个人简介
      */
     private String bio;
     
     /**
-     * 验证码会话 ID
+     * 注册时间
      */
-    private String captchaSessionId;
+    private LocalDateTime createdAt;
     
     /**
-     * 用户输入的验证码
+     * 更新时间
      */
-    private String captchaCode;
+    private LocalDateTime updatedAt;
+    
+    /**
+     * 状态:0-禁用，1-正常
+     */
+    private Integer status;
+    
+    /**
+     * 用户角色
+     */
+    private Role role;
 }

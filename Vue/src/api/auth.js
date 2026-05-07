@@ -4,9 +4,6 @@ import request from '@/utils/request'
  * 认证相关 API
  */
 
-// TODO: 添加 API 请求缓存，减少重复请求
-// TODO: 添加 API 错误重试机制
-
 // 用户登录
 export function login(data) {
   return request({

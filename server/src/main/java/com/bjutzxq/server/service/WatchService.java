@@ -1,9 +1,10 @@
 package com.bjutzxq.server.service;
 
 import com.bjutzxq.common.NotificationType;
-import com.bjutzxq.pojo.Project;
-import com.bjutzxq.pojo.Tag;
-import com.bjutzxq.pojo.Watch;
+import com.bjutzxq.pojo.entity.Project;
+import com.bjutzxq.pojo.entity.Tag;
+import com.bjutzxq.pojo.entity.User;
+import com.bjutzxq.pojo.entity.Watch;
 import com.bjutzxq.server.mapper.ProjectMapper;
 import com.bjutzxq.server.mapper.UserMapper;
 import com.bjutzxq.server.mapper.WatchMapper;
@@ -54,7 +55,7 @@ public class WatchService {
         Watch watch = new Watch();
         watch.setUserId(userId);
         watch.setProjectId(projectId);
-        watch.setNotificationType(notificationType != null ? notificationType : 1);
+        watch.setNotificationType(notificationType != null ? notificationType : 1);  // 默认值 1-全部
         watchMapper.insert(watch);
         
         // 3. 原子性增加项目关注数
@@ -67,10 +68,14 @@ public class WatchService {
         // 5. 创建通知（通知项目所有者）
         try {
             if (project != null && !project.getOwnerId().equals(userId)) {
-                String content = "关注了你的项目：" + project.getName();
+                // 获取关注用户的名称
+                User sender = userMapper.selectById(userId);
+                String senderName = sender != null ? sender.getUsername() : "未知用户";
+                
+                String content = senderName + " 关注了你的项目：" + project.getName();
                 notificationService.createNotification(
                     project.getOwnerId(), userId, projectId,
-                    NotificationType.WATCH.getCode(), content);
+                    NotificationType.WATCH, content);
             }
         } catch (Exception e) {
             log.warn("创建通知失败：{}", e.getMessage());
@@ -112,16 +117,7 @@ public class WatchService {
         
         return watchCount;
     }
-    
-    /**
-     * 获取项目关注数
-     * @param projectId 项目 ID
-     * @return 关注数
-     */
-    public Integer getWatchCount(Integer projectId) {
-        return watchMapper.countByProjectId(projectId);
-    }
-    
+
     /**
      * 获取用户关注的项目列表
      * @param userId 用户 ID
@@ -147,13 +143,9 @@ public class WatchService {
             java.util.List<Tag> tags = projectTagService.getProjectTags(project.getId());
             project.setTags(tags);
             
-            // 设置别名字段
-            project.setLikes(project.getStarCount() != null ? project.getStarCount() : 0);
-            project.setFavorites(project.getWatchCount() != null ? project.getWatchCount() : 0);
-            
             // 加载作者名称
             if (project.getOwnerId() != null) {
-                com.bjutzxq.pojo.User owner = userMapper.selectById(project.getOwnerId());
+                User owner = userMapper.selectById(project.getOwnerId());
                 if (owner != null) {
                     project.setAuthor(owner.getUsername());
                 } else {

@@ -3,7 +3,7 @@
 <mapper namespace="com.bjutzxq.server.mapper.StarMapper">
     
     <!-- 结果映射 -->
-    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.Star">
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.entity.Star">
         <id column="id" property="id"/>
         <result column="user_id" property="userId"/>
         <result column="project_id" property="projectId"/>
@@ -16,7 +16,7 @@
     </sql>
 
     <!-- 新增点赞 -->
-    <insert id="insert" parameterType="com.bjutzxq.pojo.Star" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.bjutzxq.pojo.entity.Star" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO star (
             user_id,
             project_id,
@@ -41,13 +41,6 @@
     <delete id="deleteById" parameterType="java.lang.Integer">
         DELETE FROM star WHERE id = #{id}
     </delete>
-    
-    <!-- 统计项目点赞数 -->
-    <select id="countByProjectId" resultType="int">
-        SELECT COUNT(*) 
-        FROM star
-        WHERE project_id = #{projectId}
-    </select>
     
     <!-- 根据项目 ID 删除所有点赞记录 -->
     <delete id="deleteByProjectId" parameterType="java.lang.Integer">

@@ -12,8 +12,10 @@ import Favorites from '@/components/Favorites.vue'
 import SearchResult from '@/components/SearchResult.vue'
 import UserProfile from '@/components/UserProfile.vue'
 import ClassManagement from '@/components/ClassManagement.vue'
+import AdminDashboard from '@/components/AdminDashboard.vue'
 import { log } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
+import { toast } from '@/utils/toast'
 
 const routes = [
   // 登录页面
@@ -159,6 +161,18 @@ const routes = [
     }
   },
   
+  // 管理后台（仅管理员）
+  {
+    path: '/admin',
+    name: 'AdminDashboard',
+    component: AdminDashboard,
+    meta: { 
+      title: '管理后台',
+      requiresAuth: true,
+      requiresAdmin: true
+    }
+  },
+  
   // 404 页面
   {
     path: '/:pathMatch(.*)*',
@@ -196,7 +210,27 @@ router.beforeEach((to) => {
       path: '/login',
       query: { redirect: to.fullPath } // 保存目标路径，登录后可以跳转回去
     }
-  } else if ((to.path === '/login' || to.path === '/register') && isLoggedIn) {
+  }
+  
+  // 检查管理员权限
+  if (to.meta?.requiresAdmin) {
+    const userInfo = tokenManager.getUserInfo()
+    if (!userInfo || userInfo.role !== 'ADMIN') {
+      toast.error('无权访问该页面')
+      return '/home'
+    }
+  }
+  
+  // 检查教师权限
+  if (to.meta?.requiresTeacher) {
+    const userInfo = tokenManager.getUserInfo()
+    if (!userInfo || (userInfo.role !== 'TEACHER' && userInfo.role !== 'ADMIN')) {
+      toast.error('无权访问该页面')
+      return '/home'
+    }
+  }
+  
+  if ((to.path === '/login' || to.path === '/register') && isLoggedIn) {
     // 已登录用户访问登录/注册页，跳转到主页
     return '/home'
   }

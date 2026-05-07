@@ -25,15 +25,6 @@ export function createComment(projectId, data) {
   })
 }
 
-// 回复评论
-export function replyComment(projectId, parentId, data) {
-  return request({
-    url: `/projects/${projectId}/comments/${parentId}/replies`,
-    method: 'post',
-    data
-  })
-}
-
 // 删除评论
 export function deleteComment(commentId) {
   return request({
@@ -42,10 +33,3 @@ export function deleteComment(commentId) {
   })
 }
 
-// 点赞评论
-export function likeComment(commentId) {
-  return request({
-    url: `/comments/${commentId}/like`,
-    method: 'post'
-  })
-}

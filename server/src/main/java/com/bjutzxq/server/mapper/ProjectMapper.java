@@ -1,7 +1,7 @@
 package com.bjutzxq.server.mapper;
 
 
-import com.bjutzxq.pojo.Project;
+import com.bjutzxq.pojo.entity.Project;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -32,11 +32,25 @@ public interface ProjectMapper {
     List<Project> selectByName(@Param("name") String name);
     
     /**
+     * 统计符合条件的项目总数（按名称）
+     * @param name 项目名称
+     * @return 项目总数
+     */
+    int countByName(@Param("name") String name);
+    
+    /**
      * 根据用户 ID 查询项目
      * @param userId 用户 ID
      * @return 项目信息
      */
     List<Project> selectByUserId(@Param("userId") Integer userId);
+    
+    /**
+     * 统计用户的项目总数
+     * @param userId 用户 ID
+     * @return 项目总数
+     */
+    int countByUserId(@Param("userId") Integer userId);
 
     /**
      * 根据 ID 更新项目
@@ -64,6 +78,12 @@ public interface ProjectMapper {
     List<Project> selectPublicProjects();
     
     /**
+     * 统计公开项目总数
+     * @return 项目总数
+     */
+    int countPublicProjects();
+    
+    /**
      * 根据用户 ID 删除所有项目
      * @param userId 用户 ID
      * @return 影响行数
@@ -76,6 +96,13 @@ public interface ProjectMapper {
      * @return 项目列表
      */
     List<Project> selectByTagId(@Param("tagId") Integer tagId);
+    
+    /**
+     * 统计标签下的项目总数
+     * @param tagId 标签 ID
+     * @return 项目总数
+     */
+    int countByTagId(@Param("tagId") Integer tagId);
     
     /**
      * 获取热门项目（按浏览量排序）
@@ -151,6 +178,45 @@ public interface ProjectMapper {
         @Param("projectType") String projectType,
         @Param("courseName") String courseName,
         @Param("thesisType") String thesisType
+    );
+    
+    /**
+     * 按班级和课程筛选项目（用于教学管理）
+     * @param className 班级名称（可选，支持模糊查询）
+     * @param courseName 课程名称（可选）
+     * @param projectType 项目类型（可选）
+     * @return 项目列表
+     */
+    List<Project> selectByClassAndCourse(
+        @Param("className") String className,
+        @Param("courseName") String courseName,
+        @Param("projectType") String projectType
+    );
+    
+    /**
+     * 统计按班级和课程筛选的项目总数
+     * @param className 班级名称（可选，支持模糊查询）
+     * @param courseName 课程名称（可选）
+     * @param projectType 项目类型（可选）
+     * @return 项目总数
+     */
+    int countByClassAndCourse(
+        @Param("className") String className,
+        @Param("courseName") String courseName,
+        @Param("projectType") String projectType
+    );
+    
+    /**
+     * 获取按班级和课程筛选的所有项目ID（用于批量下载）
+     * @param className 班级名称（可选，支持模糊查询）
+     * @param courseName 课程名称（可选）
+     * @param projectType 项目类型（可选）
+     * @return 项目ID列表
+     */
+    List<Integer> selectIdsByClassAndCourse(
+        @Param("className") String className,
+        @Param("courseName") String courseName,
+        @Param("projectType") String projectType
     );
 
 }

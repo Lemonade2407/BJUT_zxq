@@ -72,8 +72,22 @@ const handleLogin = async () => {
     
     if (res.code === 200) {
       // 使用 tokenManager 保存 token 和用户信息
-      tokenManager.saveToken(res.data.token)
-      tokenManager.saveUserInfo(res.data.user)
+      // 注意：后端返回的 LoginResponse 结构是扁平的，不是嵌套的 { user: {...} }
+      const loginData = res.data
+      
+      tokenManager.saveToken(loginData.token)
+      
+      // 构建用户信息对象（从 LoginResponse 中提取）
+      const userInfo = {
+        id: loginData.id,
+        username: loginData.username,
+        email: loginData.email,
+        avatar: loginData.avatar,
+        employeeId: loginData.employeeId,
+        role: loginData.role
+      }
+      
+      tokenManager.saveUserInfo(userInfo)
       
       // 如果勾选了记住我，保存到 localStorage
       if (loginForm.rememberMe) {
@@ -86,8 +100,19 @@ const handleLogin = async () => {
       // 启动 Token 自动刷新
       tokenManager.startAutoRefresh()
       
-      // 登录成功,跳转到主页或之前访问的页面
-      const redirect = route.query.redirect || '/home'
+      // 登录成功,根据角色跳转到不同页面
+      const userRole = res.data.user?.role
+      let redirect = route.query.redirect
+      
+      // 如果没有指定重定向路径，根据角色决定跳转目标
+      if (!redirect) {
+        if (userRole === 'ADMIN') {
+          redirect = '/admin'
+        } else {
+          redirect = '/home'
+        }
+      }
+      
       await router.replace(redirect)
     }
   } catch (err) {

@@ -3,7 +3,7 @@
 <mapper namespace="com.bjutzxq.server.mapper.ProjectMapper">
     
     <!-- 结果映射 -->
-    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.Project">
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.entity.Project">
         <id column="id" property="id"/>
         <result column="name" property="name"/>
         <result column="description" property="description"/>
@@ -31,7 +31,7 @@
     </sql>
 
     <!-- 新增项目 -->
-    <insert id="insert" parameterType="com.bjutzxq.pojo.Project" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.bjutzxq.pojo.entity.Project" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO project (
             name,
             description,
@@ -59,7 +59,7 @@
         )
     </insert>
     <!-- 更新项目 -->
-    <update id="updateById" parameterType="com.bjutzxq.pojo.Project">
+    <update id="updateById" parameterType="com.bjutzxq.pojo.entity.Project">
         UPDATE project
         <set>
             <if test="name != null">name = #{name},</if>
@@ -77,7 +77,7 @@
     </update>
 
     <!-- 删除项目 -->
-    <delete id="deleteById" parameterType="com.bjutzxq.pojo.Project">
+    <delete id="deleteById" parameterType="com.bjutzxq.pojo.entity.Project">
         DELETE FROM project
         WHERE id = #{id}
     </delete>
@@ -102,6 +102,13 @@
         ORDER BY p.created_at DESC
     </select>
     
+    <!-- 统计符合条件的项目总数（按名称） -->
+    <select id="countByName" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM project
+        WHERE name LIKE CONCAT('%', #{name}, '%')
+    </select>
+    
     <!-- 根据用户 ID 查询项目 -->
     <select id="selectByUserId" resultMap="BaseResultMap">
         SELECT 
@@ -112,6 +119,13 @@
         LEFT JOIN user u ON p.owner_id = u.id
         WHERE p.owner_id = #{userId}
         ORDER BY p.created_at DESC
+    </select>
+    
+    <!-- 统计用户的项目总数 -->
+    <select id="countByUserId" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM project
+        WHERE owner_id = #{userId}
     </select>
     
     <!-- 统计项目总数 -->
@@ -138,6 +152,14 @@
         ORDER BY p.created_at DESC
     </select>
     
+    <!-- 统计标签下的项目总数 -->
+    <select id="countByTagId" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT p.id)
+        FROM project p
+        INNER JOIN project_tag pt ON p.id = pt.project_id
+        WHERE pt.tag_id = #{tagId}
+    </select>
+    
     <!-- 查询所有公开项目 -->
     <select id="selectPublicProjects" resultMap="BaseResultMap">
         SELECT 
@@ -148,6 +170,13 @@
         LEFT JOIN user u ON p.owner_id = u.id
         WHERE p.visibility = 1
         ORDER BY p.created_at DESC
+    </select>
+    
+    <!-- 统计公开项目总数 -->
+    <select id="countPublicProjects" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM project
+        WHERE visibility = 1
     </select>
     
     <!-- 获取热门项目（按浏览量排序） -->
@@ -247,6 +276,62 @@
         </if>
         <if test="thesisType != null and thesisType != ''">
             AND p.thesis_type = #{thesisType}
+        </if>
+        ORDER BY p.updated_at DESC, p.created_at DESC
+    </select>
+    
+    <!-- 按班级和课程筛选项目（用于教学管理） -->
+    <select id="selectByClassAndCourse" resultMap="BaseResultMap">
+        SELECT 
+            p.*,
+            u.username AS owner_username,
+            u.class_name AS owner_class_name
+        FROM project p
+        LEFT JOIN user u ON p.owner_id = u.id
+        WHERE 1=1
+        <if test="className != null and className != ''">
+            AND u.class_name LIKE CONCAT('%', #{className}, '%')
+        </if>
+        <if test="courseName != null and courseName != ''">
+            AND p.course_name = #{courseName}
+        </if>
+        <if test="projectType != null and projectType != ''">
+            AND p.project_type = #{projectType}
+        </if>
+        ORDER BY p.updated_at DESC, p.created_at DESC
+    </select>
+    
+    <!-- 统计按班级和课程筛选的项目总数 -->
+    <select id="countByClassAndCourse" resultType="java.lang.Integer">
+        SELECT COUNT(DISTINCT p.id)
+        FROM project p
+        LEFT JOIN user u ON p.owner_id = u.id
+        WHERE 1=1
+        <if test="className != null and className != ''">
+            AND u.class_name LIKE CONCAT('%', #{className}, '%')
+        </if>
+        <if test="courseName != null and courseName != ''">
+            AND p.course_name = #{courseName}
+        </if>
+        <if test="projectType != null and projectType != ''">
+            AND p.project_type = #{projectType}
+        </if>
+    </select>
+    
+    <!-- 获取按班级和课程筛选的所有项目ID（用于批量下载） -->
+    <select id="selectIdsByClassAndCourse" resultType="java.lang.Integer">
+        SELECT DISTINCT p.id
+        FROM project p
+        LEFT JOIN user u ON p.owner_id = u.id
+        WHERE 1=1
+        <if test="className != null and className != ''">
+            AND u.class_name LIKE CONCAT('%', #{className}, '%')
+        </if>
+        <if test="courseName != null and courseName != ''">
+            AND p.course_name = #{courseName}
+        </if>
+        <if test="projectType != null and projectType != ''">
+            AND p.project_type = #{projectType}
         </if>
         ORDER BY p.updated_at DESC, p.created_at DESC
     </select>

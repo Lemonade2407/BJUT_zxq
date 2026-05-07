@@ -1,7 +1,7 @@
 package com.bjutzxq.server.mapper;
 
 
-import com.bjutzxq.pojo.Watch;
+import com.bjutzxq.pojo.entity.Watch;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 

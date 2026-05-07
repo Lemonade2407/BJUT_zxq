@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { register } from '@/api/auth'
 import { getCaptcha, checkPasswordStrength } from '@/api/captcha'
 
+
 const router = useRouter()
 
 // 表单数据
@@ -587,7 +588,7 @@ const getStrengthColor = (level) => {
                 alt="验证码"
               />
               <div v-else class="captcha-loading">
-                <span class="loading-spinner">⟳</span>
+                <span class="loading-spinner">⏳</span>
               </div>
             </div>
           </div>

@@ -1,7 +1,6 @@
-package com.bjutzxq.pojo;
+package com.bjutzxq.pojo.entity;
 
 import lombok.Data;
-import java.time.LocalDateTime;
 
 /**
  * 标签实体类

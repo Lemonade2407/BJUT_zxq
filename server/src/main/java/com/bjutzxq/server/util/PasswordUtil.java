@@ -32,9 +32,11 @@ public class PasswordUtil {
      * @return 是否匹配
      */
     public static boolean matches(String rawPassword, String encodedPassword) {
+        // 参数为空时直接返回 false
         if (rawPassword == null || encodedPassword == null) {
             return false;
         }
+        
         try {
             return passwordEncoder.matches(rawPassword, encodedPassword);
         } catch (Exception e) {

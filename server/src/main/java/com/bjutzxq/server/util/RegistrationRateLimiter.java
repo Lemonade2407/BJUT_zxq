@@ -1,9 +1,7 @@
 package com.bjutzxq.server.util;
 
-import lombok.Data;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
-
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -76,12 +74,11 @@ public class RegistrationRateLimiter {
             // 增加计数
             record.increment();
             log.debug("IP 注册计数：{}, 次数：{}", ip, record.getCount());
-            return new RateLimitResult(true, "");
         } else {
             // 时间窗口已过，重置计数
             IP_REGISTRATION_RECORDS.put(ip, new RegistrationRecord(1, currentTime));
-            return new RateLimitResult(true, "");
         }
+        return new RateLimitResult(true, "");
     }
     
     /**
@@ -120,18 +117,16 @@ public class RegistrationRateLimiter {
             // 增加计数
             record.increment();
             log.debug("邮箱注册计数：{}, 次数：{}", normalizedEmail, record.getCount());
-            return new RateLimitResult(true, "");
         } else {
             // 时间窗口已过，重置计数
             EMAIL_REGISTRATION_RECORDS.put(normalizedEmail, new RegistrationRecord(1, currentTime));
-            return new RateLimitResult(true, "");
         }
+        return new RateLimitResult(true, "");
     }
     
     /**
      * 清理过期的记录（定期调用）
      */
-    // TODO: 添加定时任务自动清理过期记录，避免内存泄漏
     public static void cleanupExpiredRecords() {
         long currentTime = System.currentTimeMillis();
         
@@ -158,9 +153,10 @@ public class RegistrationRateLimiter {
     /**
      * 注册记录内部类
      */
+    @Getter
     private static class RegistrationRecord {
         private int count;
-        private long firstAttemptTime;
+        private final long firstAttemptTime;
         
         public RegistrationRecord(int count, long firstAttemptTime) {
             this.count = count;
@@ -170,27 +166,11 @@ public class RegistrationRateLimiter {
         public void increment() {
             this.count++;
         }
-        
-        public int getCount() {
-            return count;
-        }
-        
-        public long getFirstAttemptTime() {
-            return firstAttemptTime;
-        }
+
     }
     
     /**
      * 频率限制结果
      */
-    @Data
-    public static class RateLimitResult {
-        private boolean allowed;
-        private String message;
-
-        public RateLimitResult(boolean allowed, String message) {
-            this.allowed = allowed;
-            this.message = message;
-        }
-    }
+    public record RateLimitResult(boolean allowed, String message) {}
 }

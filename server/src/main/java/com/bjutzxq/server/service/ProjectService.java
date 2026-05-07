@@ -1,18 +1,16 @@
 package com.bjutzxq.server.service;
 
-import com.bjutzxq.pojo.Project;
-import com.bjutzxq.pojo.Tag;
-import com.bjutzxq.server.mapper.ProjectMapper;
+import com.bjutzxq.pojo.entity.*;
+import com.bjutzxq.server.mapper.*;
+import com.bjutzxq.server.util.OssUtil;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -36,19 +34,19 @@ public class ProjectService {
     private ProjectTagService projectTagService;
     
     @Autowired
-    private com.bjutzxq.server.mapper.UserMapper userMapper;
+    private UserMapper userMapper;
     
     @Autowired
-    private com.bjutzxq.server.mapper.StarMapper starMapper;
+    private StarMapper starMapper;
     
     @Autowired
-    private com.bjutzxq.server.mapper.WatchMapper watchMapper;
+    private WatchMapper watchMapper;
     
     @Autowired
-    private com.bjutzxq.server.mapper.ProjectFileMapper projectFileMapper;
+    private ProjectFileMapper projectFileMapper;
     
     @Autowired
-    private com.bjutzxq.server.util.OssUtil ossUtil;
+    private OssUtil ossUtil;
     
     @Autowired
     private ProjectFileService projectFileService;
@@ -62,20 +60,6 @@ public class ProjectService {
     @Transactional(rollbackFor = Exception.class)
     public Project createProject(Project project, List<Integer> tagIds) {
         log.info("开始创建项目，项目名：{}", project.getName());
-        
-        // 参数验证
-        if (project == null) {
-            log.warn("创建项目失败：项目信息为空");
-            throw new IllegalArgumentException("项目信息不能为空");
-        }
-        if (project.getName() == null || project.getName().trim().isEmpty()) {
-            log.warn("创建项目失败：项目名称为空");
-            throw new IllegalArgumentException("项目名称不能为空");
-        }
-        if (project.getOwnerId() == null) {
-            log.warn("创建项目失败：项目所有者 ID 为空");
-            throw new IllegalArgumentException("项目所有者 ID 不能为空");
-        }
         
         // 检查同一用户名下是否有同名项目
         List<Project> existingProjects = projectMapper.selectByUserId(project.getOwnerId());
@@ -93,8 +77,9 @@ public class ProjectService {
         log.info("项目创建成功，ID：{}", project.getId());
         
         // 设置标签
-        if (tagIds != null && !tagIds.isEmpty()) {
+        if (tagIds != null) {
             projectTagService.setProjectTags(project.getId(), tagIds);
+            log.info("项目标签设置成功，项目 ID: {}, 标签数量: {}", project.getId(), tagIds.size());
         }
         
         return project;
@@ -109,7 +94,7 @@ public class ProjectService {
     @Transactional(rollbackFor = Exception.class)
     public Project updateProject(Project project, List<Integer> tagIds) {
         log.info("开始修改项目信息，项目 ID：{}", project != null ? project.getId() : "null");
-            
+        
         // 参数验证
         if (project == null) {
             log.warn("修改项目失败：项目信息为空");
@@ -118,10 +103,6 @@ public class ProjectService {
         if (project.getId() == null) {
             log.warn("修改项目失败：项目 ID 为空");
             throw new IllegalArgumentException("项目 ID 不能为空");
-        }
-        if (project.getName() == null || project.getName().trim().isEmpty()) {
-            log.warn("修改项目失败：项目名称为空");
-            throw new IllegalArgumentException("项目名称不能为空");
         }
             
         // 查询原项目信息
@@ -253,16 +234,6 @@ public class ProjectService {
      */
     public Project selectById(Integer id) {
         log.debug("查询项目详情，项目 ID: {}", id);
-        
-        // 增加项目浏览量
-        try {
-            projectMapper.incrementViewCount(id);
-            log.debug("项目浏览量 +1，项目 ID: {}", id);
-        } catch (Exception e) {
-            // 浏览量增加失败不影响主流程，仅记录日志
-            log.warn("增加项目浏览量失败，项目 ID: {}, 错误: {}", id, e.getMessage());
-        }
-        
         return projectMapper.selectById(id);
     }
 
@@ -275,7 +246,6 @@ public class ProjectService {
      */
     public List<Project> selectByName(String name, Integer pageNum, Integer pageSize) {
         log.info("按名称搜索项目，名称：{}, 页码：{}, 每页数量：{}", name, pageNum, pageSize);
-        // 使用 PageHelper 设置分页参数
         PageHelper.startPage(pageNum, pageSize);
         return projectMapper.selectByName(name);
     }
@@ -289,7 +259,6 @@ public class ProjectService {
      */
     public List<Project> selectByUserId(Integer userId, Integer pageNum, Integer pageSize) {
         log.info("按用户 ID 查询项目，用户 ID: {}, 页码：{}, 每页数量：{}", userId, pageNum, pageSize);
-        // 使用 PageHelper 设置分页参数
         PageHelper.startPage(pageNum, pageSize);
         return projectMapper.selectByUserId(userId);
     }
@@ -318,6 +287,109 @@ public class ProjectService {
         PageHelper.startPage(pageNum, pageSize);
         return projectMapper.selectPublicProjects();
     }
+    
+    /**
+     * 按班级和课程筛选项目（用于教学管理，支持分页）
+     * @param className 班级名称（可选，支持模糊查询）
+     * @param courseName 课程名称（可选）
+     * @param projectType 项目类型（可选）
+     * @param pageNum 页码
+     * @param pageSize 每页数量
+     * @return 项目列表
+     */
+    public List<Project> selectByClassAndCourse(
+            String className, 
+            String courseName, 
+            String projectType,
+            Integer pageNum, 
+            Integer pageSize) {
+        log.info("按班级和课程筛选项目，班级：{}, 课程：{}, 类型：{}, 页码：{}, 每页数量：{}",
+                className, courseName, projectType, pageNum, pageSize);
+        
+        // 使用 PageHelper 设置分页参数
+        PageHelper.startPage(pageNum, pageSize);
+        
+        // 调用 Mapper 查询
+        List<Project> projects = projectMapper.selectByClassAndCourse(
+            className != null ? className.trim() : null,
+            courseName != null ? courseName.trim() : null,
+            projectType
+        );
+        
+        log.info("筛选结果数量：{}", projects.size());
+        return projects;
+    }
+    
+    /**
+     * 获取按班级和课程筛选的项目总数
+     * @param className 班级名称（可选，支持模糊查询）
+     * @param courseName 课程名称（可选）
+     * @param projectType 项目类型（可选）
+     * @return 项目总数
+     */
+    public long countByClassAndCourse(String className, String courseName, String projectType) {
+        log.debug("统计筛选项目总数，班级：{}, 课程：{}, 类型：{}", className, courseName, projectType);
+        return projectMapper.countByClassAndCourse(
+            className != null ? className.trim() : null,
+            courseName != null ? courseName.trim() : null,
+            projectType
+        );
+    }
+    
+    /**
+     * 统计符合条件的项目总数（按名称）
+     * @param name 项目名称
+     * @return 项目总数
+     */
+    public long countByName(String name) {
+        log.debug("统计项目名称总数，名称：{}", name);
+        return projectMapper.countByName(name);
+    }
+    
+    /**
+     * 统计用户的项目总数
+     * @param userId 用户 ID
+     * @return 项目总数
+     */
+    public long countByUserId(Integer userId) {
+        log.debug("统计用户项目总数，用户 ID：{}", userId);
+        return projectMapper.countByUserId(userId);
+    }
+    
+    /**
+     * 统计标签下的项目总数
+     * @param tagId 标签 ID
+     * @return 项目总数
+     */
+    public long countByTagId(Integer tagId) {
+        log.debug("统计标签项目总数，标签 ID：{}", tagId);
+        return projectMapper.countByTagId(tagId);
+    }
+    
+    /**
+     * 统计公开项目总数
+     * @return 项目总数
+     */
+    public long countPublicProjects() {
+        log.debug("统计公开项目总数");
+        return projectMapper.countPublicProjects();
+    }
+    
+    /**
+     * 获取按班级和课程筛选的所有项目ID（用于批量下载）
+     * @param className 班级名称（可选，支持模糊查询）
+     * @param courseName 课程名称（可选）
+     * @param projectType 项目类型（可选）
+     * @return 项目ID列表
+     */
+    public List<Integer> getProjectIdsByClassAndCourse(String className, String courseName, String projectType) {
+        log.info("获取筛选项目ID列表，班级：{}, 课程：{}, 类型：{}", className, courseName, projectType);
+        return projectMapper.selectIdsByClassAndCourse(
+            className != null ? className.trim() : null,
+            courseName != null ? courseName.trim() : null,
+            projectType
+        );
+    }
 
     /**
      * 丰富项目信息（添加标签、用户交互状态）
@@ -334,13 +406,9 @@ public class ProjectService {
         List<Tag> tags = projectTagService.getProjectTags(project.getId());
         project.setTags(tags);
         
-        // 设置点赞和收藏的别名字段（用于前端显示）
-        project.setLikes(project.getStarCount() != null ? project.getStarCount() : 0);
-        project.setFavorites(project.getWatchCount() != null ? project.getWatchCount() : 0);
-        
         // 设置作者名称
         if (project.getOwnerId() != null) {
-            com.bjutzxq.pojo.User owner = userMapper.selectById(project.getOwnerId());
+            User owner = userMapper.selectById(project.getOwnerId());
             if (owner != null) {
                 project.setAuthor(owner.getUsername());
             } else {
@@ -351,16 +419,16 @@ public class ProjectService {
         // 如果提供了用户 ID，查询用户的交互状态
         if (userId != null) {
             // 检查是否已点赞
-            com.bjutzxq.pojo.Star star = starMapper.selectByUserIdAndProjectId(userId, project.getId());
-            project.setIsLiked(star != null);
+            Star star = starMapper.selectByUserIdAndProjectId(userId, project.getId());
+            project.setIsStarred(star != null);
             
-            // 检查是否已收藏
-            com.bjutzxq.pojo.Watch watch = watchMapper.selectByUserIdAndProjectId(userId, project.getId());
-            project.setIsFavorited(watch != null);
+            // 检查是否已关注
+            Watch watch = watchMapper.selectByUserIdAndProjectId(userId, project.getId());
+            project.setIsWatched(watch != null);
         } else {
             // 未登录用户，默认为 false
-            project.setIsLiked(false);
-            project.setIsFavorited(false);
+            project.setIsStarred(false);
+            project.setIsWatched(false);
         }
         
         return project;
@@ -407,6 +475,20 @@ public class ProjectService {
     }
     
     /**
+     * 增加项目浏览次数
+     * @param id 项目 ID
+     */
+    public void incrementViewCount(Integer id) {
+        log.debug("增加项目浏览次数，项目 ID: {}", id);
+        try {
+            projectMapper.incrementViewCount(id);
+            log.debug("项目浏览次数 +1，项目 ID: {}", id);
+        } catch (Exception e) {
+            log.warn("增加项目浏览次数失败，项目 ID: {}, 错误: {}", id, e.getMessage());
+        }
+    }
+    
+    /**
      * 增加项目下载次数
      * @param id 项目 ID
      */
@@ -433,8 +515,9 @@ public class ProjectService {
             // 1. 创建临时目录
             String tempDir = System.getProperty("java.io.tmpdir") + "/project_downloads/";
             File dir = new File(tempDir);
-            if (!dir.exists()) {
-                dir.mkdirs();
+            if (!dir.exists() && !dir.mkdirs()) {
+                log.error("创建临时目录失败: {}", tempDir);
+                throw new IOException("创建临时目录失败");
             }
             
             // 2. 生成 ZIP 文件路径
@@ -442,120 +525,114 @@ public class ProjectService {
             Path zipPath = Paths.get(tempDir, zipFileName);
             
             // 3. 获取项目的所有文件
-            List<com.bjutzxq.pojo.ProjectFile> projectFiles = projectFileMapper.selectByProjectId(projectId);
+            List<com.bjutzxq.pojo.entity.ProjectFile> projectFiles = projectFileMapper.selectByProjectId(projectId);
             
             if (projectFiles == null || projectFiles.isEmpty()) {
                 log.warn("项目没有文件，创建空 ZIP");
-                // 创建一个空的 ZIP 文件
-                try (FileOutputStream fos = new FileOutputStream(zipPath.toFile());
-                     ZipOutputStream zos = new ZipOutputStream(fos)) {
-                    // 空 ZIP
-                }
+                createEmptyZip(zipPath);
                 return zipPath;
             }
             
-            log.info("找到 {} 个文件，开始打包...", projectFiles.size());
+            // 4. 过滤出需要打包的文件（非目录且有 URL）
+            List<com.bjutzxq.pojo.entity.ProjectFile> filesToPack = projectFiles.stream()
+                .filter(f -> f.getIsDir() == null || f.getIsDir() == 0)
+                .filter(f -> f.getStorageUrl() != null && !f.getStorageUrl().trim().isEmpty())
+                .collect(java.util.stream.Collectors.toList());
             
-            // 统计目录和文件数量
-            long dirCount = projectFiles.stream().filter(f -> f.getIsDir() != null && f.getIsDir() == 1).count();
-            long fileCount = projectFiles.stream().filter(f -> f.getIsDir() == null || f.getIsDir() == 0).count();
-            long withUrlCount = projectFiles.stream().filter(f -> f.getStorageUrl() != null && !f.getStorageUrl().trim().isEmpty()).count();
-            
-            log.info("统计: 总数={}, 目录={}, 文件={}, 有URL={}", 
-                projectFiles.size(), dirCount, fileCount, withUrlCount);
-            
-            // 打印前5个非目录文件的详情
-            int printed = 0;
-            for (com.bjutzxq.pojo.ProjectFile f : projectFiles) {
-                if ((f.getIsDir() == null || f.getIsDir() == 0) && printed < 5) {
-                    log.info("示例文件 {}: name={}, storageUrl={}, filePath={}", 
-                        printed+1, f.getFileName(), f.getStorageUrl(), f.getFilePath());
-                    printed++;
-                }
-            }
-            
-            // 4. 创建 ZIP 文件
-            try (FileOutputStream fos = new FileOutputStream(zipPath.toFile());
-                 ZipOutputStream zos = new ZipOutputStream(fos)) {
-                
-                int successCount = 0;
-                int failCount = 0;
-                int skipDirCount = 0;
-                int skipNoUrlCount = 0;
-                
-                // 收集需要打包的文件
-                List<com.bjutzxq.pojo.ProjectFile> filesToPack = projectFiles.stream()
-                    .filter(f -> f.getIsDir() == null || f.getIsDir() == 0)  // 只保留文件
-                    .filter(f -> f.getStorageUrl() != null && !f.getStorageUrl().trim().isEmpty())  // 有 URL
-                    .collect(java.util.stream.Collectors.toList());
-                
-                log.info("开始并行下载 {} 个文件...", filesToPack.size());
-                
-                // 并行下载所有文件（使用 CompletableFuture）
-                ExecutorService executor = Executors.newFixedThreadPool(
-                    Math.min(10, filesToPack.size())  // 最多10个线程
-                );
-                
-                List<CompletableFuture<byte[]>> futures = new ArrayList<>();
-                List<com.bjutzxq.pojo.ProjectFile> validFiles = new ArrayList<>();
-                
-                for (com.bjutzxq.pojo.ProjectFile file : filesToPack) {
-                    CompletableFuture<byte[]> future = CompletableFuture.supplyAsync(() -> {
-                        try {
-                            return ossUtil.download(file.getStorageUrl());
-                        } catch (IOException e) {
-                            log.error("下载文件失败: {}, 错误: {}", file.getFileName(), e.getMessage());
-                            return null;
-                        }
-                    }, executor);
-                    
-                    futures.add(future);
-                    validFiles.add(file);
-                }
-                
-                // 等待所有下载完成并写入 ZIP
-                for (int i = 0; i < futures.size(); i++) {
-                    try {
-                        byte[] fileContent = futures.get(i).join();
-                        com.bjutzxq.pojo.ProjectFile file = validFiles.get(i);
-                        
-                        if (fileContent == null) {
-                            failCount++;
-                            continue;
-                        }
-                        
-                        // 构建文件在 ZIP 中的路径
-                        String entryPath = file.getFilePath();
-                        if (entryPath != null && !entryPath.trim().isEmpty()) {
-                            entryPath = entryPath + "/" + file.getFileName();
-                        } else {
-                            entryPath = file.getFileName();
-                        }
-                        
-                        // 添加到 ZIP
-                        ZipEntry entry = new ZipEntry(entryPath);
-                        zos.putNextEntry(entry);
-                        zos.write(fileContent);
-                        zos.closeEntry();
-                        
-                        successCount++;
-                    } catch (Exception e) {
-                        log.error("写入 ZIP 失败: {}, 错误: {}", validFiles.get(i).getFileName(), e.getMessage());
-                        failCount++;
-                    }
-                }
-                
-                // 关闭线程池
-                executor.shutdown();
-                
-                log.info("项目打包完成，成功: {}, 失败: {}, ZIP 文件: {}", 
-                    successCount, failCount, zipPath);
+            if (filesToPack.isEmpty()) {
+                log.warn("项目没有可下载的文件，创建空 ZIP");
+                createEmptyZip(zipPath);
                 return zipPath;
             }
+            
+            log.info("找到 {} 个文件，开始并行打包...", filesToPack.size());
+            
+            // 5. 并行下载并打包
+            int successCount = downloadAndPackFiles(filesToPack, zipPath);
+            
+            log.info("项目打包完成，成功: {}, ZIP 文件: {}", successCount, zipPath);
+            return zipPath;
+            
         } catch (IOException e) {
             log.error("项目打包失败：{}", e.getMessage(), e);
             return null;
         }
+    }
+    
+    /**
+     * 创建空 ZIP 文件
+     */
+    private void createEmptyZip(Path zipPath) throws IOException {
+        try (FileOutputStream fos = new FileOutputStream(zipPath.toFile());
+             ZipOutputStream zos = new ZipOutputStream(fos)) {
+            // 空 ZIP
+        }
+    }
+    
+    /**
+     * 并行下载文件并打包到 ZIP
+     * @return 成功打包的文件数量
+     */
+    private int downloadAndPackFiles(List<com.bjutzxq.pojo.entity.ProjectFile> filesToPack, Path zipPath) throws IOException {
+        ExecutorService executor = Executors.newFixedThreadPool(Math.min(10, filesToPack.size()));
+        
+        try {
+            // 1. 并行下载所有文件
+            List<CompletableFuture<FileContent>> futures = filesToPack.stream()
+                .map(file -> CompletableFuture.supplyAsync(() -> {
+                    try {
+                        byte[] content = ossUtil.download(file.getStorageUrl());
+                        return new FileContent(file, content);
+                    } catch (IOException e) {
+                        log.error("下载文件失败: {}, 错误: {}", file.getFileName(), e.getMessage());
+                        return new FileContent(file, null);
+                    }
+                }, executor))
+                .toList();
+            
+            // 2. 等待所有下载完成并写入 ZIP
+            int successCount = 0;
+            try (FileOutputStream fos = new FileOutputStream(zipPath.toFile());
+                 ZipOutputStream zos = new ZipOutputStream(fos)) {
+                
+                for (CompletableFuture<FileContent> future : futures) {
+                    FileContent fileContent = future.join();
+                    
+                    if (fileContent.content != null) {
+                        String entryPath = buildZipEntryPath(fileContent.file);
+                        ZipEntry entry = new ZipEntry(entryPath);
+                        zos.putNextEntry(entry);
+                        zos.write(fileContent.content);
+                        zos.closeEntry();
+                        successCount++;
+                    }
+                }
+            }
+            
+            return successCount;
+            
+        } finally {
+            executor.shutdown();
+        }
+    }
+    
+    /**
+     * 构建 ZIP 条目路径
+     */
+    private String buildZipEntryPath(com.bjutzxq.pojo.entity.ProjectFile file) {
+        String entryPath = file.getFilePath();
+        if (entryPath != null && !entryPath.trim().isEmpty()) {
+            entryPath = entryPath + "/" + file.getFileName();
+        } else {
+            entryPath = file.getFileName();
+        }
+        return entryPath;
+    }
+
+    /**
+         * 文件内容封装类
+         */
+        private record FileContent(ProjectFile file, byte[] content) {
     }
     
     /**
@@ -588,7 +665,7 @@ public class ProjectService {
         log.info("开始上传项目文档，项目 ID: {}, 文件名: {}", projectId, file.getOriginalFilename());
         
         // 1. 验证文件
-        if (file == null || file.isEmpty()) {
+        if (file.isEmpty()) {
             throw new IllegalArgumentException("文件不能为空");
         }
         
@@ -599,9 +676,9 @@ public class ProjectService {
         
         // 2. 验证文件类型（只允许 PDF、Word 等文档格式）
         String fileExtension = getFileExtension(originalFilename).toLowerCase();
-        List<String> allowedExtensions = List.of("pdf", "doc", "docx", "txt", "md", "ppt", "pptx");
+        List<String> allowedExtensions = List.of("pdf", "doc", "docx", "txt", "md");
         if (!allowedExtensions.contains(fileExtension)) {
-            throw new IllegalArgumentException("不支持的文件类型: " + fileExtension + "，仅支持 PDF、Word、TXT、Markdown、PPT 格式");
+            throw new IllegalArgumentException("不支持的文件类型: " + fileExtension + "，仅支持 PDF、Word、TXT、Markdown格式");
         }
         
         // 3. 获取原项目信息
@@ -720,7 +797,7 @@ public class ProjectService {
      * @param userId 用户 ID
      * @return 用户信息
      */
-    public com.bjutzxq.pojo.User getUserById(Integer userId) {
+    public User getUserById(Integer userId) {
         if (userId == null) {
             return null;
         }
@@ -741,8 +818,9 @@ public class ProjectService {
             // 1. 创建临时目录
             String tempDir = System.getProperty("java.io.tmpdir") + "/batch_downloads/";
             File dir = new File(tempDir);
-            if (!dir.exists()) {
-                dir.mkdirs();
+            if (!dir.exists() && !dir.mkdirs()) {
+                log.error("创建临时目录失败: {}", tempDir);
+                throw new IOException("创建临时目录失败");
             }
             
             // 2. 生成 ZIP 文件路径
@@ -768,7 +846,7 @@ public class ProjectService {
                         }
                         
                         // 4.2 获取项目所有者信息（学号和姓名）
-                        com.bjutzxq.pojo.User owner = userMapper.selectById(project.getOwnerId());
+                        com.bjutzxq.pojo.entity.User owner = userMapper.selectById(project.getOwnerId());
                         if (owner == null) {
                             log.warn("项目所有者不存在，跳过，项目 ID: {}", projectId);
                             failCount++;
@@ -780,7 +858,7 @@ public class ProjectService {
                         log.info("处理项目: {}", folderName);
                         
                         // 4.4 获取项目的所有文件
-                        List<com.bjutzxq.pojo.ProjectFile> projectFiles = projectFileMapper.selectByProjectId(projectId);
+                        List<com.bjutzxq.pojo.entity.ProjectFile> projectFiles = projectFileMapper.selectByProjectId(projectId);
                         
                         if (projectFiles == null || projectFiles.isEmpty()) {
                             log.warn("项目没有文件，创建空文件夹: {}", folderName);
@@ -793,10 +871,10 @@ public class ProjectService {
                         }
                         
                         // 4.5 收集需要打包的文件
-                        List<com.bjutzxq.pojo.ProjectFile> filesToPack = projectFiles.stream()
+                        List<com.bjutzxq.pojo.entity.ProjectFile> filesToPack = projectFiles.stream()
                             .filter(f -> f.getIsDir() == null || f.getIsDir() == 0)  // 只保留文件
                             .filter(f -> f.getStorageUrl() != null && !f.getStorageUrl().trim().isEmpty())  // 有 URL
-                            .collect(java.util.stream.Collectors.toList());
+                            .toList();
                         
                         if (filesToPack.isEmpty()) {
                             log.warn("项目没有可下载的文件，跳过: {}", folderName);
@@ -810,9 +888,9 @@ public class ProjectService {
                         );
                         
                         List<CompletableFuture<byte[]>> futures = new ArrayList<>();
-                        List<com.bjutzxq.pojo.ProjectFile> validFiles = new ArrayList<>();
+                        List<com.bjutzxq.pojo.entity.ProjectFile> validFiles = new ArrayList<>();
                         
-                        for (com.bjutzxq.pojo.ProjectFile file : filesToPack) {
+                        for (com.bjutzxq.pojo.entity.ProjectFile file : filesToPack) {
                             CompletableFuture<byte[]> future = CompletableFuture.supplyAsync(() -> {
                                 try {
                                     return ossUtil.download(file.getStorageUrl());
@@ -830,7 +908,7 @@ public class ProjectService {
                         for (int i = 0; i < futures.size(); i++) {
                             try {
                                 byte[] fileContent = futures.get(i).join();
-                                com.bjutzxq.pojo.ProjectFile file = validFiles.get(i);
+                                com.bjutzxq.pojo.entity.ProjectFile file = validFiles.get(i);
                                 
                                 if (fileContent == null) {
                                     continue;

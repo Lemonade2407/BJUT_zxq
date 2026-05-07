@@ -1,20 +1,22 @@
 package com.bjutzxq.server.service;
 
-import com.bjutzxq.common.Constants;
 import com.bjutzxq.common.NotificationType;
-import com.bjutzxq.pojo.Comment;
-import com.bjutzxq.pojo.User;
+import com.bjutzxq.pojo.vo.CommentVO;
+import com.bjutzxq.pojo.entity.Comment;
+import com.bjutzxq.pojo.entity.User;
+import com.bjutzxq.server.util.DtoConverter;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.bjutzxq.server.mapper.CommentMapper;
-import com.bjutzxq.server.mapper.ProjectMapper;
 import com.bjutzxq.server.mapper.UserMapper;
-import com.bjutzxq.pojo.Project;
-
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * 评论服务类
@@ -26,81 +28,56 @@ public class CommentService {
     private CommentMapper commentMapper;
     
     @Autowired
-    private ProjectMapper projectMapper;
-    
-    @Autowired
     private UserMapper userMapper;
     
     @Autowired
     private NotificationService notificationService;
     
     /**
-     * 发表评论（包括回复）
+     * 发表评论
      * @param userId 用户 ID
      * @param projectId 项目 ID
      * @param content 评论内容
-     * @param parentId 父评论 ID（回复时使用）
      * @return 评论信息
      */
     @Transactional(rollbackFor = Exception.class)
-    public Comment postComment(Integer userId, Integer projectId, String content, Integer parentId) {
-        log.info("发表评论，用户 ID: {}, 项目 ID: {}, 父评讻 ID: {}", userId, projectId, parentId);
-            
-        // TODO: 添加敏感词过滤功能
-        // TODO: 添加评论频率限制，防止刷评
-        // TODO: 支持 Markdown 格式解析
+    public Comment postComment(Integer userId, Integer projectId, String content) {
+        log.info("发表评论，用户 ID: {}, 项目 ID: {}", userId, projectId);
             
         // 1. 验证参数
         if (content == null || content.trim().isEmpty()) {
             throw new IllegalArgumentException("评论内容不能为空");
         }
         
-        // 2. 如果是回复，检查父评论是否存在
-        if (parentId != null) {
-            Comment parent = commentMapper.selectById(parentId);
-            if (parent == null || Constants.Comment.STATUS_DELETED.equals(parent.getStatus())) {
-                throw new RuntimeException("父评论不存在或已被删除");
-            }
-            
-            // 增加父评论的回复数
-            if (parent.getReplyCount() == null) {
-                parent.setReplyCount(0);
-            }
-            parent.setReplyCount(parent.getReplyCount() + 1);
-            commentMapper.updateById(parent);
-        }
-        
-        // 3. 创建评论对象
+        // 2. 创建评论对象
         Comment comment = new Comment();
         comment.setUserId(userId);
         comment.setProjectId(projectId);
-        comment.setParentId(parentId);
         comment.setContent(content.trim());
         comment.setLikeCount(0);
-        comment.setReplyCount(0);
         comment.setStatus(1);
         
-        // 4. 保存到数据库
+        // 3. 保存到数据库
         commentMapper.insert(comment);
         
-        // 5. 创建通知（如果是回复评论，通知被回复者；否则通知项目所有者）
+        // 4. 创建通知（通知项目所有者）
         try {
-            // TODO: 异步发送通知，避免阻塞主流程
-            Project project = projectMapper.selectById(projectId);
-            if (project != null) {
-                Integer receiverId = parentId != null ? 
-                    commentMapper.selectById(parentId).getUserId() : project.getOwnerId();
-                    
-                // 只有不是自己发表/回复时才发送通知
-                if (!receiverId.equals(userId)) {
-                    String notificationContent = parentId != null ? 
-                        "回复了你的评论：" + content.trim() : 
-                        "评论了你的项目：" + project.getName();
-                    
-                    notificationService.createNotification(
-                        receiverId, userId, projectId, 
-                        NotificationType.COMMENT.getCode(), notificationContent);
-                }
+            // 查询项目信息（获取项目名称和所有者ID）
+            Integer ownerId = commentMapper.getProjectOwnerId(projectId);
+            String projectName = commentMapper.getProjectName(projectId);
+            
+            // 只有不是自己发表时才发送通知
+            if (ownerId != null && !ownerId.equals(userId)) {
+                // 获取评论用户的名称
+                User sender = userMapper.selectById(userId);
+                String senderName = sender != null ? sender.getUsername() : "未知用户";
+                String projectNameStr = projectName != null ? projectName : "未知项目";
+                
+                String notificationContent = senderName + " 评论了你的项目：" + projectNameStr;
+                
+                notificationService.createNotification(
+                    ownerId, userId, projectId, 
+                    NotificationType.COMMENT, notificationContent);
             }
         } catch (Exception e) {
             log.warn("创建通知失败：{}", e.getMessage());
@@ -113,51 +90,52 @@ public class CommentService {
     }
     
     /**
-     * 获取项目评论列表（分页）
+     * 获取项目评论列表
      * @param projectId 项目 ID
      * @param pageNum 页码
      * @param pageSize 每页数量
      * @param status 评论状态
-     * @return 评论列表
+     * @return 评论 VO 列表（包含用户信息）
      */
-    public List<Comment> getCommentsByProjectId(Integer projectId, Integer pageNum, Integer pageSize, Integer status) {
+    @Cacheable(value = "commentList", key = "#projectId + '_' + #pageNum + '_' + #pageSize + '_' + #status")
+    public List<CommentVO> getCommentsByProjectId(Integer projectId, Integer pageNum, Integer pageSize, Integer status) {
         log.info("获取评论列表，项目 ID: {}, 页码：{}, 每页数量：{}", projectId, pageNum, pageSize);
         
         // 设置分页
         PageHelper.startPage(pageNum, pageSize);
         
-        // 查询评论列表（只查询顶级评论）
+        // 1. 查询评论列表
         List<Comment> comments = commentMapper.selectByProjectId(projectId, status != null ? status : 1);
         
-        // 为每个评论加载回复列表和用户信息
-        for (Comment comment : comments) {
-            // 加载用户信息
-            User user = userMapper.selectById(comment.getUserId());
-            if (user != null) {
-                // 将用户名和头像存储到 Comment 的扩展字段中
-                // 注意：这里我们利用 content 字段暂时存储，更好的方式是创建 VO 类
-                // 但为了快速实现，我们在前端通过 userId 再次查询
-            }
-            
-            // 加载回复列表
-            if (comment.getParentId() == null) {
-                List<Comment> replies = commentMapper.selectReplies(comment.getId());
-                comment.setReplyCount(replies.size());
-            }
+        if (comments.isEmpty()) {
+            return List.of();
         }
         
-        log.info("评论列表获取成功，评论数量：{}", comments.size());
+        // 2. 批量查询所有评论者的用户信息（解决 N+1 问题）
+        List<Integer> userIds = comments.stream()
+            .map(Comment::getUserId)
+            .distinct()
+            .collect(Collectors.toList());
         
-        return comments;
-    }
-    
-    /**
-     * 获取评论详情
-     * @param id 评论 ID
-     * @return 评论信息
-     */
-    public Comment getCommentById(Integer id) {
-        return commentMapper.selectById(id);
+        // 防止空列表导致 SQL 错误
+        final Map<Integer, Map<String, Object>> userMap;
+        if (!userIds.isEmpty()) {
+            List<Map<String, Object>> users = commentMapper.selectUserBatch(userIds);
+            userMap = users.stream()
+                .collect(Collectors.toMap(
+                    u -> (Integer) u.get("id"),
+                    u -> u
+                ));
+        } else {
+            userMap = new java.util.HashMap<>();
+        }
+        
+        // 3. 转换为 CommentVO（包含用户信息）
+        List<CommentVO> commentVOs = DtoConverter.toCommentVOList(comments, userMap);
+        
+        log.info("评论列表获取成功，评论数量：{}", commentVOs.size());
+        
+        return commentVOs;
     }
     
     /**
@@ -166,6 +144,7 @@ public class CommentService {
      * @param userId 当前用户 ID
      */
     @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "commentList", allEntries = true)
     public void deleteComment(Integer commentId, Integer userId) {
         log.info("删除评论，评论 ID: {}, 用户 ID: {}", commentId, userId);
         
@@ -179,26 +158,21 @@ public class CommentService {
         if (!comment.getUserId().equals(userId)) {
             throw new RuntimeException("没有权限删除该评论");
         }
-        
-        // 3. 如果是顶级评论，先删除所有回复
-        if (comment.getParentId() == null) {
-            List<Comment> replies = commentMapper.selectReplies(commentId);
-            for (Comment reply : replies) {
-                commentMapper.deleteById(reply.getId());
-            }
-        } else {
-            // 如果是回复，减少父评论的回复数
-            Comment parent = commentMapper.selectById(comment.getParentId());
-            if (parent != null && parent.getReplyCount() != null && parent.getReplyCount() > 0) {
-                parent.setReplyCount(parent.getReplyCount() - 1);
-                commentMapper.updateById(parent);
-            }
-        }
-        
-        // 4. 删除评论（软删除，将状态设为 0）
+
+        // 3. 软删除评论（将状态设为 0）
         comment.setStatus(0);
         commentMapper.updateById(comment);
         
         log.info("评论删除成功，评论 ID: {}", commentId);
+    }
+    
+    /**
+     * 统计项目的评论总数
+     * @param projectId 项目 ID
+     * @return 评论总数
+     */
+    public long countByProjectId(Integer projectId) {
+        log.debug("统计评论总数，项目 ID: {}", projectId);
+        return commentMapper.countByProjectId(projectId);
     }
 }

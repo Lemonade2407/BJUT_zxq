@@ -3,23 +3,20 @@
 <mapper namespace="com.bjutzxq.server.mapper.CourseMapper">
 
     <!-- 结果映射 -->
-    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.Course">
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.entity.Course">
         <id column="id" property="id"/>
         <result column="course_name" property="courseName"/>
-        <result column="is_active" property="isActive"/>
-        <result column="created_at" property="createdAt"/>
-        <result column="updated_at" property="updatedAt"/>
     </resultMap>
 
     <!-- 基础列 -->
     <sql id="Base_Column_List">
-        id, course_name, is_active, created_at, updated_at
+        id, course_name
     </sql>
 
     <!-- 插入课程 -->
     <insert id="insert" useGeneratedKeys="true" keyProperty="id">
-        INSERT INTO course (course_name, is_active)
-        VALUES (#{courseName}, #{isActive})
+        INSERT INTO course (course_name)
+        VALUES (#{courseName})
     </insert>
 
     <!-- 根据 ID 删除 -->
@@ -30,8 +27,7 @@
     <!-- 更新课程 -->
     <update id="update">
         UPDATE course
-        SET course_name = #{courseName},
-            is_active = #{isActive}
+        SET course_name = #{courseName}
         WHERE id = #{id}
     </update>
 
@@ -49,19 +45,11 @@
         WHERE course_name = #{courseName}
     </select>
 
-    <!-- 查询所有启用的课程 -->
-    <select id="selectActiveCourses" resultMap="BaseResultMap">
-        SELECT <include refid="Base_Column_List"/>
-        FROM course
-        WHERE is_active = 1
-        ORDER BY course_name ASC
-    </select>
-
     <!-- 查询所有课程 -->
     <select id="selectAllCourses" resultMap="BaseResultMap">
         SELECT <include refid="Base_Column_List"/>
         FROM course
-        ORDER BY is_active DESC, course_name ASC
+        ORDER BY course_name ASC
     </select>
 
     <!-- 模糊搜索课程 -->
@@ -69,7 +57,6 @@
         SELECT <include refid="Base_Column_List"/>
         FROM course
         WHERE course_name LIKE CONCAT('%', #{keyword}, '%')
-        AND is_active = 1
         ORDER BY course_name ASC
     </select>
 

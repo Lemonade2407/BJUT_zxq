@@ -44,7 +44,20 @@ class TokenManager {
    */
   getUserInfo() {
     const info = localStorage.getItem(this.userInfoKey)
-    return info ? JSON.parse(info) : null
+    
+    // 检查是否存在且不是 "undefined" 字符串
+    if (!info || info === 'undefined' || info === 'null') {
+      return null
+    }
+    
+    try {
+      return JSON.parse(info)
+    } catch (error) {
+      console.error('解析用户信息失败:', error)
+      // 清除无效数据
+      localStorage.removeItem(this.userInfoKey)
+      return null
+    }
   }
 
   /**
@@ -60,7 +73,6 @@ class TokenManager {
   updateTokenFromResponse(response) {
     const newToken = response.headers.get('X-New-Token')
     if (newToken) {
-      console.log('Token 已自动刷新')
       this.saveToken(newToken)
       return true
     }
@@ -72,10 +84,7 @@ class TokenManager {
    */
   async refreshToken() {
     const token = this.getToken()
-    if (!token) {
-      console.error('没有 Token，无法刷新')
-      return false
-    }
+    if (!token) return false
 
     try {
       const response = await fetch('/api/auth/refresh', {
@@ -90,15 +99,13 @@ class TokenManager {
       
       if (result.code === 200) {
         this.saveToken(result.data.token)
-        console.log('Token 刷新成功')
         return true
       } else {
-        console.error('Token 刷新失败:', result.message)
         this.handleTokenExpired()
         return false
       }
     } catch (error) {
-      console.error('Token 刷新异常:', error)
+      this.handleTokenExpired()
       return false
     }
   }
@@ -107,7 +114,6 @@ class TokenManager {
    * 启动自动刷新定时器
    * 每 30 分钟检查一次，如果 Token 即将过期则刷新
    */
-  // TODO: 优化刷新策略，根据 Token 剩余时间动态调整检查频率
   startAutoRefresh() {
     this.stopAutoRefresh()
     
@@ -120,7 +126,6 @@ class TokenManager {
       }
 
       try {
-        // TODO: 添加请求超时处理
         // 尝试请求一个需要认证的接口，检查是否需要刷新
         const response = await fetch('/api/auth/me', {
           headers: {
@@ -130,7 +135,6 @@ class TokenManager {
 
         // 如果返回 401，说明 Token 已过期
         if (response.status === 401) {
-          console.warn('Token 已过期，请重新登录')
           this.handleTokenExpired()
           return
         }
@@ -138,11 +142,9 @@ class TokenManager {
         // 检查响应头是否有新 Token
         this.updateTokenFromResponse(response)
       } catch (error) {
-        console.error('自动刷新检查失败:', error)
+        // 静默失败，不影响用户体验
       }
     }, 30 * 60 * 1000) // 30 分钟
-
-    console.log('Token 自动刷新已启动')
   }
 
   /**
@@ -152,7 +154,6 @@ class TokenManager {
     if (this.refreshTimer) {
       clearInterval(this.refreshTimer)
       this.refreshTimer = null
-      console.log('Token 自动刷新已停止')
     }
   }
 
@@ -160,7 +161,6 @@ class TokenManager {
    * 处理 Token 过期
    */
   handleTokenExpired() {
-    console.log('处理 Token 过期')
     this.removeToken()
     
     // 跳转到登录页

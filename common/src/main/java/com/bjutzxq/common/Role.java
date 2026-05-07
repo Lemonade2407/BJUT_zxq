@@ -1,8 +1,11 @@
 package com.bjutzxq.common;
 
+import lombok.Getter;
+
 /**
  * 用户角色枚举
  */
+@Getter
 public enum Role {
     /**
      * 普通用户（学生）
@@ -25,14 +28,6 @@ public enum Role {
     Role(int code, String description) {
         this.code = code;
         this.description = description;
-    }
-    
-    public int getCode() {
-        return code;
-    }
-    
-    public String getDescription() {
-        return description;
     }
     
     /**

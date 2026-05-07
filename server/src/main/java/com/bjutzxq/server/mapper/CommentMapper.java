@@ -1,10 +1,11 @@
 package com.bjutzxq.server.mapper;
 
 
-import com.bjutzxq.pojo.Comment;
+import com.bjutzxq.pojo.entity.Comment;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 评论 Mapper 接口
@@ -35,13 +36,6 @@ public interface CommentMapper {
     List<Comment> selectByProjectId(
             @Param("projectId") Integer projectId,
             @Param("status") Integer status);
-    
-    /**
-     * 根据父评论 ID 查询回复列表
-     * @param parentId 父评论 ID
-     * @return 回复列表
-     */
-    List<Comment> selectReplies(@Param("parentId") Integer parentId);
     
     /**
      * 更新评论信息
@@ -76,4 +70,25 @@ public interface CommentMapper {
      * @return 影响行数
      */
     int deleteByUserId(@Param("userId") Integer userId);
+    
+    /**
+     * 批量查询评论的用户信息（优化 N+1 问题）
+     * @param userIds 用户 ID 列表
+     * @return 用户信息列表（id, username, avatar）
+     */
+    List<Map<String, Object>> selectUserBatch(@Param("userIds") List<Integer> userIds);
+    
+    /**
+     * 获取项目所有者ID
+     * @param projectId 项目 ID
+     * @return 所有者 ID
+     */
+    Integer getProjectOwnerId(@Param("projectId") Integer projectId);
+    
+    /**
+     * 获取项目名称
+     * @param projectId 项目 ID
+     * @return 项目名称
+     */
+    String getProjectName(@Param("projectId") Integer projectId);
 }

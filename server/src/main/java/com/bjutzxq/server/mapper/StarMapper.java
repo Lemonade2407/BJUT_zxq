@@ -1,7 +1,7 @@
 package com.bjutzxq.server.mapper;
 
 
-import com.bjutzxq.pojo.Star;
+import com.bjutzxq.pojo.entity.Star;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -34,13 +34,6 @@ public interface StarMapper {
      * @return 影响行数
      */
     int deleteById(@Param("id") Integer id);
-    
-    /**
-     * 统计项目点赞数
-     * @param projectId 项目 ID
-     * @return 点赞数
-     */
-    int countByProjectId(@Param("projectId") Integer projectId);
     
     /**
      * 根据项目 ID 删除所有点赞记录

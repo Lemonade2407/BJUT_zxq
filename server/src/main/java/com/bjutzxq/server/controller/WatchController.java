@@ -1,14 +1,15 @@
 package com.bjutzxq.server.controller;
 
-import com.bjutzxq.common.Constants;
 import com.bjutzxq.common.Result;
+import com.bjutzxq.pojo.entity.Project;
+import com.bjutzxq.server.context.UserIdContext;
 import com.bjutzxq.server.service.WatchService;
-import com.bjutzxq.server.util.JwtUtil;
-import jakarta.servlet.http.HttpServletRequest;
 import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
 
 /**
  * 关注控制器
@@ -21,58 +22,27 @@ public class WatchController {
     private WatchService watchService;
     
     /**
-     * 从 Authorization header 中解析 Token 获取当前登录用户 ID
-     */
-    private Integer getCurrentUserId(HttpServletRequest request) {
-        String authorization = request.getHeader(Constants.JWT.TOKEN_HEADER);
-        
-        if (authorization == null || authorization.trim().isEmpty()) {
-            throw new RuntimeException("请先登录");
-        }
-        
-        // 提取 Token（去掉 "Bearer " 前缀）
-        String token = authorization;
-        if (token.startsWith("Bearer ")) {
-            token = token.substring(7);
-        }
-        
-        // 验证并解析 Token
-        if (!JwtUtil.validateToken(token)) {
-            throw new RuntimeException("Token 无效或已过期");
-        }
-        
-        return JwtUtil.getUserIdFromToken(token);
-    }
-    
-    /**
      * 关注项目
      * POST /api/watch/{projectId}
      */
     @PostMapping("/{projectId}")
     public Result<Object> watchProject(
-            HttpServletRequest request,
             @PathVariable Integer projectId,
             @RequestBody(required = false) WatchRequest watchRequest) {
         
         log.info("收到关注请求，项目 ID: {}", projectId);
         
-        try {
-            // 1. 获取当前用户 ID
-            Integer userId = getCurrentUserId(request);
-            
-            // 2. 获取通知类型（默认 1）
-            Integer notificationType = watchRequest != null ? watchRequest.getNotificationType() : 1;
-            
-            // 3. 关注项目
-            Integer watchCount = watchService.watchProject(userId, projectId, notificationType);
-            
-            log.info("关注成功，当前关注数：{}", watchCount);
-            return Result.success("关注成功", watchCount);
-            
-        } catch (Exception e) {
-            log.error("关注失败：{}", e.getMessage());
-            return Result.error(500, "关注失败：" + e.getMessage());
-        }
+        // 1. 获取当前用户 ID
+        Integer userId = UserIdContext.getCurrentUserId();
+        
+        // 2. 获取通知类型（默认 1）
+        Integer notificationType = watchRequest != null ? watchRequest.getNotificationType() : 1;
+        
+        // 3. 关注项目
+        Integer watchCount = watchService.watchProject(userId, projectId, notificationType);
+        
+        log.info("关注成功，当前关注数：{}", watchCount);
+        return Result.success("关注成功", watchCount);
     }
     
     /**
@@ -80,26 +50,18 @@ public class WatchController {
      * DELETE /api/watch/{projectId}
      */
     @DeleteMapping("/{projectId}")
-    public Result<Object> unwatchProject(
-            HttpServletRequest request,
-            @PathVariable Integer projectId) {
+    public Result<Object> unwatchProject(@PathVariable Integer projectId) {
         
         log.info("收到取消关注请求，项目 ID: {}", projectId);
         
-        try {
-            // 1. 获取当前用户 ID
-            Integer userId = getCurrentUserId(request);
-            
-            // 2. 取消关注
-            Integer watchCount = watchService.unwatchProject(userId, projectId);
-            
-            log.info("取消关注成功，当前关注数：{}", watchCount);
-            return Result.success("取消成功", watchCount);
-            
-        } catch (Exception e) {
-            log.error("取消关注失败：{}", e.getMessage());
-            return Result.error(500, "取消关注失败：" + e.getMessage());
-        }
+        // 1. 获取当前用户 ID
+        Integer userId = UserIdContext.getCurrentUserId();
+        
+        // 2. 取消关注
+        Integer watchCount = watchService.unwatchProject(userId, projectId);
+        
+        log.info("取消关注成功，当前关注数：{}", watchCount);
+        return Result.success("取消成功", watchCount);
     }
     
     /**
@@ -107,25 +69,18 @@ public class WatchController {
      * GET /api/watch/my
      */
     @GetMapping("/my")
-    public Result<java.util.List<com.bjutzxq.pojo.Project>> getMyWatchedProjects(
-            HttpServletRequest request) {
+    public Result<List<Project>> getMyWatchedProjects() {
         
         log.info("获取用户关注的项目列表");
         
-        try {
-            // 1. 获取当前用户 ID
-            Integer userId = getCurrentUserId(request);
-            
-            // 2. 获取关注的项目列表
-            java.util.List<com.bjutzxq.pojo.Project> projects = watchService.getUserWatchedProjects(userId);
-            
-            log.info("返回 {} 个关注的项目", projects.size());
-            return Result.success("获取成功", projects);
-            
-        } catch (Exception e) {
-            log.error("获取关注列表失败：{}", e.getMessage());
-            return Result.error(500, "获取失败：" + e.getMessage());
-        }
+        // 1. 获取当前用户 ID
+        Integer userId = UserIdContext.getCurrentUserId();
+        
+        // 2. 获取关注的项目列表
+        List<Project> projects = watchService.getUserWatchedProjects(userId);
+        
+        log.info("返回 {} 个关注的项目", projects.size());
+        return Result.success("获取成功", projects);
     }
     
     /**

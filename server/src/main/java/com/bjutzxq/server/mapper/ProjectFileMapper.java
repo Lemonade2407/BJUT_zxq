@@ -1,7 +1,7 @@
 package com.bjutzxq.server.mapper;
 
 
-import com.bjutzxq.pojo.ProjectFile;
+import com.bjutzxq.pojo.entity.ProjectFile;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -61,13 +61,6 @@ public interface ProjectFileMapper {
      * @return 影响行数
      */
     int updateById(ProjectFile projectFile);
-    
-    /**
-     * 删除文件
-     * @param id 文件 ID
-     * @return 影响行数
-     */
-    int deleteById(@Param("id") Integer id);
     
     /**
      * 统计项目文件数量

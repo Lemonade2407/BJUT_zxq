@@ -26,7 +26,7 @@
       <!-- 文件信息 -->
       <div class="file-info">
         <span v-if="!file.isDir && file.fileSize" class="file-size">{{ formatFileSize(file.fileSize) }}</span>
-        <span v-if="file.updatedAt" class="file-time">{{ formatDate(file.updatedAt) }}</span>
+        <span v-if="file.updatedAt" class="file-time">{{ formatFileTime(file.updatedAt) }}</span>
       </div>
     </div>
     
@@ -47,6 +47,8 @@
 
 <script setup>
 import { onMounted } from 'vue'
+import { formatFileTime, formatFileSize } from '@/utils/helpers'
+
 
 const props = defineProps({
   file: Object,
@@ -55,7 +57,7 @@ const props = defineProps({
 
 const emit = defineEmits(['toggle'])
 
-// 根据文件类型返回对应图标
+// 根据文件类型返回对应 Emoji
 const getFileIcon = () => {
   if (props.file.isDir) {
     return '📁'
@@ -64,7 +66,7 @@ const getFileIcon = () => {
   const ext = props.file.fileType?.toLowerCase()
   const iconMap = {
     // 代码文件
-    'js': '📜', 'ts': '📘', 'jsx': '⚛️', 'tsx': '⚛️',
+    'js': '📜', 'ts': '📜', 'jsx': '📜', 'tsx': '📜',
     'java': '☕', 'py': '🐍', 'cpp': '⚙️', 'c': '⚙️', 'h': '⚙️',
     'html': '🌐', 'css': '🎨', 'scss': '🎨', 'less': '🎨',
     'json': '📋', 'xml': '📋', 'yaml': '📋', 'yml': '📋',
@@ -80,45 +82,6 @@ const getFileIcon = () => {
   }
   
   return iconMap[ext] || '📄'
-}
-
-// 格式化日期
-const formatDate = (dateStr) => {
-  if (!dateStr) return ''
-  const date = new Date(dateStr)
-  const now = new Date()
-  const diff = now - date
-  
-  // 小于1小时显示相对时间
-  if (diff < 3600000) {
-    const minutes = Math.floor(diff / 60000)
-    return `${minutes}分钟前`
-  }
-  // 小于24小时
-  if (diff < 86400000) {
-    const hours = Math.floor(diff / 3600000)
-    return `${hours}小时前`
-  }
-  // 小于7天
-  if (diff < 604800000) {
-    const days = Math.floor(diff / 86400000)
-    return `${days}天前`
-  }
-  
-  // 否则显示日期
-  return date.toLocaleDateString('zh-CN', {
-    month: '2-digit',
-    day: '2-digit'
-  })
-}
-
-// 格式化文件大小
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 B'
-  const k = 1024
-  const sizes = ['B', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
 }
 </script>
 

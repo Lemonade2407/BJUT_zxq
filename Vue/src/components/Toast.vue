@@ -1,6 +1,7 @@
 <script setup>
 import { ref } from 'vue'
 
+
 const visible = ref(false)
 const message = ref('')
 const type = ref('info') // success, error, warning, info
@@ -40,7 +41,10 @@ defineExpose({ show, hide })
     <div v-if="visible" :class="['toast-container', type]" @click="hide">
       <div class="toast-content">
         <span class="toast-icon">
-          {{ type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️' }}
+          <span v-if="type === 'success'">✅</span>
+          <span v-else-if="type === 'error'">❌</span>
+          <span v-else-if="type === 'warning'">⚠️</span>
+          <span v-else>ℹ️</span>
         </span>
         <span class="toast-message">{{ message }}</span>
         <button class="toast-close" @click.stop="hide">×</button>

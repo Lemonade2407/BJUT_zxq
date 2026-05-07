@@ -1,4 +1,4 @@
-package com.bjutzxq.pojo;
+package com.bjutzxq.pojo.entity;
 
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -42,11 +42,6 @@ public class ProjectFile {
      * 存储 URL（实际存储地址）
      */
     private String storageUrl;
-    
-    /**
-     * 存储类型:1-本地/Git, 2-OSS
-     */
-    private Integer storageType;
     
     /**
      * 文件内容（仅文本文件存储）

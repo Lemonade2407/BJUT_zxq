@@ -1,9 +1,9 @@
 package com.bjutzxq.server.mapper;
 
-import com.bjutzxq.pojo.Notification;
+import com.bjutzxq.pojo.entity.Notification;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
-
+import java.time.LocalDateTime;
 import java.util.List;
 
 /**
@@ -50,7 +50,7 @@ public interface NotificationMapper {
      * @return 影响行数
      */
     int batchInsert(@Param("notifications") List<Notification> notifications);
-    
+
     /**
      * 更新通知
      * @param notification 通知对象
@@ -85,4 +85,18 @@ public interface NotificationMapper {
      * @return 影响行数
      */
     int batchDelete(@Param("notificationIds") List<Integer> notificationIds);
+    
+    /**
+     * 删除指定日期之前的通知
+     * @param beforeDate 日期阈值
+     * @return 影响行数
+     */
+    int deleteBeforeDate(@Param("beforeDate") LocalDateTime beforeDate);
+
+    /**
+     * 删除已读且指定日期之前的通知
+     * @param beforeDate 日期阈值
+     * @return 影响行数
+     */
+    int deleteReadBeforeDate(@Param("beforeDate") LocalDateTime beforeDate);
 }

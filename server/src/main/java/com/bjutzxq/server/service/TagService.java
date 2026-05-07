@@ -1,6 +1,6 @@
 package com.bjutzxq.server.service;
 
-import com.bjutzxq.pojo.Tag;
+import com.bjutzxq.pojo.entity.Tag;
 import com.bjutzxq.server.mapper.ProjectTagMapper;
 import com.bjutzxq.server.mapper.TagMapper;
 import lombok.extern.slf4j.Slf4j;
@@ -32,10 +32,6 @@ public class TagService {
         log.info("开始创建标签，名称：{}", tag.getName());
         
         // 参数验证
-        if (tag == null) {
-            log.warn("创建标签失败：标签信息为空");
-            throw new IllegalArgumentException("标签信息不能为空");
-        }
         if (tag.getName() == null || tag.getName().trim().isEmpty()) {
             log.warn("创建标签失败：标签名称为空");
             throw new IllegalArgumentException("标签名称不能为空");
@@ -70,13 +66,9 @@ public class TagService {
         log.info("开始更新标签，ID：{}", tag.getId());
         
         // 参数验证
-        if (tag == null || tag.getId() == null) {
+        if (tag.getId() == null) {
             log.warn("更新标签失败：标签 ID 为空");
             throw new IllegalArgumentException("标签 ID 不能为空");
-        }
-        if (tag.getName() != null && tag.getName().trim().isEmpty()) {
-            log.warn("更新标签失败：标签名称为空");
-            throw new IllegalArgumentException("标签名称不能为空");
         }
         
         // 查询原标签
@@ -86,15 +78,25 @@ public class TagService {
             throw new RuntimeException("标签不存在");
         }
         
-        // 如果修改了名称，检查是否与其他标签重名
-        if (tag.getName() != null && !tag.getName().trim().isEmpty() 
-            && !tag.getName().trim().equals(existingTag.getName())) {
-            int count = tagMapper.countByNameExcludeId(tag.getName().trim(), tag.getId());
-            if (count > 0) {
-                log.warn("标签名称已存在：{}", tag.getName());
-                throw new RuntimeException("标签名称已存在");
+        // 如果修改了名称，验证并检查是否与其他标签重名
+        if (tag.getName() != null) {
+            String newName = tag.getName().trim();
+            
+            // 验证名称不为空
+            if (newName.isEmpty()) {
+                log.warn("更新标签失败：标签名称为空");
+                throw new IllegalArgumentException("标签名称不能为空");
             }
-            existingTag.setName(tag.getName().trim());
+            
+            // 如果名称发生变化，检查是否重名
+            if (!newName.equals(existingTag.getName())) {
+                int count = tagMapper.countByNameExcludeId(newName, tag.getId());
+                if (count > 0) {
+                    log.warn("标签名称已存在：{}", newName);
+                    throw new RuntimeException("标签名称已存在");
+                }
+                existingTag.setName(newName);
+            }
         }
         
         // 执行更新
@@ -209,35 +211,5 @@ public class TagService {
             limit = 50; // 最多返回 50 个
         }
         return tagMapper.selectHotTags(limit);
-    }
-    
-    /**
-     * 增加标签使用次数
-     * @param tagId 标签 ID
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public void incrementTagUsage(Integer tagId) {
-        log.debug("增加标签使用次数，标签 ID: {}", tagId);
-        Tag tag = tagMapper.selectById(tagId);
-        if (tag != null) {
-            tagMapper.incrementUsageCount(tagId);
-        } else {
-            log.warn("标签不存在，无法增加使用次数，ID: {}", tagId);
-        }
-    }
-    
-    /**
-     * 减少标签使用次数
-     * @param tagId 标签 ID
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public void decrementTagUsage(Integer tagId) {
-        log.debug("减少标签使用次数，标签 ID: {}", tagId);
-        Tag tag = tagMapper.selectById(tagId);
-        if (tag != null) {
-            tagMapper.decrementUsageCount(tagId);
-        } else {
-            log.warn("标签不存在，无法减少使用次数，ID: {}", tagId);
-        }
     }
 }

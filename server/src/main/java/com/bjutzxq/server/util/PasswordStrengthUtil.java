@@ -1,5 +1,6 @@
 package com.bjutzxq.server.util;
 
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 
 /**
@@ -11,6 +12,7 @@ public class PasswordStrengthUtil {
     /**
      * 密码强度等级
      */
+    @Getter
     public enum StrengthLevel {
         WEAK("弱", 1),
         MEDIUM("中", 2),
@@ -24,14 +26,7 @@ public class PasswordStrengthUtil {
             this.description = description;
             this.level = level;
         }
-        
-        public String getDescription() {
-            return description;
-        }
-        
-        public int getLevel() {
-            return level;
-        }
+
     }
     
     /**
@@ -89,7 +84,7 @@ public class PasswordStrengthUtil {
         }
         
         // 5. 包含特殊字符（最多 20 分）
-        if (password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*")) {
+        if (password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?].*")) {
             score += 20;
         } else {
             suggestions.append("建议包含特殊字符（如 !@#$%）；");
@@ -141,35 +136,14 @@ public class PasswordStrengthUtil {
         // 必须包含字母和数字
         return password.matches("^(?=.*[a-zA-Z])(?=.*\\d).+$");
     }
-    
+
     /**
-     * 密码强度信息类
-     */
-    public static class PasswordStrengthInfo {
-        private StrengthLevel level;
-        private int score;
-        private String suggestion;
-        
-        public PasswordStrengthInfo(StrengthLevel level, int score, String suggestion) {
-            this.level = level;
-            this.score = score;
-            this.suggestion = suggestion;
-        }
-        
-        public StrengthLevel getLevel() {
-            return level;
-        }
-        
-        public int getScore() {
-            return score;
-        }
-        
-        public String getSuggestion() {
-            return suggestion;
-        }
-        
+         * 密码强度信息类
+         */
+        public record PasswordStrengthInfo(StrengthLevel level, int score, String suggestion) {
+
         public String getLevelDescription() {
-            return level.getDescription();
+                return level.getDescription();
+            }
         }
-    }
 }

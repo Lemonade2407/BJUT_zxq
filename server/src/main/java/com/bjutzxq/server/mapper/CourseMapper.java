@@ -1,6 +1,6 @@
 package com.bjutzxq.server.mapper;
 
-import com.bjutzxq.pojo.Course;
+import com.bjutzxq.pojo.entity.Course;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
@@ -35,11 +35,6 @@ public interface CourseMapper {
      * 根据课程名称查询
      */
     Course selectByCourseName(@Param("courseName") String courseName);
-
-    /**
-     * 查询所有启用的课程
-     */
-    List<Course> selectActiveCourses();
 
     /**
      * 查询所有课程

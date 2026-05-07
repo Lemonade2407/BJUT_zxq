@@ -3,7 +3,7 @@
 <mapper namespace="com.bjutzxq.server.mapper.TagMapper">
     
     <!-- 结果映射 -->
-    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.Tag">
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.entity.Tag">
         <id column="id" property="id"/>
         <result column="name" property="name"/>
         <result column="category" property="category"/>
@@ -11,7 +11,7 @@
     </resultMap>
     
     <!-- 插入标签 -->
-    <insert id="insert" parameterType="com.bjutzxq.pojo.Tag" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.bjutzxq.pojo.entity.Tag" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO tag (name, category, usage_count)
         VALUES (#{name}, #{category}, #{usageCount})
     </insert>
@@ -22,7 +22,7 @@
     </delete>
     
     <!-- 更新标签 -->
-    <update id="update" parameterType="com.bjutzxq.pojo.Tag">
+    <update id="update" parameterType="com.bjutzxq.pojo.entity.Tag">
         UPDATE tag
         <set>
             <if test="name != null and name != ''">

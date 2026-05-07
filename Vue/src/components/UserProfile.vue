@@ -6,6 +6,7 @@ import { toast } from '@/utils/toast'
 import { error as logError } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 import UserSidebar from '@/components/UserSidebar.vue'
+import { formatDateShort } from '@/utils/helpers'
 
 const router = useRouter()
 
@@ -146,17 +147,6 @@ const handleChangePassword = async () => {
     logError('修改密码失败:', error)
     toast.error(error.response?.data?.message || '修改密码失败，请检查原密码是否正确')
   }
-}
-
-// 格式化日期
-const formatDate = (dateString) => {
-  if (!dateString) return '-'
-  const date = new Date(dateString)
-  return date.toLocaleDateString('zh-CN', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  })
 }
 
 // 上传头像

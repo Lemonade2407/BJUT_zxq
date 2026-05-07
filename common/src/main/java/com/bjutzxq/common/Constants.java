@@ -128,10 +128,12 @@ public class Constants {
          * Token 过期时间（2 小时）
          */
         public static final long TOKEN_EXPIRE_TIME = 7200 * 1000;
-        // TODO: 测试用，生产环境请修改
         /**
          * Token 密钥（至少 32 字符/256 位，用于 HMAC-SHA256）
+         * 优先从环境变量 JWT_SECRET 读取，生产环境必须设置此环境变量
          */
-        public static final String TOKEN_SECRET = "bjut_zxq_2026_jwt_secret_key_for_hmac_sha256";
+        public static final String TOKEN_SECRET = System.getenv("JWT_SECRET") != null 
+            ? System.getenv("JWT_SECRET") 
+            : "bjut_zxq_2026_jwt_secret_key_for_hmac_sha256"; // 默认值（仅开发环境使用）
     }
 }

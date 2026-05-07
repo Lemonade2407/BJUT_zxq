@@ -1,14 +1,16 @@
-package com.bjutzxq.pojo;
+package com.bjutzxq.pojo.vo;
 
+import com.bjutzxq.pojo.entity.Tag;
 import lombok.Data;
 import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * 项目实体类
+ * 项目视图对象 VO（用于展示层，组合多表数据）
  */
 @Data
-public class Project {
+public class ProjectVO {
+    
     /**
      * 项目 ID
      */
@@ -30,6 +32,11 @@ public class Project {
     private Integer ownerId;
     
     /**
+     * 作者名称
+     */
+    private String author;
+    
+    /**
      * 项目类型: COURSE-课程设计, THESIS-毕业设计, COMPETITION-竞赛作品, PERSONAL-个人项目, OTHER-其他
      */
     private String projectType;
@@ -45,7 +52,7 @@ public class Project {
     private String thesisType;
     
     /**
-     * 可见性:0-私有，1-公开
+     * 可见性：0-私有，1-公开
      */
     private Integer visibility;
     
@@ -75,7 +82,7 @@ public class Project {
     private Integer viewCount;
     
     /**
-     * 项目文档 URL（支持 PDF、Word 等格式）
+     * 项目文档 URL
      */
     private String documentUrl;
     
@@ -90,42 +97,27 @@ public class Project {
     private LocalDateTime updatedAt;
     
     /**
-     * 标签列表（非数据库字段）
+     * 标签列表
      */
     private List<Tag> tags;
     
     /**
-     * 当前用户是否已点赞（非数据库字段）
+     * 当前用户是否已点赞
      */
-    private Boolean isLiked;
+    private Boolean isStarred;
     
     /**
-     * 当前用户是否已收藏（非数据库字段）
+     * 当前用户是否已关注
      */
-    private Boolean isFavorited;
+    private Boolean isWatched;
     
     /**
-     * 点赞数别名（用于前端显示，对应 starCount）
-     */
-    private Integer likes;
-    
-    /**
-     * 收藏数别名（用于前端显示，对应 watchCount）
-     */
-    private Integer favorites;
-    
-    /**
-     * 作者名称（非数据库字段，用于前端显示）
-     */
-    private String author;
-    
-    /**
-     * 项目所有者用户名（非数据库字段，用于教学管理）
+     * 项目所有者用户名（用于教学管理）
      */
     private String ownerUsername;
     
     /**
-     * 项目所有者班级（非数据库字段，用于教学管理）
+     * 项目所有者班级（用于教学管理）
      */
     private String ownerClassName;
 }

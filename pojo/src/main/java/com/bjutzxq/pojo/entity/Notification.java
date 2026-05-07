@@ -1,4 +1,4 @@
-package com.bjutzxq.pojo;
+package com.bjutzxq.pojo.entity;
 
 import lombok.Data;
 import java.time.LocalDateTime;
@@ -29,7 +29,7 @@ public class Notification {
     private Integer projectId;
     
     /**
-     * 通知类型:1-点赞，2-评论，3-关注等
+     * 通知类型:1-点赞，2-评论，3-关注，4-系统通知
      */
     private Integer type;
     

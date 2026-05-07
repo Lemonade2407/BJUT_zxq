@@ -26,24 +26,16 @@ export function initToast(app) {
 // 便捷方法（用于 Composition API）
 export const toast = {
   success: (message, duration) => {
-    if (toastRef) {
-      toastRef.show(message, 'success', duration)
-    }
+    toastRef?.show(message, 'success', duration)
   },
   error: (message, duration) => {
-    if (toastRef) {
-      toastRef.show(message, 'error', duration)
-    }
+    toastRef?.show(message, 'error', duration)
   },
   warning: (message, duration) => {
-    if (toastRef) {
-      toastRef.show(message, 'warning', duration)
-    }
+    toastRef?.show(message, 'warning', duration)
   },
   info: (message, duration) => {
-    if (toastRef) {
-      toastRef.show(message, 'info', duration)
-    }
+    toastRef?.show(message, 'info', duration)
   },
   confirm: (message, title = '确认', callback) => {
     // 使用浏览器原生 confirm

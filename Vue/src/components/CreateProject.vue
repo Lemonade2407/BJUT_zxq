@@ -1,11 +1,12 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { createProject, uploadFiles } from '@/api/project'
+import { createProject, uploadFiles, getProjectTypes } from '@/api/project'
 import { getTagsByCategory } from '@/api/tag'
 import { getActiveCourses } from '@/api/course'
 import { toast } from '@/utils/toast'
 import { log, error as logError } from '@/utils/logger'
+
 
 const router = useRouter()
 
@@ -20,14 +21,8 @@ const form = ref({
   visibility: 1 // 默认公开
 })
 
-// 项目类型选项
-const projectTypeOptions = [
-  { value: 'COURSE', label: '课程设计' },
-  { value: 'THESIS', label: '毕业设计' },
-  { value: 'COMPETITION', label: '竞赛作品' },
-  { value: 'PERSONAL', label: '个人项目' },
-  { value: 'OTHER', label: '其他' }
-]
+// 项目类型选项（从后端动态获取）
+const projectTypeOptions = ref([])
 
 // 课程列表（从数据库加载）
 const courseList = ref([])
@@ -63,8 +58,8 @@ const uploadProgress = ref(0)
 
 // 可见性选项
 const visibilityOptions = [
-  { value: 1, label: '公开', description: '所有人都可以查看和访问' },
-  { value: 0, label: '私有', description: '只有你可以查看和访问' }
+  { value: 1, label: '公开'},
+  { value: 0, label: '私有' }
 ]
 
 // 按文件夹结构组织文件
@@ -227,19 +222,16 @@ const loadCourses = async () => {
 // 切换标签选择
 const toggleTag = (tagId) => {
   const index = form.value.tagIds.indexOf(tagId)
-  if (index > -1) {
-    form.value.tagIds.splice(index, 1)
-  } else {
-    form.value.tagIds.push(tagId)
-  }
+  index > -1 ? form.value.tagIds.splice(index, 1) : form.value.tagIds.push(tagId)
 }
 
 // 查看更多标签
 const showMoreTags = (category) => {
   const totalCount = tagsByCategory.value[category].length
-  const currentCount = displayCount.value[category]
-  // 每次增加10个，但不超过总数
-  displayCount.value[category] = Math.min(currentCount + 10, totalCount)
+  displayCount.value[category] = Math.min(
+    displayCount.value[category] + TAGS_PER_PAGE, 
+    totalCount
+  )
 }
 
 // 获取当前分类显示的标签
@@ -545,10 +537,48 @@ const formatFileSize = (bytes) => {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
 }
 
+// 加载项目类型列表
+const loadProjectTypes = async () => {
+  try {
+    log('加载项目类型列表...')
+    const res = await getProjectTypes()
+    
+    if (res.code === 200 && res.data) {
+      // 转换为前端需要的格式
+      projectTypeOptions.value = res.data.map(type => ({
+        value: type.typeCode,
+        label: type.typeName
+      }))
+      log(`加载完成，项目类型数量: ${projectTypeOptions.value.length}`)
+    } else {
+      logError('项目类型 API 返回数据异常:', res)
+      // 降级：使用默认值
+      projectTypeOptions.value = [
+        { value: 'COURSE', label: '课程设计' },
+        { value: 'THESIS', label: '毕业设计' },
+        { value: 'COMPETITION', label: '竞赛作品' },
+        { value: 'PERSONAL', label: '个人项目' },
+        { value: 'OTHER', label: '其他' }
+      ]
+    }
+  } catch (error) {
+    logError('加载项目类型列表失败:', error)
+    // 降级：使用默认值
+    projectTypeOptions.value = [
+      { value: 'COURSE', label: '课程设计' },
+      { value: 'THESIS', label: '毕业设计' },
+      { value: 'COMPETITION', label: '竞赛作品' },
+      { value: 'PERSONAL', label: '个人项目' },
+      { value: 'OTHER', label: '其他' }
+    ]
+  }
+}
+
 // 组件挂载时加载数据
 onMounted(() => {
   isLoading.value = true
   Promise.all([
+    loadProjectTypes(),
     loadTags(),
     loadCourses()
   ]).finally(() => {
@@ -568,7 +598,7 @@ onMounted(() => {
 
       <!-- 加载状态 -->
       <div v-if="isLoading" class="loading-state">
-        <span class="loading-spinner">⟳</span>
+        <span class="loading-spinner">⏳</span>
         <p>加载中...</p>
       </div>
 
@@ -666,7 +696,7 @@ onMounted(() => {
             
             <!-- 技术栈标签 -->
             <div v-if="tagsByCategory['技术栈'].length > 0" class="tag-category">
-              <h4 class="category-title">🛠️ 技术栈</h4>
+              <h4 class="category-title">🔧 技术栈</h4>
               <div class="tags-grid">
                 <div
                   v-for="tag in getDisplayedTags('技术栈')"
@@ -728,7 +758,6 @@ onMounted(() => {
                 <div class="option-header">
                   <span class="option-label">{{ option.label }}</span>
                 </div>
-                <p class="option-description">{{ option.description }}</p>
               </div>
             </div>
           </div>
@@ -758,7 +787,7 @@ onMounted(() => {
               />
               <div class="upload-icon">📁</div>
               <p class="upload-text">点击选择文件或文件夹，或直接拖拽到此处</p>
-              <p class="upload-hint">支持批量上传文件和整个文件夹，单个文件不超过 50MB</p>
+              <p class="upload-hint">支持批量上传文件和整个文件夹，单个文件不超过 100MB（大文件自动分片上传）</p>
             </div>
 
             <!-- 文件列表 -->
@@ -780,7 +809,9 @@ onMounted(() => {
                 :style="{ paddingLeft: (item.level * 20 + 12) + 'px' }"
               >
                 <div class="file-info">
-                  <span class="file-icon">{{ item.isFolder ? '📁' : '📄' }}</span>
+                  <span class="file-icon">
+                    {{ item.isFolder ? '📁' : '📄' }}
+                  </span>
                   <div class="file-details">
                     <span class="file-name">{{ item.name }}</span>
                     <span v-if="!item.isFolder" class="file-size">{{ formatFileSize(item.size) }}</span>

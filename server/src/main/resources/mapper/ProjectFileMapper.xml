@@ -3,7 +3,7 @@
 <mapper namespace="com.bjutzxq.server.mapper.ProjectFileMapper">
     
     <!-- 结果映射 -->
-    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.ProjectFile">
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.entity.ProjectFile">
         <id column="id" property="id"/>
         <result column="project_id" property="projectId"/>
         <result column="file_name" property="fileName"/>
@@ -25,7 +25,7 @@
     </sql>
 
     <!-- 新增文件 -->
-    <insert id="insert" parameterType="com.bjutzxq.pojo.ProjectFile" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.bjutzxq.pojo.entity.ProjectFile" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO project_file (
             project_id,
             file_name,
@@ -56,7 +56,7 @@
     </insert>
     
     <!-- 更新文件 -->
-    <update id="updateById" parameterType="com.bjutzxq.pojo.ProjectFile">
+    <update id="updateById" parameterType="com.bjutzxq.pojo.entity.ProjectFile">
         <set>
             <if test="fileName != null">file_name = #{fileName},</if>
             <if test="filePath != null">file_path = #{filePath},</if>
@@ -70,11 +70,6 @@
         </set>
         WHERE id = #{id}
     </update>
-
-    <!-- 删除文件 -->
-    <delete id="deleteById" parameterType="com.bjutzxq.pojo.ProjectFile">
-        DELETE FROM project_file WHERE id = #{id}
-    </delete>
 
     <!-- 根据 ID 查询文件 -->
     <select id="selectById" resultMap="BaseResultMap">

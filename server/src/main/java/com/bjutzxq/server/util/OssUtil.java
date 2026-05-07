@@ -2,9 +2,7 @@ package com.bjutzxq.server.util;
 
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
-import com.aliyun.oss.model.DeleteObjectsRequest;
-import com.aliyun.oss.model.DeleteObjectsResult;
-import com.aliyun.oss.model.OSSObject;
+import com.aliyun.oss.model.*;
 import jakarta.annotation.PostConstruct;
 import jakarta.annotation.PreDestroy;
 import lombok.extern.slf4j.Slf4j;
@@ -341,6 +339,130 @@ public class OssUtil {
         }
         
         return totalDeleted;
+    }
+    
+    /**
+     * 分片上传大文件（>50MB）
+     * @param file 上传的文件
+     * @param directory 自定义目录
+     * @return 文件的访问 URL
+     */
+    public String multipartUpload(MultipartFile file, String directory) throws IOException {
+        String uploadId = null;
+        String objectName = null;
+        try {
+            // 获取原始文件名和后缀
+            String originalFilename = file.getOriginalFilename();
+            if (originalFilename == null || originalFilename.trim().isEmpty()) {
+                throw new IOException("文件名不能为空");
+            }
+            
+            // 验证文件大小
+            if (file.getSize() > maxFileSize) {
+                long maxSizeMB = maxFileSize / 1024 / 1024;
+                throw new IOException("文件大小不能超过 " + maxSizeMB + "MB");
+            }
+            
+            // 验证文件类型
+            String fileExtension = getFileExtension(originalFilename);
+            if (!isAllowedType(fileExtension)) {
+                throw new IOException("不支持的文件类型: " + fileExtension);
+            }
+            
+            // 生成唯一文件名
+            String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+            String suffix = "";
+            int lastDotIndex = originalFilename.lastIndexOf(".");
+            if (lastDotIndex > 0 && lastDotIndex < originalFilename.length() - 1) {
+                suffix = originalFilename.substring(lastDotIndex);
+            }
+            String fileName = UUID.randomUUID().toString().replace("-", "") + suffix;
+            
+            // 决定存储路径
+            if (directory != null && !directory.trim().isEmpty()) {
+                objectName = directory + "/" + datePath + "/" + fileName;
+            } else {
+                objectName = fileHost + "/" + datePath + "/" + fileName;
+            }
+            
+            log.info("开始分片上传文件到 OSS: {}, 大小: {} bytes ({:.2f} MB)", 
+                objectName, file.getSize(), file.getSize() / 1024.0 / 1024.0);
+            
+            // 1. 初始化分片上传
+            InitiateMultipartUploadRequest initRequest = new InitiateMultipartUploadRequest(bucketName, objectName);
+            InitiateMultipartUploadResult initResult = ossClient.initiateMultipartUpload(initRequest);
+            uploadId = initResult.getUploadId();
+            
+            log.info("分片上传初始化成功，uploadId: {}", uploadId);
+            
+            // 2. 分片上传
+            long fileSize = file.getSize();
+            long partSize = 5 * 1024 * 1024; // 每个分片 5MB
+            int partCount = (int) (fileSize / partSize);
+            if (fileSize % partSize != 0) {
+                partCount++;
+            }
+            
+            log.info("文件将分为 {} 个分片上传，每个分片大小: {} MB", partCount, partSize / 1024 / 1024);
+            
+            java.util.List<PartETag> partETags = new java.util.ArrayList<>();
+            
+            try (java.io.InputStream inputStream = file.getInputStream()) {
+                for (int i = 0; i < partCount; i++) {
+                    // 计算当前分片的大小
+                    long currentPartSize = Math.min(partSize, fileSize - i * partSize);
+                    
+                    // 读取分片数据
+                    byte[] partBuffer = new byte[(int) currentPartSize];
+                    int bytesRead = inputStream.read(partBuffer);
+                    
+                    if (bytesRead != currentPartSize) {
+                        throw new IOException("读取分片数据失败");
+                    }
+                    
+                    // 上传分片
+                    UploadPartRequest uploadPartRequest = new UploadPartRequest();
+                    uploadPartRequest.setBucketName(bucketName);
+                    uploadPartRequest.setKey(objectName);
+                    uploadPartRequest.setUploadId(uploadId);
+                    uploadPartRequest.setInputStream(new java.io.ByteArrayInputStream(partBuffer));
+                    uploadPartRequest.setPartSize(currentPartSize);
+                    uploadPartRequest.setPartNumber(i + 1);
+                    
+                    UploadPartResult uploadPartResult = ossClient.uploadPart(uploadPartRequest);
+                    partETags.add(uploadPartResult.getPartETag());
+                    
+                    log.debug("分片 {}/{} 上传成功", i + 1, partCount);
+                }
+            }
+            
+            // 3. 完成分片上传
+            CompleteMultipartUploadRequest completeRequest = new CompleteMultipartUploadRequest(
+                bucketName, objectName, uploadId, partETags);
+            ossClient.completeMultipartUpload(completeRequest);
+            
+            String accessUrl = getFileAccessUrl(objectName);
+            log.info("分片上传成功: {}", accessUrl);
+            
+            return accessUrl;
+            
+        } catch (Exception e) {
+            log.error("OSS 分片上传失败: {}", e.getMessage(), e);
+            
+            // 如果上传失败，取消分片上传
+            if (uploadId != null && objectName != null) {
+                try {
+                    AbortMultipartUploadRequest abortRequest = new AbortMultipartUploadRequest(
+                        bucketName, objectName, uploadId);
+                    ossClient.abortMultipartUpload(abortRequest);
+                    log.info("已取消分片上传: {}", uploadId);
+                } catch (Exception abortEx) {
+                    log.error("取消分片上传失败: {}", abortEx.getMessage());
+                }
+            }
+            
+            throw new IOException("OSS 分片上传失败: " + e.getMessage(), e);
+        }
     }
 }
 

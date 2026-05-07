@@ -23,8 +23,6 @@
           <div v-else-if="projects.length === 0" class="empty-state">
             <div class="empty-icon">⭐</div>
             <h3>还没有收藏任何项目</h3>
-            <p>去项目广场发现有趣的项目吧！</p>
-            <router-link to="/projects" class="btn-primary">浏览项目广场</router-link>
           </div>
 
           <!-- 项目列表 -->
@@ -51,7 +49,7 @@
                       ❤️ {{ formatNumber(project.starCount || 0) }}
                     </span>
                     <span class="stat">
-                      ⭐ {{ formatNumber(project.watchCount || 0) }}
+                      👁️ {{ formatNumber(project.watchCount || 0) }}
                     </span>
                   </div>
                 </div>
@@ -104,6 +102,8 @@ import { useRouter } from 'vue-router'
 import { getMyWatchedProjects } from '@/api/project'
 import { error as logError } from '@/utils/logger'
 import UserSidebar from '@/components/UserSidebar.vue'
+import { formatNumber } from '@/utils/helpers'
+
 
 const router = useRouter()
 const loading = ref(false)
@@ -168,17 +168,6 @@ const formatTime = (timeStr) => {
   if (days < 30) return `${Math.floor(days / 7)}周前`
   if (days < 365) return `${Math.floor(days / 30)}个月前`
   return `${Math.floor(days / 365)}年前`
-}
-
-// 格式化数字
-const formatNumber = (num) => {
-  if (num === undefined || num === null) {
-    return '0'
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'k'
-  }
-  return num.toString()
 }
 
 onMounted(() => {

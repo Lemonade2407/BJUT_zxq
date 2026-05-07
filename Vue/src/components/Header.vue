@@ -6,22 +6,27 @@ import { toast } from '@/utils/toast'
 import { error as logError, log } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 
+
 const router = useRouter()
 const route = useRoute()
 
 // 用户信息
 const userInfo = ref({
   username: '',
-  avatar: ''
+  avatar: '',
+  role: ''
 })
 
 // 搜索框
 const searchQuery = ref('')
 
+// 退出登录确认对话框
+const showLogoutModal = ref(false)
+
 // 导航菜单项
 const menuItems = [
   { icon: '🏠', label: '主页', path: '/home' },
-  { icon: '📦', label: '项目广场', path: '/projects' },
+  { icon: '📁', label: '项目广场', path: '/projects' },
   // { icon: '👥', label: '组队广场', path: '/team' },  // 暂时注释，后续开发
 ]
 
@@ -31,20 +36,30 @@ const isActive = (path) => {
 }
 
 // 处理退出登录
-const handleLogout = async () => {
-  // TODO: 添加退出确认对话框美化（使用自定义 Modal）
-  if (confirm('确定要退出登录吗？')) {
-    try {
-      await logoutApi()
-    } catch (error) {
-      logError('退出登录失败:', error)
-    } finally {
-      // 使用 tokenManager 清除认证信息
-      tokenManager.removeToken()
-      // 跳转到登录页
-      await router.push('/login')
-    }
+const handleLogout = () => {
+  // 显示自定义确认对话框
+  showLogoutModal.value = true
+}
+
+// 确认退出登录
+const confirmLogout = async () => {
+  try {
+    await logoutApi()
+  } catch (error) {
+    logError('退出登录失败:', error)
+  } finally {
+    // 关闭对话框
+    showLogoutModal.value = false
+    // 使用 tokenManager 清除认证信息
+    tokenManager.removeToken()
+    // 跳转到登录页
+    await router.push('/login')
   }
+}
+
+// 取消退出登录
+const cancelLogout = () => {
+  showLogoutModal.value = false
 }
 
 // 处理搜索
@@ -68,6 +83,11 @@ const handleNavigation = (path) => {
 // 处理头像点击
 const handleAvatarClick = () => {
   router.push('/profile')
+}
+
+// 跳转到管理后台
+const goToAdmin = () => {
+  router.push('/admin')
 }
 
 // 组件挂载时加载用户信息
@@ -98,8 +118,7 @@ onMounted(() => {
             @click.prevent="handleNavigation(item.path)" 
             :class="['nav-item', { active: isActive(item.path) }]"
           >
-            <span class="nav-emoji">{{ item.icon }}</span>
-            {{ item.label }}
+            {{ item.icon }} {{ item.label }}
             <span v-if="item.count" class="nav-count">{{ item.count }}</span>
           </a>
         </nav>
@@ -121,6 +140,15 @@ onMounted(() => {
           />
         </div>
         <div class="user-info">
+          <!-- 管理员入口 -->
+          <button 
+            v-if="userInfo.role === 'ADMIN'"
+            @click="goToAdmin" 
+            class="admin-btn" 
+            title="管理后台"
+          >
+            🛡️ 管理
+          </button>
           <img
             :src="userInfo.avatar || '/logo.svg'"
             alt="User avatar"
@@ -136,6 +164,33 @@ onMounted(() => {
           >{{ userInfo.username || '用户' }}</span>
           <button @click="handleLogout" class="logout-btn" title="退出登录">
             退出登录
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 退出登录确认对话框 -->
+    <div v-if="showLogoutModal" class="modal-overlay" @click.self="cancelLogout">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h2 class="modal-title">确认退出</h2>
+          <button @click="cancelLogout" class="close-btn" title="关闭">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div class="modal-icon">
+            <svg viewBox="0 0 64 64" width="64" height="64">
+              <circle cx="32" cy="32" r="30" fill="#d1fae5" stroke="#10b981" stroke-width="2"/>
+              <path d="M32 18v18M32 42v2" stroke="#10b981" stroke-width="3" stroke-linecap="round"/>
+            </svg>
+          </div>
+          <p class="modal-message">确定要退出登录吗？</p>
+        </div>
+        <div class="modal-footer">
+          <button @click="cancelLogout" class="modal-btn cancel">
+            取消
+          </button>
+          <button @click="confirmLogout" class="modal-btn confirm">
+            确认退出
           </button>
         </div>
       </div>
@@ -227,8 +282,7 @@ onMounted(() => {
   background-color: rgba(16, 185, 129, 0.2);
 }
 
-.nav-emoji {
-  font-size: 16px;
+.nav-icon {
   display: inline-block;
 }
 
@@ -328,14 +382,32 @@ onMounted(() => {
   border-color: #f59e0b;
 }
 
-/* 退出确认对话框 */
+/* 管理员按钮 */
+.admin-btn {
+  padding: 6px 12px;
+  color: #ffffff;
+  background-color: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.admin-btn:hover {
+  background-color: rgba(239, 68, 68, 0.35);
+  border-color: #ef4444;
+}
+
+/* 退出登录确认对话框 */
 .modal-overlay {
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: rgba(0, 0, 0, 0.5);
+  background: rgba(0, 0, 0, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -344,27 +416,32 @@ onMounted(() => {
 }
 
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 
 .modal-content {
   background: #ffffff;
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 51, 102, 0.3);
-  max-width: 400px;
+  border-radius: 16px;
   width: 90%;
-  animation: slideIn 0.3s ease-out;
+  max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.25);
+  animation: slideUp 0.3s ease-out;
+  overflow: hidden;
 }
 
-@keyframes slideIn {
+@keyframes slideUp {
   from {
+    transform: translateY(20px);
     opacity: 0;
-    transform: translateY(-20px) scale(0.95);
   }
   to {
+    transform: translateY(0);
     opacity: 1;
-    transform: translateY(0) scale(1);
   }
 }
 
@@ -373,36 +450,37 @@ onMounted(() => {
   justify-content: space-between;
   align-items: center;
   padding: 20px 24px;
-  border-bottom: 1px solid #e8e8e8;
+  border-bottom: 1px solid #f0f0f0;
+  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
 }
 
-.modal-header h3 {
+.modal-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 20px;
   font-weight: 600;
-  color: #064e3b;
+  color: #065f46;
 }
 
 .close-btn {
   background: none;
   border: none;
-  font-size: 28px;
-  color: #999999;
+  font-size: 32px;
+  color: #065f46;
   cursor: pointer;
   line-height: 1;
   padding: 0;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
+  border-radius: 8px;
   transition: all 0.2s;
 }
 
 .close-btn:hover {
-  background-color: #f5f5f5;
-  color: #333333;
+  background: rgba(6, 95, 70, 0.1);
+  transform: rotate(90deg);
 }
 
 .modal-body {
@@ -411,64 +489,76 @@ onMounted(() => {
 }
 
 .modal-icon {
-  font-size: 48px;
   margin-bottom: 16px;
+  animation: bounce 0.6s ease-in-out;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
 }
 
 .modal-message {
-  font-size: 16px;
-  color: #333333;
   margin: 0 0 8px 0;
+  font-size: 18px;
   font-weight: 500;
+  color: #1f2937;
 }
 
 .modal-hint {
-  font-size: 14px;
-  color: #999999;
   margin: 0;
+  font-size: 14px;
+  color: #6b7280;
 }
 
 .modal-footer {
   display: flex;
   gap: 12px;
-  padding: 16px 24px 24px;
-  justify-content: flex-end;
+  padding: 16px 24px;
+  background: #f9fafb;
+  border-top: 1px solid #f0f0f0;
 }
 
 .modal-btn {
-  padding: 10px 24px;
+  flex: 1;
+  padding: 12px 20px;
   border: none;
-  border-radius: 6px;
-  font-size: 14px;
+  border-radius: 8px;
+  font-size: 15px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
-  min-width: 100px;
 }
 
-.cancel-btn {
-  background-color: #f5f5f5;
-  color: #666666;
+.modal-btn.cancel {
+  background: #ffffff;
+  color: #6b7280;
+  border: 2px solid #e5e7eb;
 }
 
-.cancel-btn:hover {
-  background-color: #e8e8e8;
-  color: #333333;
+.modal-btn.cancel:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  color: #374151;
 }
 
-.confirm-btn {
-  background: linear-gradient(135deg, #ff4d4f 0%, #ff7875 100%);
+.modal-btn.confirm {
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
   color: #ffffff;
-  box-shadow: 0 2px 4px rgba(255, 77, 79, 0.2);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);
 }
 
-.confirm-btn:hover {
-  background: linear-gradient(135deg, #ff7875 0%, #ffa39e 100%);
-  box-shadow: 0 4px 8px rgba(255, 77, 79, 0.3);
+.modal-btn.confirm:hover {
+  background: linear-gradient(135deg, #059669 0%, #047857 100%);
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
   transform: translateY(-1px);
 }
 
-.confirm-btn:active {
+.modal-btn.confirm:active {
   transform: translateY(0);
 }
 

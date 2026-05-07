@@ -1,12 +1,11 @@
 package com.bjutzxq.server.service;
 
-import com.bjutzxq.pojo.Course;
+import com.bjutzxq.pojo.entity.Course;
 import com.bjutzxq.server.mapper.CourseMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 
 /**
@@ -24,6 +23,12 @@ public class CourseService {
      */
     @Transactional
     public Course createCourse(String courseName) {
+        // 参数验证
+        if (courseName == null || courseName.trim().isEmpty()) {
+            throw new IllegalArgumentException("课程名称不能为空");
+        }
+        courseName = courseName.trim();
+
         // 检查课程是否已存在
         Course existing = courseMapper.selectByCourseName(courseName);
         if (existing != null) {
@@ -32,7 +37,6 @@ public class CourseService {
 
         Course course = new Course();
         course.setCourseName(courseName);
-        course.setIsActive(1);
 
         courseMapper.insert(course);
         log.info("创建课程成功: {}", courseName);
@@ -55,7 +59,13 @@ public class CourseService {
      * 更新课程
      */
     @Transactional
-    public Course updateCourse(Integer id, String courseName, Integer isActive) {
+    public Course updateCourse(Integer id, String courseName) {
+        // 参数验证
+        if (courseName == null || courseName.trim().isEmpty()) {
+            throw new IllegalArgumentException("课程名称不能为空");
+        }
+        courseName = courseName.trim();
+
         Course course = courseMapper.selectById(id);
         if (course == null) {
             throw new RuntimeException("课程不存在");
@@ -70,27 +80,11 @@ public class CourseService {
         }
 
         course.setCourseName(courseName);
-        course.setIsActive(isActive);
         courseMapper.update(course);
 
         log.info("更新课程成功, ID: {}", id);
         return course;
     }
-
-    /**
-     * 根据 ID 查询课程
-     */
-    public Course getCourseById(Integer id) {
-        return courseMapper.selectById(id);
-    }
-
-    /**
-     * 查询所有启用的课程
-     */
-    public List<Course> getActiveCourses() {
-        return courseMapper.selectActiveCourses();
-    }
-
     /**
      * 查询所有课程
      */
@@ -103,7 +97,7 @@ public class CourseService {
      */
     public List<Course> searchCourses(String keyword) {
         if (keyword == null || keyword.trim().isEmpty()) {
-            return getActiveCourses();
+            return getAllCourses();
         }
         return courseMapper.searchCourses(keyword.trim());
     }
