@@ -7,7 +7,7 @@ services:
     # 使用 host 网络,避免 docker-proxy 问题
     network_mode: host
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:BJUT-zxq2026}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: bjut_zxq
       TZ: Asia/Shanghai
     volumes:
