@@ -9,10 +9,9 @@ spring:
   
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://60.205.210.11:3306/bjut_zxq?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: BJUT-zxq2026
-    # TODO: 生产环境数据库密码应使用环境变量或加密配置
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:bjut_zxq}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:BJUT-zxq2026}
       
     # HikariCP 连接池配置
     hikari:
@@ -66,14 +65,16 @@ management:
 # 日志配置
 logging:
   level:
-    com.bjutzxq: debug
-    com.bjutzxq.server.mapper: debug
+    root: info
+    com.bjutzxq: info
+    com.bjutzxq.server.mapper: warn
   file:
     name: logs/bjut-zxq.log
   logback:
-    rolling policy:
+    rollingpolicy:
       max-file-size: 10MB
       max-history: 30
+      total-size-cap: 1GB
 # 待办
 aliyun:
   oss:
