@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { getTags } from '@/api/tag'
 import { toast } from '@/utils/toast'
 import { error as logError } from '@/utils/logger'
@@ -8,6 +8,11 @@ import tokenManager from '@/utils/tokenManager'
 const tags = ref([])
 const isLoading = ref(false)
 const searchKeyword = ref('')
+
+// 分页配置
+const PAGE_SIZE = 20
+const currentPage = ref(1)
+const total = ref(0)
 
 // 对话框
 const showCreateDialog = ref(false)
@@ -25,18 +30,13 @@ const editForm = ref({
 const loadTags = async () => {
   isLoading.value = true
   try {
-    const res = await getTags()
-    if (res.code === 200) {
-      // 如果有搜索关键词，进行前端过滤
-      let filteredTags = res.data || []
-      if (searchKeyword.value.trim()) {
-        const keyword = searchKeyword.value.toLowerCase()
-        filteredTags = filteredTags.filter(tag => 
-          tag.name.toLowerCase().includes(keyword) ||
-          (tag.category && tag.category.toLowerCase().includes(keyword))
-        )
-      }
-      tags.value = filteredTags
+    const res = await getTags({
+      pageNum: currentPage.value,
+      pageSize: PAGE_SIZE
+    })
+    if (res.code === 200 && res.data) {
+      tags.value = res.data.records || []
+      total.value = res.data.total || 0
     }
   } catch (error) {
     logError('加载标签列表失败:', error)
@@ -48,8 +48,19 @@ const loadTags = async () => {
 
 // 搜索标签
 const searchTags = () => {
+  currentPage.value = 1  // 搜索时重置到第一页
   loadTags()
 }
+
+// 切换页码
+const changePage = (page) => {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+  loadTags()
+}
+
+// 计算总页数
+const totalPages = computed(() => Math.ceil(total.value / PAGE_SIZE))
 
 // 打开新建对话框
 const openCreateDialog = () => {
@@ -262,6 +273,27 @@ onMounted(() => {
           </tr>
         </tbody>
       </table>
+    </div>
+    
+    <!-- 分页组件 -->
+    <div class="pagination">
+      <button 
+        @click="changePage(currentPage - 1)" 
+        :disabled="currentPage === 1"
+        class="page-btn"
+      >
+        上一页
+      </button>
+      <span class="page-info">
+        第 {{ currentPage }} / {{ totalPages }} 页，共 {{ total }} 条记录
+      </span>
+      <button 
+        @click="changePage(currentPage + 1)" 
+        :disabled="currentPage === totalPages || totalPages === 0"
+        class="page-btn"
+      >
+        下一页
+      </button>
     </div>
 
     <!-- 新建标签对话框 -->
@@ -630,5 +662,41 @@ onMounted(() => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* 分页样式 */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 16px 0;
+}
+
+.page-btn {
+  padding: 8px 16px;
+  background-color: #10b981;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background-color: #059669;
+}
+
+.page-btn:disabled {
+  background-color: #d9d9d9;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.page-info {
+  font-size: 14px;
+  color: #666666;
 }
 </style>

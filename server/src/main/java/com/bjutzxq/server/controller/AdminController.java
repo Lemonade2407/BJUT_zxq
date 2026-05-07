@@ -2,6 +2,7 @@ package com.bjutzxq.server.controller;
 
 import com.bjutzxq.common.Result;
 import com.bjutzxq.common.Role;
+import com.bjutzxq.pojo.dto.PageResult;
 import com.bjutzxq.pojo.entity.Project;
 import com.bjutzxq.pojo.entity.User;
 import com.bjutzxq.server.annotation.RequireRole;
@@ -34,12 +35,14 @@ public class AdminController {
      */
     @GetMapping("/users")
     @RequireRole(Role.ADMIN)
-    public Result<List<User>> getAllUsers(
+    public Result<PageResult<User>> getAllUsers(
             @RequestParam(value = "pageNum", defaultValue = "1") Integer pageNum,
             @RequestParam(value = "pageSize", defaultValue = "20") Integer pageSize) {
         log.info("管理员获取所有用户，页码：{}, 每页数量：{}", pageNum, pageSize);
         List<User> users = userService.queryUsers(null, null, pageNum, pageSize);
-        return Result.success(users);
+        long total = userService.countAllUsers();
+        PageResult<User> response = new PageResult<>(users, total, pageNum, pageSize);
+        return Result.success(response);
     }
     
     /**
@@ -48,13 +51,15 @@ public class AdminController {
      */
     @GetMapping("/users/search")
     @RequireRole(Role.ADMIN)
-    public Result<List<User>> searchUsers(
+    public Result<PageResult<User>> searchUsers(
             @RequestParam(value = "keyword") String keyword,
             @RequestParam(value = "pageNum", defaultValue = "1") Integer pageNum,
             @RequestParam(value = "pageSize", defaultValue = "20") Integer pageSize) {
         log.info("管理员搜索用户，关键词：{}, 页码：{}, 每页数量：{}", keyword, pageNum, pageSize);
         List<User> users = userService.queryUsers(null, keyword, pageNum, pageSize);
-        return Result.success(users);
+        long total = userService.countUsersByKeyword(keyword);
+        PageResult<User> response = new PageResult<>(users, total, pageNum, pageSize);
+        return Result.success(response);
     }
     
     /**

@@ -1,6 +1,7 @@
 package com.bjutzxq.server.controller;
 
 import com.bjutzxq.common.Result;
+import com.bjutzxq.pojo.dto.PageResult;
 import com.bjutzxq.pojo.entity.Tag;
 import com.bjutzxq.server.service.TagService;
 import lombok.extern.slf4j.Slf4j;
@@ -94,16 +95,29 @@ public class TagController {
     }
     
     /**
-     * 查询所有标签
-     * GET /api/tags
+     * 查询所有标签（支持分页）
+     * GET /api/tags?pageNum=1&pageSize=20
      */
     @GetMapping
-    public Result<List<Tag>> getAllTags() {
-        log.debug("收到查询所有标签请求");
+    public Result<PageResult<Tag>> getAllTags(
+            @RequestParam(value = "pageNum", defaultValue = "1") Integer pageNum,
+            @RequestParam(value = "pageSize", defaultValue = "20") Integer pageSize) {
+        log.debug("收到查询所有标签请求，页码：{}, 每页数量：{}", pageNum, pageSize);
         
-        List<Tag> tags = tagService.getAllTags();
-        log.debug("所有标签查询成功，数量：{}", tags.size());
-        return Result.success(tags);
+        // 分页参数验证
+        if (pageNum < 1) {
+            pageNum = 1;
+        }
+        if (pageSize < 1 || pageSize > 100) {
+            pageSize = 20;
+        }
+        
+        List<Tag> tags = tagService.getAllTags(pageNum, pageSize);
+        long total = tagService.countAllTags();
+        PageResult<Tag> response = new PageResult<>(tags, total, pageNum, pageSize);
+        
+        log.debug("所有标签查询成功，数量：{}, 总数：{}", tags.size(), total);
+        return Result.success(response);
     }
     
     /**

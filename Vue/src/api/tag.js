@@ -4,11 +4,15 @@ import request from '@/utils/request'
  * 标签相关 API
  */
 
-// 获取所有标签
-export function getTags() {
+// 获取所有标签（支持分页）
+export function getTags(params = {}) {
   return request({
     url: '/tags',
-    method: 'get'
+    method: 'get',
+    params: {
+      pageNum: params.pageNum || 1,
+      pageSize: params.pageSize || 20
+    }
   })
 }
 

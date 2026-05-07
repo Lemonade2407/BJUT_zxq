@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { toast } from '@/utils/toast'
 import { error as logError } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
@@ -8,6 +8,11 @@ import tokenManager from '@/utils/tokenManager'
 const users = ref([])
 const isLoading = ref(false)
 const searchKeyword = ref('')
+
+// 分页配置
+const PAGE_SIZE = 20
+const currentPage = ref(1)
+const total = ref(0)
 
 // 编辑对话框
 const showEditDialog = ref(false)
@@ -28,7 +33,7 @@ const editForm = ref({
 const loadUsers = async () => {
   isLoading.value = true
   try {
-    const response = await fetch('/api/admin/users?pageNum=1&pageSize=100', {
+    const response = await fetch(`/api/admin/users?pageNum=${currentPage.value}&pageSize=${PAGE_SIZE}`, {
       headers: {
         'Authorization': `Bearer ${tokenManager.getToken()}`
       }
@@ -37,7 +42,8 @@ const loadUsers = async () => {
     if (response.ok) {
       const data = await response.json()
       if (data.code === 200) {
-        users.value = data.data
+        users.value = data.data.records || []
+        total.value = data.data.total || 0
       }
     }
   } catch (error) {
@@ -57,7 +63,7 @@ const searchUsers = async () => {
   
   isLoading.value = true
   try {
-    const response = await fetch(`/api/admin/users/search?keyword=${encodeURIComponent(searchKeyword.value)}&pageNum=1&pageSize=100`, {
+    const response = await fetch(`/api/admin/users/search?keyword=${encodeURIComponent(searchKeyword.value)}&pageNum=${currentPage.value}&pageSize=${PAGE_SIZE}`, {
       headers: {
         'Authorization': `Bearer ${tokenManager.getToken()}`
       }
@@ -66,7 +72,8 @@ const searchUsers = async () => {
     if (response.ok) {
       const data = await response.json()
       if (data.code === 200) {
-        users.value = data.data
+        users.value = data.data.records || []
+        total.value = data.data.total || 0
       }
     }
   } catch (error) {
@@ -76,6 +83,20 @@ const searchUsers = async () => {
     isLoading.value = false
   }
 }
+
+// 切换页码
+const changePage = (page) => {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
+  if (searchKeyword.value.trim()) {
+    searchUsers()
+  } else {
+    loadUsers()
+  }
+}
+
+// 计算总页数
+const totalPages = computed(() => Math.ceil(total.value / PAGE_SIZE))
 
 // 封禁用户
 const banUser = async (userId) => {
@@ -361,6 +382,28 @@ onMounted(() => {
           </tr>
         </tbody>
       </table>
+    </div>
+    
+    <!-- 分页组件 -->
+    <div v-if="users.length > 0 && totalPages > 1" class="pagination">
+      <button 
+        @click="changePage(currentPage - 1)" 
+        :disabled="currentPage <= 1"
+        class="pagination-btn">
+        上一页
+      </button>
+      
+      <span class="pagination-info">
+        第 {{ currentPage }} / {{ totalPages }} 页，
+        共 {{ total }} 条记录
+      </span>
+      
+      <button 
+        @click="changePage(currentPage + 1)" 
+        :disabled="currentPage >= totalPages"
+        class="pagination-btn">
+        下一页
+      </button>
     </div>
 
     <!-- 编辑用户对话框 -->
@@ -789,5 +832,41 @@ onMounted(() => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* 分页样式 */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 16px 0;
+}
+
+.pagination-btn {
+  padding: 8px 16px;
+  background-color: #ffffff;
+  color: #10b981;
+  border: 1px solid #10b981;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background-color: #10b981;
+  color: #ffffff;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: #666666;
 }
 </style>

@@ -3,11 +3,11 @@ package com.bjutzxq.server.service;
 import com.bjutzxq.pojo.entity.Tag;
 import com.bjutzxq.server.mapper.ProjectTagMapper;
 import com.bjutzxq.server.mapper.TagMapper;
+import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
 import java.util.List;
 
 /**
@@ -163,12 +163,23 @@ public class TagService {
     }
     
     /**
-     * 查询所有标签
+     * 查询所有标签（支持分页）
+     * @param pageNum 页码
+     * @param pageSize 每页数量
      * @return 标签列表
      */
-    public List<Tag> getAllTags() {
-        log.debug("查询所有标签");
+    public List<Tag> getAllTags(Integer pageNum, Integer pageSize) {
+        log.debug("查询所有标签，页码：{}, 每页数量：{}", pageNum, pageSize);
+        PageHelper.startPage(pageNum, pageSize);
         return tagMapper.selectAll();
+    }
+    
+    /**
+     * 统计标签总数
+     * @return 标签总数
+     */
+    public long countAllTags() {
+        return tagMapper.countAll();
     }
     
     /**

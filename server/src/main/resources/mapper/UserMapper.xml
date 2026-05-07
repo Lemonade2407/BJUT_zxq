@@ -129,6 +129,14 @@
         SELECT COUNT(*) FROM user
     </select>
     
+    <!-- 统计关键词搜索的用户总数 -->
+    <select id="countByKeyword" resultType="int">
+        SELECT COUNT(*) FROM user
+        WHERE username LIKE CONCAT('%', #{keyword}, '%')
+           OR email LIKE CONCAT('%', #{keyword}, '%')
+           OR employee_id LIKE CONCAT('%', #{keyword}, '%')
+    </select>
+    
     <!-- 根据关键词搜索用户 -->
     <select id="searchByKeyword" resultMap="BaseResultMap">
         SELECT 

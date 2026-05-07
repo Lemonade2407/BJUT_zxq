@@ -48,6 +48,11 @@
         SELECT * FROM tag ORDER BY category ASC, usage_count DESC, id ASC
     </select>
     
+    <!-- 统计标签总数 -->
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM tag
+    </select>
+    
     <!-- 根据分组查询标签 -->
     <select id="selectByCategory" resultMap="BaseResultMap">
         SELECT * FROM tag WHERE category = #{category} ORDER BY usage_count DESC, id ASC

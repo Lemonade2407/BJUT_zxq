@@ -614,4 +614,24 @@ public class UserService {
         log.info("查询用户列表成功，数量：{}", users.size());
         return users;
     }
+    
+    /**
+     * 统计所有用户总数
+     * @return 用户总数
+     */
+    public long countAllUsers() {
+        return userMapper.countAll();
+    }
+    
+    /**
+     * 统计关键词搜索的用户总数
+     * @param keyword 搜索关键词
+     * @return 用户总数
+     */
+    public long countUsersByKeyword(String keyword) {
+        if (keyword == null || keyword.trim().isEmpty()) {
+            return countAllUsers();
+        }
+        return userMapper.countByKeyword(keyword.trim());
+    }
 }

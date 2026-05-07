@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { toast } from '@/utils/toast'
 import { error as logError } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
@@ -7,6 +7,11 @@ import tokenManager from '@/utils/tokenManager'
 const projects = ref([])
 const isLoading = ref(false)
 const searchKeyword = ref('')
+
+// 分页配置
+const PAGE_SIZE = 20
+const currentPage = ref(1)
+const total = ref(0)
 
 // 编辑对话框
 const showEditDialog = ref(false)
@@ -26,9 +31,9 @@ const allTags = ref([])
 const loadProjects = async () => {
   isLoading.value = true
   try {
-    let url = '/api/projects/list?pageNum=1&pageSize=100'
+    let url = `/api/projects/list?pageNum=${currentPage.value}&pageSize=${PAGE_SIZE}`
     if (searchKeyword.value.trim()) {
-      url = `/api/projects/search/name?name=${encodeURIComponent(searchKeyword.value)}&pageNum=1&pageSize=100`
+      url = `/api/projects/search/name?name=${encodeURIComponent(searchKeyword.value)}&pageNum=${currentPage.value}&pageSize=${PAGE_SIZE}`
     }
     
     const response = await fetch(url, {
@@ -42,6 +47,7 @@ const loadProjects = async () => {
       if (data.code === 200) {
         // enrichProject 已经包含了标签数据，直接使用
         projects.value = data.data.records || []
+        total.value = data.data.total || 0
       }
     }
   } catch (error) {
@@ -74,6 +80,17 @@ const loadTags = async () => {
 
 // 搜索项目
 const searchProjects = () => {
+  currentPage.value = 1  // 搜索时重置到第一页
+  loadProjects()
+}
+
+// 计算总页数
+const totalPages = computed(() => Math.ceil(total.value / PAGE_SIZE))
+
+// 切换页码
+const changePage = (page) => {
+  if (page < 1 || page > totalPages.value) return
+  currentPage.value = page
   loadProjects()
 }
 
@@ -239,7 +256,29 @@ onMounted(() => {
         </tbody>
       </table>
     </div>
-
+    
+    <!-- 分页组件 -->
+    <div v-if="projects.length > 0 && totalPages > 1" class="pagination">
+      <button 
+        @click="changePage(currentPage - 1)" 
+        :disabled="currentPage <= 1"
+        class="pagination-btn">
+        上一页
+      </button>
+      
+      <span class="pagination-info">
+        第 {{ currentPage }} / {{ totalPages }} 页，
+        共 {{ total }} 条记录
+      </span>
+      
+      <button 
+        @click="changePage(currentPage + 1)" 
+        :disabled="currentPage >= totalPages"
+        class="pagination-btn">
+        下一页
+      </button>
+    </div>
+    
     <!-- 编辑项目对话框 -->
     <div v-if="showEditDialog" class="modal-overlay" @click="closeEditDialog">
       <div class="modal-content" @click.stop>
@@ -652,5 +691,41 @@ onMounted(() => {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* 分页样式 */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 16px;
+  margin-top: 24px;
+  padding: 16px 0;
+}
+
+.pagination-btn {
+  padding: 8px 16px;
+  background-color: #ffffff;
+  color: #10b981;
+  border: 1px solid #10b981;
+  border-radius: 6px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background-color: #10b981;
+  color: #ffffff;
+}
+
+.pagination-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 14px;
+  color: #666666;
 }
 </style>

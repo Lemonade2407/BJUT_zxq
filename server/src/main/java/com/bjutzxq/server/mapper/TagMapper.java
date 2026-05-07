@@ -47,6 +47,12 @@ public interface TagMapper {
     List<Tag> selectAll();
     
     /**
+     * 统计标签总数
+     * @return 标签总数
+     */
+    int countAll();
+    
+    /**
      * 根据分组查询标签
      * @param category 标签分组
      * @return 标签列表

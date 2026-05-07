@@ -97,6 +97,13 @@ public interface UserMapper {
     int countAll();
     
     /**
+     * 统计关键词搜索的用户总数
+     * @param keyword 搜索关键词
+     * @return 用户总数
+     */
+    int countByKeyword(@Param("keyword") String keyword);
+    
+    /**
      * 批量查询用户信息（用于优化 N+1 查询）
      * @param ids 用户 ID 列表
      * @return 用户列表
