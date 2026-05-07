@@ -68,7 +68,7 @@ public class WebMvcConfig implements WebMvcConfigurer {
                 .excludePathPatterns(
                         "/auth/login",      // 排除登录接口（无需 Token）
                         "/auth/register",   // 排除注册接口（无需 Token）
-                        "/auth/captcha"   // 排除验证码接口（无需 Token）
+                        "/captcha/**"       // 排除验证码相关接口（无需 Token）
                 );
     }
 }
