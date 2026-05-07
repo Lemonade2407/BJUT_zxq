@@ -10,7 +10,7 @@ COPY pojo/pom.xml pojo/
 COPY server/pom.xml server/
 
 # 下载依赖（利用 Docker 缓存，只有 pom.xml 变化时才会重新执行）
-RUN mvn dependency:go-offline -B
+RUN --mount=type=cache,target=/root/.m2 mvn dependency:go-offline -B
 
 # 第二步：复制源代码并编译（代码变化时才重新执行）
 COPY common/src common/src
@@ -18,7 +18,7 @@ COPY pojo/src pojo/src
 COPY server/src server/src
 
 # 编译打包（完全跳过测试编译和执行为加快速度）
-RUN mvn clean package -Dmaven.test.skip=true -pl server -am
+RUN --mount=type=cache,target=/root/.m2 mvn clean package -Dmaven.test.skip=true -pl server -am
 
 # 运行阶段
 FROM eclipse-temurin:21-jre-alpine

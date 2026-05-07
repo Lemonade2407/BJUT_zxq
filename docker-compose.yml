@@ -53,6 +53,8 @@ services:
     # 不使用端口映射,通过 Nginx 代理访问
     volumes:
       - ./logs:/app/logs
+      # Maven 本地仓库缓存（加速构建）
+      - maven_cache:/root/.m2
     depends_on:
       mysql:
         condition: service_healthy
@@ -85,4 +87,6 @@ services:
 
 volumes:
   mysql_data:
+    driver: local
+  maven_cache:
     driver: local
