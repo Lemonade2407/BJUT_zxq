@@ -43,13 +43,6 @@ public interface NotificationMapper {
      * @return 影响行数
      */
     int insert(Notification notification);
-    
-    /**
-     * 批量插入通知
-     * @param notifications 通知列表
-     * @return 影响行数
-     */
-    int batchInsert(@Param("notifications") List<Notification> notifications);
 
     /**
      * 更新通知
@@ -86,12 +79,7 @@ public interface NotificationMapper {
      */
     int batchDelete(@Param("notificationIds") List<Integer> notificationIds);
     
-    /**
-     * 删除指定日期之前的通知
-     * @param beforeDate 日期阈值
-     * @return 影响行数
-     */
-    int deleteBeforeDate(@Param("beforeDate") LocalDateTime beforeDate);
+
 
     /**
      * 删除已读且指定日期之前的通知
