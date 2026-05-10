@@ -31,12 +31,11 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
         
-        // 允许的域名
-        config.setAllowedOrigins(Arrays.asList(
-            "http://localhost:5173",
-            "http://127.0.0.1:5173",
-            "http://localhost:5174",
-            "http://127.0.0.1:5174",
+        // 允许的域名（使用通配符模式支持多端口/多域名访问）
+        config.setAllowedOriginPatterns(Arrays.asList(
+            "http://localhost:*",
+            "http://127.0.0.1:*",
+            "https://*.bjut-zxq.cn",
             "https://bjut-zxq.cn"
         ));
         

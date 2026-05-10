@@ -85,9 +85,9 @@ public class GlobalExceptionHandler {
      * 处理业务异常（可控制 HTTP 状态码）
      */
     @ExceptionHandler(BusinessException.class)
-    public Result<Void> handleBusinessException(BusinessException e, HttpServletResponse response) throws IOException {
+    public Result<Void> handleBusinessException(BusinessException e, HttpServletResponse response) {
         log.warn("业务异常 ({}): {}", e.getCode(), e.getMessage());
-        response.sendError(e.getCode(), e.getMessage());
+        response.setStatus(e.getCode());
         return Result.error(e.getCode(), e.getMessage());
     }
 
