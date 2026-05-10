@@ -212,15 +212,9 @@ public class NotificationService {
      */
     public long countByUserId(Integer userId, Integer isRead) {
         log.debug("统计通知总数，用户 ID: {}, 是否已读: {}", userId, isRead);
-        
-        if (userId == null) {
-            throw new IllegalArgumentException("用户 ID 不能为空");
-        }
-        
-        // PageHelper 会自动从上次分页查询中获取 total
-        com.github.pagehelper.PageInfo<Notification> pageInfo = 
-            new com.github.pagehelper.PageInfo<>(notificationMapper.selectByUserId(userId, isRead));
-        return pageInfo.getTotal();
+        if (userId == null) throw new IllegalArgumentException("用户 ID 不能为空");
+        // 直接 COUNT 查询，避免重复执行 SELECT * 查询
+        return notificationMapper.countByUserId(userId);
     }
     
     /**

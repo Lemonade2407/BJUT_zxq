@@ -6,7 +6,6 @@ import { toast } from '@/utils/toast'
 import { error as logError } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
 import UserSidebar from '@/components/user/UserSidebar.vue'
-import { formatDateShort } from '@/utils/helpers'
 
 const router = useRouter()
 

@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref } from 'vue'
 import StatsOverview from './StatsOverview.vue'
 import UserManagement from './UserManagement.vue'
 import ProjectManagement from './ProjectManagement.vue'
@@ -9,8 +9,6 @@ import CommentManagement from './CommentManagement.vue'
 import TeamManagement from './TeamManagement.vue'
 import { useRouter } from 'vue-router'
 import { toast } from '@/utils/toast'
-import { error as logError } from '@/utils/logger'
-import tokenManager from '@/utils/tokenManager'
 
 const router = useRouter()
 
@@ -57,8 +55,9 @@ const switchMenu = (key) => {
 
     <!-- 主内容区 -->
     <main class="admin-main">
-      <!-- 用户管理 -->
-      <StatsOverview v-if="activeMenu === 'stats'" />
+      <KeepAlive>
+        <StatsOverview v-if="activeMenu === 'stats'" />
+      </KeepAlive>
       <UserManagement v-if="activeMenu === 'users'" />
       
       <!-- 项目管理 -->

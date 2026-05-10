@@ -100,7 +100,7 @@ onMounted(async () => { await loadStats(); buildCharts() })
       <div class="cards-grid">
         <div v-for="card in overviewCards" :key="card.key" class="stat-card">
           <span class="card-icon">{{ card.icon }}</span>
-          <span class="card-value">{{ stats.cards[card.key] || 0 }}</span>
+          <span class="card-value">{{ stats.cards?.[card.key] || 0 }}</span>
           <span class="card-label">{{ card.label }}</span>
         </div>
       </div>

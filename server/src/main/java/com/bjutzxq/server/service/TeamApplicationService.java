@@ -1,5 +1,6 @@
 package com.bjutzxq.server.service;
 
+import com.bjutzxq.common.BusinessException;
 import com.bjutzxq.common.NotificationType;
 import com.bjutzxq.pojo.entity.TeamApplication;
 import com.bjutzxq.pojo.entity.Team;
@@ -37,10 +38,10 @@ public class TeamApplicationService {
     @Transactional(rollbackFor = Exception.class)
     public TeamApplication apply(Integer teamId, Integer applicantId, String message) {
         Team team = teamMapper.selectById(teamId);
-        if (team == null) throw new RuntimeException("组队不存在");
-        if (team.getUserId().equals(applicantId)) throw new RuntimeException("不能申请自己的组队");
+        if (team == null) throw new BusinessException(404, "组队不存在");
+        if (team.getUserId().equals(applicantId)) throw new BusinessException(400, "不能申请自己的组队");
         TeamApplication existing = appMapper.selectByTeamAndUser(teamId, applicantId);
-        if (existing != null) throw new RuntimeException("您已经申请过该组队");
+        if (existing != null) throw new BusinessException(409, "您已经申请过该组队");
         TeamApplication app = new TeamApplication();
         app.setTeamId(teamId);
         app.setApplicantId(applicantId);
@@ -67,8 +68,8 @@ public class TeamApplicationService {
 
     public List<TeamApplicationVO> getTeamApplications(Integer teamId, Integer userId) {
         Team team = teamMapper.selectById(teamId);
-        if (team == null) throw new RuntimeException("组队不存在");
-        if (!team.getUserId().equals(userId)) throw new RuntimeException("只有组长可以查看申请列表");
+        if (team == null) throw new BusinessException(404, "组队不存在");
+        if (!team.getUserId().equals(userId)) throw new BusinessException(403, "只有组长可以查看申请列表");
         List<TeamApplication> apps = appMapper.selectByTeamId(teamId);
         return DtoConverter.toTeamApplicationVOList(apps, batchLoadUsers(apps));
     }
@@ -81,10 +82,12 @@ public class TeamApplicationService {
     @Transactional(rollbackFor = Exception.class)
     public void approve(Integer appId, Integer userId) {
         TeamApplication app = appMapper.selectById(appId);
-        if (app == null) throw new RuntimeException("申请不存在");
+        if (app == null) throw new BusinessException(404, "申请不存在");
         Integer creatorId = appMapper.getTeamCreatorId(app.getTeamId());
-        if (!creatorId.equals(userId)) throw new RuntimeException("只有组长可以审核");
-        if (app.getStatus() != 0) throw new RuntimeException("该申请已处理");
+        if (creatorId == null) throw new BusinessException(404, "组队不存在");
+        if (creatorId == null) throw new BusinessException(404, "组队不存在");
+        if (!creatorId.equals(userId)) throw new BusinessException(403, "只有组长可以审核");
+        if (app.getStatus() != 0) throw new BusinessException(409, "该申请已处理");
         appMapper.updateStatus(appId, 1);
         // 更新组队已有成员数
         Team team = teamMapper.selectById(app.getTeamId());
@@ -110,10 +113,12 @@ public class TeamApplicationService {
     @Transactional(rollbackFor = Exception.class)
     public void reject(Integer appId, Integer userId) {
         TeamApplication app = appMapper.selectById(appId);
-        if (app == null) throw new RuntimeException("申请不存在");
+        if (app == null) throw new BusinessException(404, "申请不存在");
         Integer creatorId = appMapper.getTeamCreatorId(app.getTeamId());
-        if (!creatorId.equals(userId)) throw new RuntimeException("只有组长可以审核");
-        if (app.getStatus() != 0) throw new RuntimeException("该申请已处理");
+        if (creatorId == null) throw new BusinessException(404, "组队不存在");
+        if (creatorId == null) throw new BusinessException(404, "组队不存在");
+        if (!creatorId.equals(userId)) throw new BusinessException(403, "只有组长可以审核");
+        if (app.getStatus() != 0) throw new BusinessException(409, "该申请已处理");
         appMapper.updateStatus(appId, 2);
         log.info("申请已拒绝，申请ID: {}", appId);
 

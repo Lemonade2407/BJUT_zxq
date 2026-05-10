@@ -27,17 +27,11 @@ const currentPageNum = ref(1)
 
 // 项目列表（只存储当前用户创建的项目）
 const allProjects = ref([])
+const total = ref(0)
 const isLoading = ref(false)
 
-// 计算总页数
-const totalPages = computed(() => Math.ceil(allProjects.value.length / PAGE_SIZE))
-
-// 计算当前页的项目列表
-const projects = computed(() => {
-  const start = (currentPageNum.value - 1) * PAGE_SIZE
-  const end = start + PAGE_SIZE
-  return allProjects.value.slice(start, end)
-})
+const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)))
+const projects = computed(() => allProjects.value)
 
 // 切换页码
 const changePage = (page) => {
@@ -78,9 +72,9 @@ const loadUserProjects = async () => {
     })
     
     if (res.code === 200 && res.data) {
-      // 后端返回的是 PageResult 对象，需要从 records 获取数组
       allProjects.value = res.data.records || []
-      log('加载完成，项目数量:', allProjects.value.length)
+      total.value = res.data.total || 0
+      log('加载完成，项目数量:', allProjects.value.length, '总数:', total.value)
     } else {
       warn('API 返回数据异常:', res)
       allProjects.value = []
@@ -194,7 +188,7 @@ onMounted(() => {
             </div>
             
             <div class="page-info">
-              共 {{ allProjects.length }} 个项目，第 {{ currentPageNum }} / {{ totalPages }} 页
+              共 {{ total }} 条，第 {{ currentPageNum }} / {{ totalPages }} 页
             </div>
           </div>
         </div>

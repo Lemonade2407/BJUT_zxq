@@ -8,7 +8,6 @@ import com.bjutzxq.server.context.UserIdContext;
 import com.bjutzxq.server.mapper.UserMapper;
 import com.bjutzxq.server.service.ProjectFileService;
 import com.bjutzxq.server.service.ProjectService;
-import com.bjutzxq.server.service.UserService;
 import com.bjutzxq.server.util.DtoConverter;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -27,9 +26,6 @@ public class ProjectFileController {
     
     @Autowired
     private ProjectFileService projectFileService;
-
-    @Autowired
-    private UserService userService;
 
     @Autowired
     private UserMapper userMapper;

@@ -1,5 +1,6 @@
 package com.bjutzxq.server.service;
 
+import com.bjutzxq.common.BusinessException;
 import com.bjutzxq.pojo.entity.Team;
 import com.bjutzxq.pojo.vo.TeamVO;
 import com.bjutzxq.server.mapper.TeamMapper;
@@ -81,10 +82,10 @@ public class TeamService {
     public void updateTeam(Integer teamId, Integer userId, Team update) {
         Team team = teamMapper.selectById(teamId);
         if (team == null) {
-            throw new RuntimeException("组队不存在");
+            throw new BusinessException(404, "组队不存在");
         }
         if (!team.getUserId().equals(userId)) {
-            throw new RuntimeException("只能修改自己的组队");
+            throw new BusinessException(403, "只能修改自己的组队");
         }
         if (update.getTitle() != null) team.setTitle(update.getTitle());
         if (update.getDescription() != null) team.setDescription(update.getDescription());
@@ -104,10 +105,10 @@ public class TeamService {
     public void deleteTeam(Integer teamId, Integer userId) {
         Team team = teamMapper.selectById(teamId);
         if (team == null) {
-            throw new RuntimeException("组队不存在");
+            throw new BusinessException(404, "组队不存在");
         }
         if (!team.getUserId().equals(userId)) {
-            throw new RuntimeException("只能删除自己的组队");
+            throw new BusinessException(403, "只能删除自己的组队");
         }
         teamMapper.deleteById(teamId);
         log.info("组队删除成功，ID: {}", teamId);
@@ -120,7 +121,7 @@ public class TeamService {
     public void adminDeleteTeam(Integer id) {
         Team team = teamMapper.selectById(id);
         if (team == null) {
-            throw new RuntimeException("组队不存在");
+            throw new BusinessException(404, "组队不存在");
         }
         teamMapper.deleteById(id);
         log.info("管理员删除组队，ID: {}", id);
@@ -133,7 +134,7 @@ public class TeamService {
     public void updateStatus(Integer id, Integer status) {
         Team team = teamMapper.selectById(id);
         if (team == null) {
-            throw new RuntimeException("组队不存在");
+            throw new BusinessException(404, "组队不存在");
         }
         team.setStatus(status);
         teamMapper.updateById(team);

@@ -258,7 +258,7 @@ onMounted(() => {
             <span :class="['status-badge-sm', `status-${team.status}`]">{{ STATUS_MAP[team.status] }}</span>
           </div>
           <div class="card-tags">
-            <span :class="['tag-badge', `tag-${team.tag?.toLowerCase()}`]">{{ TAG_MAP[team.tag] || team.tag }}</span>
+            <span :class="['tag-badge', `tag-${team.tag?.toLowerCase()}`]">{{ TAG_MAP[team.tag] || '其他' }}</span>
             <span v-if="team.courseName" class="course-badge">{{ team.courseName }}</span>
           </div>
           <p class="project-description">{{ team.description || '暂无简介' }}</p>

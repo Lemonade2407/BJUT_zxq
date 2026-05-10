@@ -1,6 +1,8 @@
 package com.bjutzxq.server.controller;
 
 import com.bjutzxq.common.Result;
+import com.bjutzxq.common.Role;
+import com.bjutzxq.server.annotation.RequireRole;
 import com.bjutzxq.pojo.dto.PageResult;
 import com.bjutzxq.pojo.entity.Tag;
 import com.bjutzxq.server.service.TagService;
@@ -28,6 +30,7 @@ public class TagController {
      * POST /api/tags
      */
     @PostMapping
+    @RequireRole({Role.ADMIN, Role.TEACHER})
     public Result<Tag> createTag(
             @RequestParam String name,
             @RequestParam String category) {
@@ -48,6 +51,7 @@ public class TagController {
      * PUT /api/tags/{id}
      */
     @PutMapping("/{id}")
+    @RequireRole({Role.ADMIN, Role.TEACHER})
     public Result<Tag> updateTag(
             @PathVariable Integer id,
             @RequestParam String name,
@@ -70,6 +74,7 @@ public class TagController {
      * DELETE /api/tags/{id}
      */
     @DeleteMapping("/{id}")
+    @RequireRole({Role.ADMIN, Role.TEACHER})
     public Result<Boolean> deleteTag(@PathVariable Integer id) {
         log.info("收到删除标签请求，ID: {}", id);
         

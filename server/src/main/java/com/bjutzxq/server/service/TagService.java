@@ -1,5 +1,6 @@
 package com.bjutzxq.server.service;
 
+import com.bjutzxq.common.BusinessException;
 import com.bjutzxq.pojo.entity.Tag;
 import com.bjutzxq.server.mapper.ProjectTagMapper;
 import com.bjutzxq.server.mapper.TagMapper;
@@ -41,7 +42,7 @@ public class TagService {
         int count = tagMapper.countByNameExcludeId(tag.getName().trim(), null);
         if (count > 0) {
             log.warn("标签名称已存在：{}", tag.getName());
-            throw new RuntimeException("标签名称已存在");
+            throw new BusinessException(409, "标签名称已存在");
         }
         
         // 设置初始使用次数

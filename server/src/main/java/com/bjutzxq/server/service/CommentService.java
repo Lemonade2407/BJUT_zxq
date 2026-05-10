@@ -1,5 +1,6 @@
 package com.bjutzxq.server.service;
 
+import com.bjutzxq.common.BusinessException;
 import com.bjutzxq.common.NotificationType;
 import com.bjutzxq.pojo.vo.CommentVO;
 import com.bjutzxq.pojo.entity.Comment;
@@ -151,12 +152,12 @@ public class CommentService {
         // 1. 查询评论信息
         Comment comment = commentMapper.selectById(commentId);
         if (comment == null) {
-            throw new RuntimeException("评论不存在");
+            throw new BusinessException(404, "评论不存在");
         }
         
         // 2. 检查权限（只能删除自己的评论）
         if (!comment.getUserId().equals(userId)) {
-            throw new RuntimeException("没有权限删除该评论");
+            throw new BusinessException(403, "没有权限删除该评论");
         }
 
         // 3. 软删除评论（将状态设为 0）
@@ -214,7 +215,7 @@ public class CommentService {
         log.info("管理员删除评论，ID: {}", commentId);
         Comment comment = commentMapper.selectById(commentId);
         if (comment == null) {
-            throw new RuntimeException("评论不存在");
+            throw new BusinessException(404, "评论不存在");
         }
         commentMapper.forceDeleteById(commentId);
         log.info("管理员删除评论成功，ID: {}", commentId);

@@ -1,4 +1,5 @@
 package com.bjutzxq.server.service;
+import com.bjutzxq.common.BusinessException;
 import com.bjutzxq.common.Constants;
 import com.bjutzxq.common.Role;
 import com.bjutzxq.pojo.vo.LoginVO;
@@ -56,21 +57,21 @@ public class UserService {
         User existingUser = userMapper.selectByUsername(user.getUsername());
         if (existingUser != null) {
             log.warn("用户名已存在：{}", user.getUsername());
-            throw new RuntimeException("用户名已存在");
+            throw new BusinessException(409, "用户名已存在");
         }
         
         // 2. 检查身份标识号是否已存在（学生为学号，教师为职工号）
         existingUser = userMapper.selectByEmployeeId(user.getEmployeeId().trim());
         if (existingUser != null) {
             log.warn("身份标识号已被使用：{}", user.getEmployeeId());
-            throw new RuntimeException("身份标识号已被使用");
+            throw new BusinessException(409, "身份标识号已被使用");
         }
         
         // 3. 检查邮箱是否已存在
         existingUser = userMapper.selectByEmail(user.getEmail());
         if (existingUser != null) {
             log.warn("邮箱已被使用：{}", user.getEmail());
-            throw new RuntimeException("邮箱已被使用");
+            throw new BusinessException(409, "邮箱已被使用");
         }
         
         // 4. 密码加密（BCrypt）
@@ -120,19 +121,19 @@ public class UserService {
         
         if (user == null) {
             log.warn("用户不存在：{}", username);
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(404, "用户不存在");
         }
         
         // 检查用户状态
         if (!Constants.User.STATUS_NORMAL.equals(user.getStatus())) {
             log.warn("账号已被禁用：{}", username);
-            throw new RuntimeException("账号已被禁用");
+            throw new BusinessException(403, "账号已被禁用");
         }
         
         // 验证密码（BCrypt）
         if (!PasswordUtil.matches(password, user.getPassword())) {
             log.warn("密码错误：{}", username);
-            throw new RuntimeException("密码错误");
+            throw new BusinessException(401, "密码错误");
         }
         
         // 生成 Token
@@ -159,7 +160,7 @@ public class UserService {
         User user = userMapper.selectById(userId);
         if (user == null) {
             log.warn("用户不存在，ID：{}", userId);
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(404, "用户不存在");
         }
         // 清除密码
         user.setPassword(null);
@@ -199,7 +200,7 @@ public class UserService {
         User existingUser = userMapper.selectById(userId);
         if (existingUser == null) {
             log.warn("用户不存在，ID：{}", userId);
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(404, "用户不存在");
         }
         
         // 只允许更新部分字段
@@ -235,13 +236,13 @@ public class UserService {
         User user = userMapper.selectById(userId);
         if (user == null) {
             log.warn("用户不存在，ID：{}", userId);
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(404, "用户不存在");
         }
         
         // 验证旧密码（BCrypt）
         if (!PasswordUtil.matches(oldPassword, user.getPassword())) {
             log.warn("原密码错误，ID：{}", userId);
-            throw new RuntimeException("原密码错误");
+            throw new BusinessException(401, "原密码错误");
         }
         
         // 加密新密码（BCrypt）
@@ -264,7 +265,7 @@ public class UserService {
         User user = userMapper.selectById(userId);
         if (user == null) {
             log.warn("封禁失败：用户不存在，ID: {}", userId);
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(404, "用户不存在");
         }
         
         user.setStatus(Constants.User.STATUS_DISABLED);
@@ -284,7 +285,7 @@ public class UserService {
         User user = userMapper.selectById(userId);
         if (user == null) {
             log.warn("解封失败：用户不存在，ID: {}", userId);
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(404, "用户不存在");
         }
         
         user.setStatus(Constants.User.STATUS_NORMAL);
@@ -305,7 +306,7 @@ public class UserService {
         User user = userMapper.selectById(userId);
         if (user == null) {
             log.warn("设置角色失败：用户不存在，ID: {}", userId);
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(404, "用户不存在");
         }
         
         user.setRole(role);
@@ -337,14 +338,14 @@ public class UserService {
         User user = userMapper.selectById(userId);
         if (user == null) {
             log.warn("更新失败：用户不存在，ID: {}", userId);
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(404, "用户不存在");
         }
         
         // 检查用户名是否已被其他用户使用
         if (username != null && !username.equals(user.getUsername())) {
             User existingUser = userMapper.selectByUsername(username);
             if (existingUser != null && !existingUser.getId().equals(userId)) {
-                throw new RuntimeException("用户名已被使用");
+                throw new BusinessException(409, "用户名已被使用");
             }
             user.setUsername(username);
         }
@@ -411,13 +412,13 @@ public class UserService {
         User user = userMapper.selectById(userId);
         if (user == null) {
             log.warn("删除失败：用户不存在，ID: {}", userId);
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(404, "用户不存在");
         }
         
         // 2. 防止删除管理员自己
         if (user.getRole() == Role.ADMIN) {
             log.warn("不能删除管理员账户，ID: {}", userId);
-            throw new RuntimeException("不能删除管理员账户");
+            throw new BusinessException(403, "不能删除管理员账户");
         }
         
         // 3. 清理该用户上传的所有文件（OSS）
@@ -520,7 +521,7 @@ public class UserService {
         // 1. 验证用户存在
         User user = userMapper.selectById(userId);
         if (user == null) {
-            throw new RuntimeException("用户不存在");
+            throw new BusinessException(404, "用户不存在");
         }
         
         // 2. 验证文件

@@ -1,4 +1,5 @@
 import request from '@/utils/request'
+import tokenManager from '@/utils/tokenManager'
 
 /**
  * 项目相关 API
@@ -174,100 +175,51 @@ export function getTrendingProjects(params = {}) {
 }
 
 // 下载项目（打包为 ZIP）
-export function downloadProject(projectId) {
-  // 使用 tokenManager 获取 Token
-  import('@/utils/tokenManager').then(({ default: tokenManager }) => {
-    const token = tokenManager.getToken()
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
-    
-    console.log('开始下载项目，ID:', projectId)
-    console.log('请求URL:', `${baseUrl}/projects/${projectId}/download`)
-    console.log('Token存在:', !!token)
-    
-    if (!token) {
-      console.error('未登录，请先登录')
-      throw new Error('未登录')
-    }
-    
-    const url = `${baseUrl}/projects/${projectId}/download`
-    
-    return fetch(url, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    }).then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      return response.blob()
-    }).then(blob => {
-      const downloadUrl = window.URL.createObjectURL(blob)
-      const link = document.createElement('a')
-      link.href = downloadUrl
-      link.download = `project_${projectId}.zip`
-      document.body.appendChild(link)
-      link.click()
-      document.body.removeChild(link)
-      window.URL.revokeObjectURL(downloadUrl)
-      console.log('下载成功')
-    })
+export async function downloadProject(projectId) {
+  const token = tokenManager.getToken()
+  if (!token) throw new Error('未登录')
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+  const response = await fetch(`${baseUrl}/projects/${projectId}/download`, {
+    headers: { 'Authorization': `Bearer ${token}` }
   })
+  if (!response.ok) throw new Error(`下载失败: ${response.status}`)
+  const blob = await response.blob()
+  const downloadUrl = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = downloadUrl
+  link.download = `project_${projectId}.zip`
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(downloadUrl)
 }
 
 // 批量下载学生项目（教师专用）
-export function batchDownloadProjects(data) {
-  import('@/utils/tokenManager').then(({ default: tokenManager }) => {
-    const token = tokenManager.getToken()
-    const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
-    
-    console.log('开始批量下载项目，数量:', data.projectIds.length)
-    console.log('班级:', data.className)
-    console.log('课程:', data.courseName)
-    
-    if (!token) {
-      console.error('未登录，请先登录')
-      throw new Error('未登录')
-    }
-    
-    const url = `${baseUrl}/projects/batch-download`
-    
-    return fetch(url, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(data)
-    }).then(response => {
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-      
-      // 从 Content-Disposition 头中提取文件名
-      const contentDisposition = response.headers.get('Content-Disposition')
-      let fileName = `${data.className}_${data.courseName}.zip`
-      
-      if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
-        if (filenameMatch && filenameMatch[1]) {
-          fileName = decodeURIComponent(filenameMatch[1])
-        }
-      }
-      
-      return response.blob().then(blob => {
-        const downloadUrl = window.URL.createObjectURL(blob)
-        const link = document.createElement('a')
-        link.href = downloadUrl
-        link.download = fileName
-        document.body.appendChild(link)
-        link.click()
-        document.body.removeChild(link)
-        window.URL.revokeObjectURL(downloadUrl)
-        console.log('批量下载成功')
-      })
-    })
+export async function batchDownloadProjects(data) {
+  const token = tokenManager.getToken()
+  if (!token) throw new Error('未登录')
+  const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
+  const response = await fetch(`${baseUrl}/projects/batch-download`, {
+    method: 'POST',
+    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data)
   })
+  if (!response.ok) throw new Error(`下载失败: ${response.status}`)
+  const contentDisposition = response.headers.get('Content-Disposition')
+  let fileName = `${data.className}_${data.courseName}.zip`
+  if (contentDisposition) {
+    const m = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i)
+    if (m && m[1]) fileName = decodeURIComponent(m[1])
+  }
+  const blob = await response.blob()
+  const downloadUrl = window.URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  link.href = downloadUrl
+  link.download = fileName
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+  window.URL.revokeObjectURL(downloadUrl)
 }
 
 // 批量上传文件

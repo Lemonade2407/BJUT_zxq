@@ -1,7 +1,9 @@
 package com.bjutzxq.server.controller;
 
 import com.bjutzxq.common.Result;
+import com.bjutzxq.common.Role;
 import com.bjutzxq.pojo.entity.Course;
+import com.bjutzxq.server.annotation.RequireRole;
 import com.bjutzxq.server.service.CourseService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,6 +35,7 @@ public class CourseController {
     /**
      * 获取所有课程（管理员使用）
      */
+    @RequireRole({Role.ADMIN, Role.TEACHER})
     @GetMapping("/all")
     public Result<List<Course>> getAllCourses() {
         List<Course> courses = courseService.getAllCourses();
@@ -51,6 +54,7 @@ public class CourseController {
     /**
      * 创建课程（管理员使用）
      */
+    @RequireRole({Role.ADMIN, Role.TEACHER})
     @PostMapping
     public Result<Course> createCourse(@RequestBody Map<String, String> request) {
         String courseName = request.get("courseName");
@@ -61,6 +65,7 @@ public class CourseController {
     /**
      * 更新课程（管理员使用）
      */
+    @RequireRole({Role.ADMIN, Role.TEACHER})
     @PutMapping("/{id}")
     public Result<Course> updateCourse(
             @PathVariable Integer id,
@@ -74,6 +79,7 @@ public class CourseController {
     /**
      * 删除课程（管理员使用）
      */
+    @RequireRole({Role.ADMIN, Role.TEACHER})
     @DeleteMapping("/{id}")
     public Result<Void> deleteCourse(@PathVariable Integer id) {
         courseService.deleteCourse(id);
