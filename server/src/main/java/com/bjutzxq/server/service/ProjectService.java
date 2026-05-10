@@ -3,6 +3,8 @@ package com.bjutzxq.server.service;
 import com.bjutzxq.pojo.entity.*;
 import com.bjutzxq.server.mapper.*;
 import com.bjutzxq.server.util.OssUtil;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.*;
@@ -92,6 +94,7 @@ public class ProjectService {
      * @return 修改后的项目信息
      * @throws RuntimeException 项目不存在或无权限修改时抛出
      */
+    @CacheEvict(value = "projectInfo", key = "#project.id")
     @Transactional(rollbackFor = Exception.class)
     public Project updateProject(Project project, List<Integer> tagIds) {
         log.info("开始修改项目信息，项目 ID：{}", project != null ? project.getId() : "null");
@@ -233,6 +236,7 @@ public class ProjectService {
      * @param id 项目 ID
      * @return 项目信息
      */
+    @Cacheable(value = "projectInfo", key = "#id")
     public Project selectById(Integer id) {
         log.debug("查询项目详情，项目 ID: {}", id);
         return projectMapper.selectById(id);

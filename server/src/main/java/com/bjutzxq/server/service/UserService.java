@@ -13,6 +13,8 @@ import com.bjutzxq.server.util.JwtUtil;
 import com.bjutzxq.server.util.OssUtil;
 import com.bjutzxq.server.util.PasswordUtil;
 import com.github.pagehelper.PageHelper;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -150,6 +152,7 @@ public class UserService {
      * @param userId 用户 ID
      * @return 用户信息
      */
+    @Cacheable(value = "userInfo", key = "#userId")
     public User getCurrentUser(Integer userId) {
         log.debug("获取用户信息，ID：{}", userId);
         
@@ -188,6 +191,7 @@ public class UserService {
      * @param bio 个人简介
      * @return 更新后的用户
      */
+    @CacheEvict(value = "userInfo", key = "#userId")
     @Transactional(rollbackFor = Exception.class)
     public User updateProfile(Integer userId, String avatar, String phone, String sex, String bio) {
         log.info("更新用户信息，ID：{}", userId);
@@ -323,8 +327,9 @@ public class UserService {
      * @param className 班级
      * @param role 角色
      */
+    @CacheEvict(value = "userInfo", key = "#userId")
     @Transactional(rollbackFor = Exception.class)
-    public void updateUserByAdmin(Integer userId, String username, String employeeId, 
+    public void updateUserByAdmin(Integer userId, String username, String employeeId,
                                    String realName, String email, String password,
                                    Integer gender, String bio, String className, Role role) {
         log.info("管理员开始更新用户信息，ID: {}", userId);
