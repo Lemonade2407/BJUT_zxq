@@ -1,8 +1,8 @@
 <script setup>
 import { computed, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import Header from './components/Header.vue'
-import Footer from './components/Footer.vue'
+import Header from './components/layout/Header.vue'
+import Footer from './components/layout/Footer.vue'
 import tokenManager from '@/utils/tokenManager'
 import notificationWS from '@/utils/websocket'
 import { log, error as logError } from '@/utils/logger'

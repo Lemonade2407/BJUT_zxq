@@ -46,5 +46,12 @@
     <delete id="deleteByProjectId" parameterType="java.lang.Integer">
         DELETE FROM star WHERE project_id = #{projectId}
     </delete>
-    
+
+    <!-- 批量查询用户点赞的项目 ID -->
+    <select id="selectStarredProjectIds" resultType="java.lang.Integer">
+        SELECT project_id FROM star
+        WHERE user_id = #{userId} AND project_id IN
+        <foreach collection="projectIds" item="pid" open="(" separator="," close=")">#{pid}</foreach>
+    </select>
+
 </mapper>

@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//myBatis//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bjutzxq.server.mapper.TeamApplicationMapper">
+
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.entity.TeamApplication">
+        <id column="id" property="id"/>
+        <result column="team_id" property="teamId"/>
+        <result column="applicant_id" property="applicantId"/>
+        <result column="message" property="message"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">id, team_id, applicant_id, message, status, created_at, updated_at</sql>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO team_application (team_id, applicant_id, message, status, created_at, updated_at)
+        VALUES (#{teamId}, #{applicantId}, #{message}, 0, NOW(), NOW())
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM team_application WHERE id = #{id}
+    </select>
+
+    <select id="selectByTeamAndUser" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM team_application
+        WHERE team_id = #{teamId} AND applicant_id = #{applicantId}
+    </select>
+
+    <select id="selectByTeamId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM team_application
+        WHERE team_id = #{teamId} ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByApplicantId" resultMap="BaseResultMap">
+        SELECT a.*, t.title as team_title FROM team_application a
+        LEFT JOIN team t ON a.team_id = t.id
+        WHERE a.applicant_id = #{applicantId} ORDER BY a.created_at DESC
+    </select>
+
+    <update id="updateStatus">
+        UPDATE team_application SET status = #{status}, updated_at = NOW() WHERE id = #{id}
+    </update>
+
+    <select id="countByTeamIdAndStatus" resultType="int">
+        SELECT COUNT(*) FROM team_application WHERE team_id = #{teamId} AND status = #{status}
+    </select>
+
+    <select id="getTeamCreatorId" resultType="int">
+        SELECT user_id FROM team WHERE id = #{teamId}
+    </select>
+
+    <select id="selectUserBatch" resultType="java.util.HashMap">
+        SELECT id, username, avatar FROM user WHERE id IN
+        <foreach collection="userIds" item="uid" open="(" separator="," close=")">#{uid}</foreach>
+    </select>
+
+</mapper>

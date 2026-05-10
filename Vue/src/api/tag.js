@@ -49,3 +49,29 @@ export function getTagsByCategory(category) {
     method: 'get'
   })
 }
+
+// 创建标签
+export function createTag(name, category) {
+  return request({
+    url: '/tags',
+    method: 'post',
+    params: { name, category }
+  })
+}
+
+// 更新标签
+export function updateTag(id, name, category) {
+  return request({
+    url: `/tags/${id}`,
+    method: 'put',
+    params: { name, category }
+  })
+}
+
+// 删除标签
+export function deleteTag(id) {
+  return request({
+    url: `/tags/${id}`,
+    method: 'delete'
+  })
+}

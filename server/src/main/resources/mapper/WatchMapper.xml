@@ -64,5 +64,12 @@
     <delete id="deleteByProjectId" parameterType="java.lang.Integer">
         DELETE FROM watch WHERE project_id = #{projectId}
     </delete>
-    
+
+    <!-- 批量查询用户关注的项目 ID -->
+    <select id="selectWatchedProjectIds" resultType="java.lang.Integer">
+        SELECT project_id FROM watch
+        WHERE user_id = #{userId} AND project_id IN
+        <foreach collection="projectIds" item="pid" open="(" separator="," close=")">#{pid}</foreach>
+    </select>
+
 </mapper>

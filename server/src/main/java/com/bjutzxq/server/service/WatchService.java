@@ -134,26 +134,24 @@ public class WatchService {
             return new java.util.ArrayList<>();
         }
         
-        // 2. 批量查询项目信息（一次查询，避免 N+1 问题）
+        // 2. 批量查询项目信息
         java.util.List<Project> projects = projectMapper.selectByIds(projectIds);
-        
-        // 3. 为每个项目加载标签和作者信息
-        for (Project project : projects) {
-            // 加载标签
-            java.util.List<Tag> tags = projectTagService.getProjectTags(project.getId());
-            project.setTags(tags);
-            
-            // 加载作者名称
-            if (project.getOwnerId() != null) {
-                User owner = userMapper.selectById(project.getOwnerId());
-                if (owner != null) {
-                    project.setAuthor(owner.getUsername());
-                } else {
-                    project.setAuthor("未知用户");
-                }
+
+        // 3. 批量加载标签和作者
+        java.util.Map<Integer, java.util.List<Tag>> tagMap = projectTagService.getProjectTagsBatch(projectIds);
+        java.util.List<Integer> ownerIds = projects.stream().map(Project::getOwnerId).filter(id -> id != null).distinct().collect(java.util.stream.Collectors.toList());
+        java.util.Map<Integer, String> ownerNameMap = new java.util.HashMap<>();
+        if (!ownerIds.isEmpty()) {
+            for (User u : userMapper.selectBatchIds(ownerIds)) {
+                ownerNameMap.put(u.getId(), u.getUsername());
             }
         }
-        
+        for (Project project : projects) {
+            project.setTags(tagMap.getOrDefault(project.getId(), java.util.List.of()));
+            String name = ownerNameMap.get(project.getOwnerId());
+            project.setAuthor(name != null ? name : "未知用户");
+        }
+
         log.info("找到 {} 个关注的项目", projects.size());
         return projects;
     }

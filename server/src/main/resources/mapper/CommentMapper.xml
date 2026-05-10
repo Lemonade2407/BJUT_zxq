@@ -114,5 +114,61 @@
     <select id="getProjectName" resultType="java.lang.String">
         SELECT name FROM project WHERE id = #{projectId}
     </select>
-    
+
+    <!-- 分页查询所有评论（管理员） -->
+    <select id="selectAllWithPage" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM comment
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+        </where>
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 按关键词搜索评论（管理员） -->
+    <select id="searchByKeyword" resultMap="BaseResultMap">
+        SELECT c.id, c.user_id, c.project_id, c.content, c.like_count, c.created_at, c.updated_at, c.status
+        FROM comment c
+        LEFT JOIN user u ON c.user_id = u.id
+        LEFT JOIN project p ON c.project_id = p.id
+        WHERE c.content LIKE CONCAT('%', #{keyword}, '%')
+           OR u.username LIKE CONCAT('%', #{keyword}, '%')
+           OR p.name LIKE CONCAT('%', #{keyword}, '%')
+        ORDER BY c.created_at DESC
+    </select>
+
+    <!-- 统计关键词匹配的评论数 -->
+    <select id="countByKeyword" resultType="int">
+        SELECT COUNT(*)
+        FROM comment c
+        LEFT JOIN user u ON c.user_id = u.id
+        LEFT JOIN project p ON c.project_id = p.id
+        WHERE c.content LIKE CONCAT('%', #{keyword}, '%')
+           OR u.username LIKE CONCAT('%', #{keyword}, '%')
+           OR p.name LIKE CONCAT('%', #{keyword}, '%')
+    </select>
+
+    <!-- 统计按状态的评论数（管理员） -->
+    <select id="countByStatus" resultType="int">
+        SELECT COUNT(*) FROM comment
+        <where>
+            <if test="status != null">
+                status = #{status}
+            </if>
+        </where>
+    </select>
+
+    <!-- 物理删除评论 -->
+    <delete id="forceDeleteById">
+        DELETE FROM comment WHERE id = #{id}
+    </delete>
+
+    <!-- 批量获取项目名称 -->
+    <select id="getProjectNamesBatch" resultType="java.util.HashMap">
+        SELECT id, name FROM project WHERE id IN
+        <foreach collection="projectIds" item="pid" open="(" separator="," close=")">#{pid}</foreach>
+    </select>
+
 </mapper>

@@ -333,17 +333,16 @@ public class NotificationService {
             throw new IllegalArgumentException("用户 ID 不能为空");
         }
         
-        // 验证所有通知都属于该用户
-        for (Integer id : notificationIds) {
-            Notification notification = notificationMapper.selectById(id);
-            if (notification == null) {
-                throw new RuntimeException("通知不存在：" + id);
-            }
-            if (!notification.getUserId().equals(userId)) {
-                throw new RuntimeException("无权限删除通知：" + id);
+        // 批量查询验证所有权
+        List<Notification> notifications = notificationMapper.selectByIds(notificationIds);
+        if (notifications.size() != notificationIds.size()) {
+            throw new RuntimeException("部分通知不存在");
+        }
+        for (Notification n : notifications) {
+            if (!n.getUserId().equals(userId)) {
+                throw new RuntimeException("无权限删除通知：" + n.getId());
             }
         }
-        
         // 批量删除
         notificationMapper.batchDelete(notificationIds);
         

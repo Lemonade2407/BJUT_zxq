@@ -112,5 +112,10 @@
         WHERE is_read = 1
         AND created_at &lt; #{beforeDate}
     </delete>
-    
+
+    <select id="selectByIds" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/> FROM notification WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
+
 </mapper>

@@ -1,5 +1,5 @@
-import { createApp, ref } from 'vue'
-import Toast from '@/components/Toast.vue'
+import { createApp } from 'vue'
+import Toast from '@/components/layout/Toast.vue'
 
 // 创建 Toast 实例
 let toastInstance = null

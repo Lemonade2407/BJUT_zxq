@@ -6,7 +6,7 @@ import { getActiveCourses } from '@/api/course'
 import { toast } from '@/utils/toast'
 import { log, error as logError } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
-import UserSidebar from '@/components/UserSidebar.vue'
+import UserSidebar from '@/components/user/UserSidebar.vue'
 import { formatNumber } from '@/utils/helpers'
 
 import { getProjectTypeText } from '@/constants/project'

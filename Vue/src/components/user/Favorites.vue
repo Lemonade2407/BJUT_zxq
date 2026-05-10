@@ -13,80 +13,50 @@
             <p class="subtitle">我关注的项目列表</p>
           </div>
 
-          <!-- 加载状态 -->
-          <div v-if="loading" class="loading-state">
-            <div class="spinner"></div>
-            <p>加载中...</p>
-          </div>
+          <div class="content-area">
+            <div v-if="loading" class="loading-state">
+              <div class="spinner"></div>
+              <p>加载中...</p>
+            </div>
 
-          <!-- 空状态 -->
-          <div v-else-if="projects.length === 0" class="empty-state">
-            <div class="empty-icon">⭐</div>
-            <h3>还没有收藏任何项目</h3>
-          </div>
+            <div v-else-if="projects.length === 0" class="empty-state">
+              <div class="empty-icon">⭐</div>
+              <h3>还没有收藏任何项目</h3>
+            </div>
 
-          <!-- 项目列表 -->
-          <div v-else>
-            <div class="project-grid">
-              <div 
-                v-for="project in projects" 
-                :key="project.id"
-                class="project-card"
-                @click="goToProject(project.id)"
-              >
-                <div class="project-card-header">
-                  <span class="project-name">{{ project.name }}</span>
-                </div>
-                <p class="project-description">{{ project.description || '暂无描述' }}</p>
-                <div class="project-tags">
-                  <span v-for="tag in (project.tags || [])" :key="tag.id" class="tech-tag">
-                    {{ tag.name }}
-                  </span>
-                </div>
-                <div class="project-footer">
-                  <div class="project-stats">
-                    <span class="stat">
-                      ❤️ {{ formatNumber(project.starCount || 0) }}
+            <div v-else class="content-wrapper">
+              <div class="project-grid">
+                <div
+                  v-for="project in projects"
+                  :key="project.id"
+                  class="project-card"
+                  @click="goToProject(project.id)"
+                >
+                  <div class="project-card-header">
+                    <span class="project-name">{{ project.name }}</span>
+                  </div>
+                  <p class="project-description">{{ project.description || '暂无描述' }}</p>
+                  <div class="project-tags">
+                    <span v-for="tag in (project.tags || [])" :key="tag.id" class="tech-tag">
+                      {{ tag.name }}
                     </span>
-                    <span class="stat">
-                      👁️ {{ formatNumber(project.watchCount || 0) }}
-                    </span>
+                  </div>
+                  <div class="project-footer">
+                    <div class="project-stats">
+                      <span class="stat">⭐ {{ formatNumber(project.starCount || 0) }}</span>
+                      <span class="stat">👁️ {{ formatNumber(project.watchCount || 0) }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            <!-- 分页控件 -->
-            <div v-if="allProjects.length > 0" class="pagination-container">
-              <div class="pagination">
-                <button 
-                  class="page-btn"
-                  @click="changePage(currentPageNum - 1)"
-                  :disabled="currentPageNum === 1"
-                >
-                  ‹ 上一页
-                </button>
-                
-                <button 
-                  v-for="page in totalPages" 
-                  :key="page"
-                  :class="['page-btn', { active: page === currentPageNum }]"
-                  @click="changePage(page)"
-                >
-                  {{ page }}
-                </button>
-                
-                <button 
-                  class="page-btn"
-                  @click="changePage(currentPageNum + 1)"
-                  :disabled="currentPageNum === totalPages"
-                >
-                  下一页 ›
-                </button>
-              </div>
-              
-              <div class="page-info">
-                共 {{ allProjects.length }} 个项目，第 {{ currentPageNum }} / {{ totalPages }} 页
+              <div v-if="allProjects.length > 0" class="pagination-container">
+                <div class="pagination">
+                  <button class="page-btn prev" @click="changePage(currentPageNum - 1)" :disabled="currentPageNum === 1">‹ 上一页</button>
+                  <button v-for="page in totalPages" :key="page" :class="['page-btn', { active: page === currentPageNum }]" @click="changePage(page)">{{ page }}</button>
+                  <button class="page-btn next" @click="changePage(currentPageNum + 1)" :disabled="currentPageNum >= totalPages">下一页 ›</button>
+                </div>
+                <div class="page-info">共 {{ allProjects.length }} 条，第 {{ currentPageNum }} / {{ totalPages }} 页</div>
               </div>
             </div>
           </div>
@@ -101,7 +71,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { getMyWatchedProjects } from '@/api/project'
 import { error as logError } from '@/utils/logger'
-import UserSidebar from '@/components/UserSidebar.vue'
+import UserSidebar from '@/components/user/UserSidebar.vue'
 import { formatNumber } from '@/utils/helpers'
 
 
@@ -180,7 +150,6 @@ onMounted(() => {
   flex: 1;
   padding: 24px;
   overflow-y: auto;
-  min-height: calc(100vh - 200px);
   width: 100%;
   background-color: #f5f7fa;
 }
@@ -191,18 +160,34 @@ onMounted(() => {
   gap: 24px;
   max-width: 1400px;
   margin: 0 auto;
-  min-height: calc(100vh - 120px);
+  min-height: calc(100vh - 180px);
 }
 
 /* 主内容区 */
 .favorites-main {
   flex: 1;
   min-width: 0;
+  display: flex;
 }
 
 .container {
   max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.content-wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 .page-header {
@@ -232,6 +217,7 @@ onMounted(() => {
   background-color: #ffffff;
   border: 1px solid #d9d9d9;
   border-radius: 6px;
+  flex: 1;
 }
 
 .spinner {
@@ -256,6 +242,7 @@ onMounted(() => {
   background-color: #ffffff;
   border: 1px solid #d9d9d9;
   border-radius: 6px;
+  flex: 1;
 }
 
 .empty-icon {
@@ -301,6 +288,8 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+  flex: 1;
+  align-content: start;
 }
 
 /* 项目卡片 */
@@ -380,59 +369,17 @@ onMounted(() => {
 }
 
 /* 分页控件 */
-.pagination-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding-top: 24px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.pagination {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
+.pagination-container { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 32px; padding-top: 24px; border-top: 1px solid #e0e0e0; }
+.pagination { display: flex; align-items: center; gap: 8px; }
 .page-btn {
-  min-width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 12px;
-  background-color: #ffffff;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  color: #333333;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
+  min-width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+  padding: 0 12px; background-color: #fff; border: 1px solid #d9d9d9;
+  border-radius: 6px; color: #333; font-size: 14px; cursor: pointer; transition: all 0.2s;
 }
-
-.page-btn:hover:not(:disabled) {
-  background-color: #10b981;
-  border-color: #10b981;
-  color: #ffffff;
-}
-
-.page-btn:disabled {
-  background-color: #f5f5f5;
-  color: #cccccc;
-  cursor: not-allowed;
-}
-
-.page-btn.active {
-  background-color: #10b981;
-  border-color: #10b981;
-  color: #ffffff;
-}
-
-.page-info {
-  font-size: 13px;
-  color: #666666;
-}
+.page-btn:hover:not(:disabled) { background-color: #10b981; border-color: #10b981; color: #fff; }
+.page-btn.active { background-color: #10b981; border-color: #10b981; color: #fff; font-weight: 600; }
+.page-btn:disabled { background-color: #f5f5f5; color: #ccc; cursor: not-allowed; opacity: 0.6; }
+.page-info { font-size: 13px; color: #666; }
 
 @media (max-width: 768px) {
   .page-header h1 {

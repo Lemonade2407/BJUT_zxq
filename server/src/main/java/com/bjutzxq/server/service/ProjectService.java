@@ -13,7 +13,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
+import java.util.*;
+import java.util.stream.Collectors;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
@@ -441,14 +442,41 @@ public class ProjectService {
      * @return 丰富后的项目列表
      */
     public List<Project> enrichProjects(List<Project> projects, Integer userId) {
-        if (projects == null || projects.isEmpty()) {
-            return projects;
+        if (projects == null || projects.isEmpty()) return projects;
+
+        // 批量查询项目标签
+        List<Integer> projectIds = projects.stream().map(Project::getId).collect(Collectors.toList());
+        Map<Integer, List<Tag>> tagMap = projectTagService.getProjectTagsBatch(projectIds);
+        Map<Integer, String> ownerNameMap = new java.util.HashMap<>();
+        Map<Integer, String> ownerClassNameMap = new java.util.HashMap<>();
+
+        // 批量查询所有者
+        List<Integer> ownerIds = projects.stream().map(Project::getOwnerId).distinct().collect(Collectors.toList());
+        if (!ownerIds.isEmpty()) {
+            List<User> owners = userMapper.selectBatchIds(ownerIds);
+            for (User o : owners) {
+                ownerNameMap.put(o.getId(), o.getUsername());
+                ownerClassNameMap.put(o.getId(), o.getClassName());
+            }
         }
-        
+
+        // 批量查询用户的点赞/关注状态
+        java.util.Set<Integer> starredIds = java.util.Collections.emptySet();
+        java.util.Set<Integer> watchedIds = java.util.Collections.emptySet();
+        if (userId != null) {
+            starredIds = new java.util.HashSet<>(starMapper.selectStarredProjectIds(userId, projectIds));
+            watchedIds = new java.util.HashSet<>(watchMapper.selectWatchedProjectIds(userId, projectIds));
+        }
+
         for (Project project : projects) {
-            enrichProject(project, userId);
+            project.setTags(tagMap.getOrDefault(project.getId(), List.of()));
+            String ownerName = ownerNameMap.get(project.getOwnerId());
+            project.setOwnerUsername(ownerName != null ? ownerName : "未知用户");
+            project.setOwnerClassName(ownerClassNameMap.get(project.getOwnerId()));
+            project.setAuthor(ownerName != null ? ownerName : "未知用户");
+            project.setIsStarred(starredIds.contains(project.getId()));
+            project.setIsWatched(watchedIds.contains(project.getId()));
         }
-        
         return projects;
     }
     

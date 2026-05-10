@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { createProject, uploadFiles, getProjectTypes } from '@/api/project'
 import { getTagsByCategory } from '@/api/tag'
 import { getActiveCourses } from '@/api/course'
+import { useFileTree } from '@/composables/useFileTree'
 import { toast } from '@/utils/toast'
 import { log, error as logError } from '@/utils/logger'
 
@@ -57,125 +58,7 @@ const isUploading = ref(false)
 const uploadProgress = ref(0)
 
 // 可见性选项
-const visibilityOptions = [
-  { value: 1, label: '公开'},
-  { value: 0, label: '私有' }
-]
-
-// 按文件夹结构组织文件
-const organizedFiles = computed(() => {
-  const fileTree = {}
-  
-  selectedFiles.value.forEach((file, index) => {
-    const path = file.relativePath || file.webkitRelativePath || file.name
-    const parts = path.split('/')
-    
-    // 如果没有路径，直接放在根目录
-    if (parts.length === 1) {
-      if (!fileTree['__root__']) {
-        fileTree['__root__'] = { type: 'folder', name: '根目录', children: [] }
-      }
-      fileTree['__root__'].children.push({ 
-        type: 'file', 
-        fileIndex: index,
-        name: file.name,
-        size: file.size
-      })
-    } else {
-      // 有路径，构建文件夹树
-      let currentLevel = fileTree
-      
-      parts.forEach((part, idx) => {
-        if (idx === parts.length - 1) {
-          // 最后一个部分是文件
-          if (!currentLevel['__files__']) {
-            currentLevel['__files__'] = []
-          }
-          currentLevel['__files__'].push({ 
-            type: 'file',
-            fileIndex: index,
-            name: part,
-            size: file.size
-          })
-        } else {
-          // 中间部分是文件夹
-          if (!currentLevel[part]) {
-            currentLevel[part] = { type: 'folder', name: part, children: {} }
-          }
-          currentLevel = currentLevel[part].children
-        }
-      })
-    }
-  })
-  
-  return fileTree
-})
-
-// 展开/折叠状态
-const expandedFolders = ref(new Set())
-
-// 切换文件夹展开状态
-const toggleFolder = (folderKey) => {
-  log('切换文件夹:', folderKey, '当前展开:', Array.from(expandedFolders.value))
-  const newSet = new Set(expandedFolders.value)
-  if (newSet.has(folderKey)) {
-    newSet.delete(folderKey)
-    log('折叠文件夹:', folderKey)
-  } else {
-    newSet.add(folderKey)
-    log('展开文件夹:', folderKey)
-  }
-  expandedFolders.value = newSet
-}
-
-// 递归渲染文件树
-const renderFileTree = (tree, level = 0, parentKey = '') => {
-  const result = []
-  
-  // 先显示当前层的文件
-  if (tree['__files__']) {
-    tree['__files__'].forEach(file => {
-      result.push({ ...file, level })
-    })
-  }
-  
-  // 再递归显示子文件夹
-  Object.keys(tree).forEach(key => {
-    if (key !== '__files__' && key !== '__root__') {
-      const folder = tree[key]
-      const folderKey = parentKey ? `${parentKey}/${key}` : key
-      const isExpanded = expandedFolders.value.has(folderKey)
-      
-      result.push({ 
-        type: 'folder', 
-        name: folder.name, 
-        level, 
-        isFolder: true,
-        folderKey,
-        isExpanded
-      })
-      
-      // 如果文件夹已展开，递归显示子内容
-      if (isExpanded) {
-        result.push(...renderFileTree(folder.children, level + 1, folderKey))
-      }
-    }
-  })
-  
-  // 处理根目录的文件
-  if (tree['__root__']) {
-    tree['__root__'].children.forEach(file => {
-      result.push({ ...file, level })
-    })
-  }
-  
-  return result
-}
-
-// 展平的文件列表（用于显示）
-const displayFiles = computed(() => {
-  return renderFileTree(organizedFiles.value)
-})
+const { organizedFiles, displayFiles, toggleFolder } = useFileTree(selectedFiles)
 
 // 加载标签列表
 const loadTags = async () => {

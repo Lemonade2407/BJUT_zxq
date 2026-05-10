@@ -5,8 +5,12 @@ import com.bjutzxq.common.Role;
 import com.bjutzxq.pojo.dto.PageResult;
 import com.bjutzxq.pojo.entity.Project;
 import com.bjutzxq.pojo.entity.User;
+import com.bjutzxq.pojo.vo.CommentVO;
+import com.bjutzxq.pojo.vo.TeamVO;
 import com.bjutzxq.server.annotation.RequireRole;
+import com.bjutzxq.server.service.CommentService;
 import com.bjutzxq.server.service.ProjectService;
+import com.bjutzxq.server.service.TeamService;
 import com.bjutzxq.server.service.UserService;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +32,13 @@ public class AdminController {
     
     @Autowired
     private ProjectService projectService;
-    
+
+    @Autowired
+    private CommentService commentService;
+
+    @Autowired
+    private TeamService teamService;
+
     /**
      * 获取所有用户（仅管理员）
      * GET /api/admin/users?pageNum=1&pageSize=20
@@ -220,6 +230,95 @@ public class AdminController {
         return Result.success("用户已删除", null);
     }
     
+    /**
+     * 获取所有评论（仅管理员）
+     * GET /api/admin/comments?pageNum=1&pageSize=20&status=1
+     */
+    @GetMapping("/comments")
+    @RequireRole(Role.ADMIN)
+    public Result<PageResult<CommentVO>> getAllComments(
+            @RequestParam(value = "pageNum", defaultValue = "1") Integer pageNum,
+            @RequestParam(value = "pageSize", defaultValue = "20") Integer pageSize,
+            @RequestParam(value = "status", required = false) Integer status) {
+        log.info("管理员获取所有评论，页码：{}，每页数量：{}，状态：{}", pageNum, pageSize, status);
+        List<CommentVO> comments = commentService.getAllCommentsForAdmin(pageNum, pageSize, status);
+        long total = commentService.countByStatus(status);
+        PageResult<CommentVO> response = new PageResult<>(comments, total, pageNum, pageSize);
+        return Result.success(response);
+    }
+
+    /**
+     * 搜索评论（仅管理员）
+     * GET /api/admin/comments/search?keyword=xxx&pageNum=1&pageSize=20
+     */
+    @GetMapping("/comments/search")
+    @RequireRole(Role.ADMIN)
+    public Result<PageResult<CommentVO>> searchComments(
+            @RequestParam(value = "keyword") String keyword,
+            @RequestParam(value = "pageNum", defaultValue = "1") Integer pageNum,
+            @RequestParam(value = "pageSize", defaultValue = "20") Integer pageSize) {
+        log.info("管理员搜索评论，关键词：{}", keyword);
+        List<CommentVO> comments = commentService.searchCommentsForAdmin(keyword, pageNum, pageSize);
+        long total = commentService.countByKeywordForAdmin(keyword);
+        PageResult<CommentVO> response = new PageResult<>(comments, total, pageNum, pageSize);
+        return Result.success(response);
+    }
+
+    /**
+     * 删除评论（仅管理员，物理删除）
+     * DELETE /api/admin/comments/{id}
+     */
+    @DeleteMapping("/comments/{id}")
+    @RequireRole(Role.ADMIN)
+    public Result<Void> deleteComment(@PathVariable Integer id) {
+        log.info("管理员删除评论，ID: {}", id);
+        commentService.adminDeleteComment(id);
+        return Result.success("评论已删除", null);
+    }
+
+    /**
+     * 获取所有组队（管理员）
+     * GET /api/admin/teams?pageNum=1&pageSize=20&tag=&status=
+     */
+    @GetMapping("/teams")
+    @RequireRole(Role.ADMIN)
+    public Result<PageResult<TeamVO>> getAllTeams(
+            @RequestParam(value = "pageNum", defaultValue = "1") Integer pageNum,
+            @RequestParam(value = "pageSize", defaultValue = "20") Integer pageSize,
+            @RequestParam(value = "tag", required = false) String tag,
+            @RequestParam(value = "status", required = false) Integer status) {
+        log.info("管理员获取所有组队，页码：{}，每页数量：{}", pageNum, pageSize);
+        List<TeamVO> teams = teamService.getTeams(pageNum, pageSize, tag, status, null);
+        long total = teamService.countAll(tag, status, null);
+        return Result.success(new PageResult<>(teams, total, pageNum, pageSize));
+    }
+
+    /**
+     * 删除组队（管理员）
+     * DELETE /api/admin/teams/{id}
+     */
+    @DeleteMapping("/teams/{id}")
+    @RequireRole(Role.ADMIN)
+    public Result<Void> deleteTeam(@PathVariable Integer id) {
+        log.info("管理员删除组队，ID: {}", id);
+        teamService.adminDeleteTeam(id);
+        return Result.success("组队已删除", null);
+    }
+
+    /**
+     * 更新组队状态（管理员）
+     * PUT /api/admin/teams/{id}/status
+     */
+    @PutMapping("/teams/{id}/status")
+    @RequireRole(Role.ADMIN)
+    public Result<Void> updateTeamStatus(
+            @PathVariable Integer id,
+            @RequestParam Integer status) {
+        log.info("管理员更新组队状态，ID: {}，状态: {}", id, status);
+        teamService.updateStatus(id, status);
+        return Result.success("状态更新成功", null);
+    }
+
     /**
      * 查看系统统计信息（仅管理员）
      * GET /api/admin/statistics

@@ -55,4 +55,14 @@ public interface WatchMapper {
      * @return 影响行数
      */
     int deleteByProjectId(@Param("projectId") Integer projectId);
+
+    /**
+     * 批量查询用户在多个项目中的关注状态
+     * @param userId 用户 ID
+     * @param projectIds 项目 ID 列表
+     * @return 已关注的项目 ID 列表
+     */
+    java.util.List<Integer> selectWatchedProjectIds(
+            @Param("userId") Integer userId,
+            @Param("projectIds") java.util.List<Integer> projectIds);
 }

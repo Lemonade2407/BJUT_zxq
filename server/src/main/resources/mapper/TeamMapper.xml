@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//myBatis//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bjutzxq.server.mapper.TeamMapper">
+
+    <resultMap id="BaseResultMap" type="com.bjutzxq.pojo.entity.Team">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="title" property="title"/>
+        <result column="description" property="description"/>
+        <result column="current_members" property="currentMembers"/>
+        <result column="needed_members" property="neededMembers"/>
+        <result column="tag" property="tag"/>
+        <result column="course_name" property="courseName"/>
+        <result column="status" property="status"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <sql id="Base_Column_List">
+        id, user_id, title, description, current_members, needed_members, tag, course_name, status, created_at, updated_at
+    </sql>
+
+    <insert id="insert" parameterType="com.bjutzxq.pojo.entity.Team" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO team (user_id, title, description, current_members, needed_members, tag, course_name, status, created_at, updated_at)
+        VALUES (#{userId}, #{title}, #{description},
+                #{currentMembers},
+                #{neededMembers},
+                #{tag},
+                #{courseName},
+                1, NOW(), NOW())
+    </insert>
+
+    <select id="selectById" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM team WHERE id = #{id}
+    </select>
+
+    <select id="selectAll" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM team
+        <where>
+            <if test="tag != null and tag != ''">
+                AND tag = #{tag}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="courseName != null and courseName != ''">
+                AND course_name = #{courseName}
+            </if>
+        </where>
+        ORDER BY created_at DESC
+    </select>
+
+    <select id="selectByUserId" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM team WHERE user_id = #{userId}
+        ORDER BY created_at DESC
+    </select>
+
+    <update id="updateById" parameterType="com.bjutzxq.pojo.entity.Team">
+        <set>
+            <if test="title != null">title = #{title},</if>
+            <if test="description != null">description = #{description},</if>
+            <if test="currentMembers != null">current_members = #{currentMembers},</if>
+            <if test="neededMembers != null">needed_members = #{neededMembers},</if>
+            <if test="tag != null">tag = #{tag},</if>
+            <if test="courseName != null">course_name = #{courseName},</if>
+            <if test="status != null">status = #{status},</if>
+            updated_at = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM team WHERE id = #{id}
+    </delete>
+
+    <select id="countAll" resultType="int">
+        SELECT COUNT(*) FROM team
+        <where>
+            <if test="tag != null and tag != ''">
+                AND tag = #{tag}
+            </if>
+            <if test="status != null">
+                AND status = #{status}
+            </if>
+            <if test="courseName != null and courseName != ''">
+                AND course_name = #{courseName}
+            </if>
+        </where>
+    </select>
+
+    <select id="selectUserBatch" resultType="java.util.HashMap">
+        SELECT id, username, avatar FROM user
+        WHERE id IN
+        <foreach collection="userIds" item="uid" open="(" separator="," close=")">
+            #{uid}
+        </foreach>
+    </select>
+
+</mapper>

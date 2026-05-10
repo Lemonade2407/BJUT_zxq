@@ -274,6 +274,47 @@ INSERT INTO `user` (`username`, `password`, `employee_id`, `real_name`, `email`,
 ON DUPLICATE KEY UPDATE `username`=`username`;
 
 -- ===========================================
+-- 组队广场表
+-- ===========================================
+CREATE TABLE IF NOT EXISTS `team` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '组队ID',
+  `user_id` INT NOT NULL COMMENT '创建者ID',
+  `title` VARCHAR(200) NOT NULL COMMENT '组队标题',
+  `description` TEXT COMMENT '组队简介',
+  `current_members` INT DEFAULT 1 COMMENT '已有成员数量',
+  `needed_members` INT NOT NULL COMMENT '需要成员数量',
+  `tag` VARCHAR(50) NOT NULL COMMENT '组队标签: COMPETITION-竞赛, PROJECT-项目, COURSE-课设',
+  `course_name` VARCHAR(100) COMMENT '课程名称（仅当tag=COURSE时有效）',
+  `status` TINYINT DEFAULT 1 COMMENT '状态: 0-已结束, 1-招募中, 2-已满员',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT '创建时间',
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT '更新时间',
+  FOREIGN KEY (`user_id`) REFERENCES `user`(`id`) ON DELETE CASCADE,
+  INDEX idx_team_user_id (`user_id`),
+  INDEX idx_team_tag (`tag`),
+  INDEX idx_team_status (`status`),
+  INDEX idx_team_created_at (`created_at`)
+) ENGINE=InnoDB COMMENT='组队表';
+
+-- ===========================================
+-- 组队申请表
+-- ===========================================
+CREATE TABLE IF NOT EXISTS `team_application` (
+  `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '申请ID',
+  `team_id` INT NOT NULL COMMENT '组队ID',
+  `applicant_id` INT NOT NULL COMMENT '申请人ID',
+  `message` VARCHAR(500) COMMENT '申请留言',
+  `status` TINYINT DEFAULT 0 COMMENT '0-待审核, 1-已通过, 2-已拒绝',
+  `created_at` DATETIME DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY (`team_id`) REFERENCES `team`(`id`) ON DELETE CASCADE,
+  FOREIGN KEY (`applicant_id`) REFERENCES `user`(`id`) ON DELETE CASCADE,
+  UNIQUE KEY uk_team_applicant (`team_id`, `applicant_id`),
+  INDEX idx_ta_team_id (`team_id`),
+  INDEX idx_ta_applicant_id (`applicant_id`),
+  INDEX idx_ta_status (`status`)
+) ENGINE=InnoDB COMMENT='组队申请表';
+
+-- ===========================================
 -- 完成提示
 -- ===========================================
 SELECT '数据库初始化完成!' AS message;

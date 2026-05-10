@@ -1,9 +1,8 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { getTags } from '@/api/tag'
+import { getTags, createTag as createTagApi, updateTag as updateTagApi, deleteTag as deleteTagApi } from '@/api/tag'
 import { toast } from '@/utils/toast'
 import { error as logError } from '@/utils/logger'
-import tokenManager from '@/utils/tokenManager'
 
 const tags = ref([])
 const isLoading = ref(false)
@@ -93,26 +92,13 @@ const createTag = async () => {
   }
   
   try {
-    const params = new URLSearchParams()
-    params.append('name', createForm.value.name)
-    params.append('category', createForm.value.category)
-    
-    const response = await fetch('/api/tags', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Bearer ${tokenManager.getToken()}`
-      },
-      body: params
-    })
-    
-    if (response.ok) {
+    const res = await createTagApi(createForm.value.name, createForm.value.category)
+    if (res.code === 200) {
       toast.success('标签创建成功')
       closeCreateDialog()
       loadTags()
     } else {
-      const data = await response.json()
-      toast.error(data.message || '创建失败')
+      toast.error(res.message || '创建失败')
     }
   } catch (error) {
     logError('创建标签失败:', error)
@@ -153,22 +139,13 @@ const updateTag = async () => {
   }
   
   try {
-    const response = await fetch(`/api/tags/${editingTag.value.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Bearer ${tokenManager.getToken()}`
-      },
-      body: `name=${encodeURIComponent(editForm.value.name)}&category=${encodeURIComponent(editForm.value.category)}`
-    })
-    
-    if (response.ok) {
+    const res = await updateTagApi(editingTag.value.id, editForm.value.name, editForm.value.category)
+    if (res.code === 200) {
       toast.success('标签更新成功')
       closeEditDialog()
       loadTags()
     } else {
-      const data = await response.json()
-      toast.error(data.message || '更新失败')
+      toast.error(res.message || '更新失败')
     }
   } catch (error) {
     logError('更新标签失败:', error)
@@ -181,19 +158,12 @@ const deleteTag = async (tagId) => {
   if (!confirm('确定要删除该标签吗？')) return
   
   try {
-    const response = await fetch(`/api/tags/${tagId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${tokenManager.getToken()}`
-      }
-    })
-    
-    if (response.ok) {
+    const res = await deleteTagApi(tagId)
+    if (res.code === 200) {
       toast.success('标签已删除')
       loadTags()
     } else {
-      const data = await response.json()
-      toast.error(data.message || '删除失败')
+      toast.error(res.message || '删除失败')
     }
   } catch (error) {
     logError('删除标签失败:', error)

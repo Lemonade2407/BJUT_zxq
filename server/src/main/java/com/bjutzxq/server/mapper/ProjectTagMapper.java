@@ -1,5 +1,6 @@
 package com.bjutzxq.server.mapper;
 
+import com.bjutzxq.pojo.entity.ProjectTag;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 
@@ -55,4 +56,11 @@ public interface ProjectTagMapper {
      * @return 项目 ID 列表
      */
     List<Integer> selectProjectIdsByTagId(@Param("tagId") Integer tagId);
+
+    /**
+     * 批量查询多个项目的标签关联
+     * @param projectIds 项目 ID 列表
+     * @return 标签关联列表
+     */
+    List<ProjectTag> selectByProjectIds(@Param("projectIds") List<Integer> projectIds);
 }

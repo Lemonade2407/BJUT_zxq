@@ -78,6 +78,7 @@ public interface NotificationMapper {
      * @return 影响行数
      */
     int batchDelete(@Param("notificationIds") List<Integer> notificationIds);
+    List<Notification> selectByIds(@Param("ids") List<Integer> ids);
     
 
 

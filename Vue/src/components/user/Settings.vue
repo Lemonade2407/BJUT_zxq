@@ -1,8 +1,8 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import UserProfile from './UserProfile.vue'
-import ProjectAnalytics from './ProjectAnalytics.vue'
+import ProjectAnalytics from '../project/ProjectAnalytics.vue'
 
 const route = useRoute()
 const router = useRouter()

@@ -22,13 +22,8 @@ const getRoleText = (role) => {
 // 组件挂载时加载用户信息
 onMounted(() => {
   const userInfoFromToken = tokenManager.getUserInfo()
-  console.log('UserSidebar - 从 localStorage 获取的用户信息:', userInfoFromToken)
   if (userInfoFromToken) {
     userInfo.value = userInfoFromToken
-    console.log('UserSidebar - 当前用户角色:', userInfo.value.role)
-    console.log('UserSidebar - 是否为教师:', userInfo.value.role === 'TEACHER')
-  } else {
-    console.warn('UserSidebar - 未找到用户信息，请先登录')
   }
 })
 </script>
@@ -44,7 +39,7 @@ onMounted(() => {
       <h3 class="sidebar-username">{{ userInfo.username }}</h3>
       <p class="sidebar-role">{{ getRoleText(userInfo.role) }}</p>
     </div>
-    
+
     <nav class="sidebar-nav">
       <router-link to="/profile" class="nav-item" active-class="active">
         <span class="nav-icon">👤</span>
@@ -54,14 +49,18 @@ onMounted(() => {
         <span class="nav-icon">📁</span>
         <span class="nav-label">我的仓库</span>
       </router-link>
+      <router-link to="/my-teams" class="nav-item" active-class="active">
+        <span class="nav-icon">👥</span>
+        <span class="nav-label">我的组队</span>
+      </router-link>
       <router-link to="/favorites" class="nav-item" active-class="active">
         <span class="nav-icon">⭐</span>
         <span class="nav-label">我的收藏</span>
       </router-link>
-      <router-link 
-        v-if="userInfo.role === 'TEACHER'" 
-        to="/class-management" 
-        class="nav-item" 
+      <router-link
+        v-if="userInfo.role === 'TEACHER'"
+        to="/class-management"
+        class="nav-item"
         active-class="active"
       >
         <span class="nav-icon">📚</span>

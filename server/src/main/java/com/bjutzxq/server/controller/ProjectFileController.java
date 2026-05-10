@@ -5,6 +5,7 @@ import com.bjutzxq.pojo.entity.ProjectFile;
 import com.bjutzxq.pojo.entity.User;
 import com.bjutzxq.pojo.vo.FileVO;
 import com.bjutzxq.server.context.UserIdContext;
+import com.bjutzxq.server.mapper.UserMapper;
 import com.bjutzxq.server.service.ProjectFileService;
 import com.bjutzxq.server.service.ProjectService;
 import com.bjutzxq.server.service.UserService;
@@ -29,7 +30,10 @@ public class ProjectFileController {
 
     @Autowired
     private UserService userService;
-    
+
+    @Autowired
+    private UserMapper userMapper;
+
     @Autowired
     private ProjectService projectService;
     
@@ -190,14 +194,10 @@ public class ProjectFileController {
         
         // 2. 批量查询用户信息
         java.util.Map<Integer, String> uploaderMap = new java.util.HashMap<>();
-        for (Integer uploaderId : uploaderIds) {
-            try {
-                User uploader = userService.getUserById(uploaderId);
-                if (uploader != null) {
-                    uploaderMap.put(uploaderId, uploader.getUsername());
-                }
-            } catch (Exception e) {
-                log.warn("获取上传者信息失败，用户 ID: {}", uploaderId);
+        if (!uploaderIds.isEmpty()) {
+            java.util.List<User> users = userMapper.selectBatchIds(new java.util.ArrayList<>(uploaderIds));
+            for (User user : users) {
+                uploaderMap.put(user.getId(), user.getUsername());
             }
         }
         

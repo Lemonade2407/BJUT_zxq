@@ -94,4 +94,11 @@ public interface TagMapper {
      * @return 标签列表
      */
     List<Tag> selectHotTags(@Param("limit") Integer limit);
+
+    /**
+     * 批量查询标签
+     * @param ids 标签 ID 列表
+     * @return 标签列表
+     */
+    List<Tag> selectByIds(@Param("ids") List<Integer> ids);
 }

@@ -58,4 +58,9 @@ public class CommentVO {
      * 状态（0-已删除, 1-正常）
      */
     private Integer status;
+
+    /**
+     * 项目名称（管理员评论列表用）
+     */
+    private String projectName;
 }

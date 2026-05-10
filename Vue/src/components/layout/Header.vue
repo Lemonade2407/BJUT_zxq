@@ -27,7 +27,7 @@ const showLogoutModal = ref(false)
 const menuItems = [
   { icon: '🏠', label: '主页', path: '/home' },
   { icon: '📁', label: '项目广场', path: '/projects' },
-  // { icon: '👥', label: '组队广场', path: '/team' },  // 暂时注释，后续开发
+  { icon: '👥', label: '组队广场', path: '/team' },
 ]
 
 // 计算导航项的激活状态

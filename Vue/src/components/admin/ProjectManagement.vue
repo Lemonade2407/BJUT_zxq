@@ -1,8 +1,10 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
+import { updateAdminProject, deleteAdminProject } from '@/api/admin'
+import { getTags } from '@/api/tag'
 import { toast } from '@/utils/toast'
 import { error as logError } from '@/utils/logger'
-import tokenManager from '@/utils/tokenManager'
+import request from '@/utils/request'
 
 const projects = ref([])
 const isLoading = ref(false)
@@ -31,24 +33,18 @@ const allTags = ref([])
 const loadProjects = async () => {
   isLoading.value = true
   try {
-    let url = `/api/projects/list?pageNum=${currentPage.value}&pageSize=${PAGE_SIZE}`
-    if (searchKeyword.value.trim()) {
-      url = `/api/projects/search/name?name=${encodeURIComponent(searchKeyword.value)}&pageNum=${currentPage.value}&pageSize=${PAGE_SIZE}`
-    }
-    
-    const response = await fetch(url, {
-      headers: {
-        'Authorization': `Bearer ${tokenManager.getToken()}`
-      }
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      if (data.code === 200) {
-        // enrichProject 已经包含了标签数据，直接使用
-        projects.value = data.data.records || []
-        total.value = data.data.total || 0
-      }
+    const params = { pageNum: currentPage.value, pageSize: PAGE_SIZE }
+    const method = searchKeyword.value.trim() ? 'get' : 'get'
+    const url = searchKeyword.value.trim()
+      ? '/projects/search/name'
+      : '/projects/list'
+    const query = searchKeyword.value.trim()
+      ? { name: searchKeyword.value, ...params }
+      : params
+    const res = await request({ url, method: 'get', params: query })
+    if (res.code === 200) {
+      projects.value = res.data.records || []
+      total.value = res.data.total || 0
     }
   } catch (error) {
     logError('加载项目列表失败:', error)
@@ -58,20 +54,11 @@ const loadProjects = async () => {
   }
 }
 
-// 加载所有标签
 const loadTags = async () => {
   try {
-    const response = await fetch('/api/tags', {
-      headers: {
-        'Authorization': `Bearer ${tokenManager.getToken()}`
-      }
-    })
-    
-    if (response.ok) {
-      const data = await response.json()
-      if (data.code === 200) {
-        allTags.value = data.data || []
-      }
+    const res = await getTags({ pageNum: 1, pageSize: 200 })
+    if (res.code === 200) {
+      allTags.value = res.data.records || []
     }
   } catch (error) {
     logError('加载标签列表失败:', error)
@@ -96,23 +83,11 @@ const changePage = (page) => {
 
 const deleteProject = async (projectId) => {
   if (!confirm('确定要删除该项目吗？')) return
-  
   try {
-    const response = await fetch(`/api/projects/${projectId}`, {
-      method: 'DELETE',
-      headers: {
-        'Authorization': `Bearer ${tokenManager.getToken()}`
-      }
-    })
-    
-    if (response.ok) {
-      toast.success('项目已删除')
-      loadProjects()
-    }
-  } catch (error) {
-    logError('删除项目失败:', error)
-    toast.error('操作失败')
-  }
+    const res = await request({ url: `/projects/${projectId}`, method: 'delete' })
+    if (res.code === 200) { toast.success('项目已删除'); loadProjects() }
+    else toast.error(res.message || '操作失败')
+  } catch (error) { logError('删除项目失败:', error); toast.error('操作失败') }
 }
 
 // 打开编辑对话框
@@ -154,23 +129,9 @@ const saveProject = async () => {
   }
   
   try {
-    const response = await fetch(`/api/admin/projects/${editingProject.value.id}`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${tokenManager.getToken()}`
-      },
-      body: JSON.stringify(editForm.value)
-    })
-    
-    if (response.ok) {
-      toast.success('项目信息已更新')
-      closeEditDialog()
-      loadProjects()
-    } else {
-      const data = await response.json()
-      toast.error(data.message || '更新失败')
-    }
+    const res = await updateAdminProject(editingProject.value.id, editForm.value)
+    if (res.code === 200) { toast.success('项目信息已更新'); closeEditDialog(); loadProjects() }
+    else toast.error(res.message || '更新失败')
   } catch (error) {
     logError('更新项目失败:', error)
     toast.error('操作失败')

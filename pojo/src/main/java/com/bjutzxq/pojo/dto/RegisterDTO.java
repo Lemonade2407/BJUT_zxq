@@ -1,7 +1,7 @@
 package com.bjutzxq.pojo.dto;
 
 import lombok.Data;
-import javax.validation.constraints.*;
+import jakarta.validation.constraints.*;
 import java.util.List;
 
 /**

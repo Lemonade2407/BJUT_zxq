@@ -1,6 +1,8 @@
 package com.bjutzxq.server.handler;
 
+import com.bjutzxq.common.BusinessException;
 import com.bjutzxq.common.Result;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.validation.BindException;
@@ -10,6 +12,7 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
+import java.io.IOException;
 import java.util.stream.Collectors;
 
 /**
@@ -79,9 +82,17 @@ public class GlobalExceptionHandler {
     }
     
     /**
-     * 处理运行时异常（业务逻辑异常）
-     * @param e 异常对象
-     * @return 统一响应结果
+     * 处理业务异常（可控制 HTTP 状态码）
+     */
+    @ExceptionHandler(BusinessException.class)
+    public Result<Void> handleBusinessException(BusinessException e, HttpServletResponse response) throws IOException {
+        log.warn("业务异常 ({}): {}", e.getCode(), e.getMessage());
+        response.sendError(e.getCode(), e.getMessage());
+        return Result.error(e.getCode(), e.getMessage());
+    }
+
+    /**
+     * 处理运行时异常（未预期的业务逻辑异常）
      */
     @ExceptionHandler(RuntimeException.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)

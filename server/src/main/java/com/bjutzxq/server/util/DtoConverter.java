@@ -210,9 +210,92 @@ public class DtoConverter {
         if (comments == null) {
             return List.of();
         }
-        
+
         return comments.stream()
             .map(comment -> toCommentVO(comment, userMap))
             .collect(Collectors.toList());
+    }
+
+    // ==================== UserVO 转换 ====================
+
+    public static UserVO toUserVO(User user) {
+        if (user == null) return null;
+        UserVO vo = new UserVO();
+        vo.setId(user.getId());
+        vo.setUsername(user.getUsername());
+        vo.setEmployeeId(user.getEmployeeId());
+        vo.setRealName(user.getRealName());
+        vo.setClassName(user.getClassName());
+        vo.setEmail(user.getEmail());
+        vo.setAvatar(user.getAvatar());
+        vo.setPhone(user.getPhone());
+        vo.setSex(user.getSex());
+        vo.setBio(user.getBio());
+        vo.setRole(user.getRole() != null ? user.getRole().name() : null);
+        vo.setStatus(user.getStatus());
+        vo.setCreatedAt(user.getCreatedAt());
+        vo.setUpdatedAt(user.getUpdatedAt());
+        return vo;
+    }
+
+    // ==================== Team / TeamApplication 转换 ====================
+
+    private static final Map<Integer, String> TEAM_STATUS_MAP = Map.of(0, "已结束", 1, "招募中", 2, "已满员");
+    private static final Map<Integer, String> APP_STATUS_MAP = Map.of(0, "待审核", 1, "已通过", 2, "已拒绝");
+
+    public static TeamVO toTeamVO(Team team, Map<Integer, Map<String, Object>> userMap) {
+        if (team == null) return null;
+        TeamVO vo = new TeamVO();
+        vo.setId(team.getId());
+        vo.setUserId(team.getUserId());
+        vo.setTitle(team.getTitle());
+        vo.setDescription(team.getDescription());
+        vo.setCurrentMembers(team.getCurrentMembers());
+        vo.setNeededMembers(team.getNeededMembers());
+        vo.setTag(team.getTag());
+        vo.setCourseName(team.getCourseName());
+        vo.setStatus(team.getStatus());
+        vo.setStatusText(TEAM_STATUS_MAP.getOrDefault(team.getStatus(), "未知"));
+        vo.setCreatedAt(team.getCreatedAt());
+        vo.setUpdatedAt(team.getUpdatedAt());
+        if (userMap != null) {
+            Map<String, Object> userInfo = userMap.get(team.getUserId());
+            if (userInfo != null) {
+                vo.setCreatorUsername((String) userInfo.get("username"));
+                vo.setCreatorAvatar((String) userInfo.get("avatar"));
+            }
+        }
+        return vo;
+    }
+
+    public static List<TeamVO> toTeamVOList(List<Team> teams, Map<Integer, Map<String, Object>> userMap) {
+        if (teams == null || teams.isEmpty()) return List.of();
+        return teams.stream().map(t -> toTeamVO(t, userMap)).collect(Collectors.toList());
+    }
+
+    public static TeamApplicationVO toTeamApplicationVO(TeamApplication app, Map<Integer, Map<String, Object>> userMap) {
+        if (app == null) return null;
+        TeamApplicationVO vo = new TeamApplicationVO();
+        vo.setId(app.getId());
+        vo.setTeamId(app.getTeamId());
+        vo.setApplicantId(app.getApplicantId());
+        vo.setMessage(app.getMessage());
+        vo.setStatus(app.getStatus());
+        vo.setStatusText(APP_STATUS_MAP.getOrDefault(app.getStatus(), "未知"));
+        vo.setTeamTitle(app.getTeamTitle());
+        vo.setCreatedAt(app.getCreatedAt());
+        if (userMap != null) {
+            Map<String, Object> u = userMap.get(app.getApplicantId());
+            if (u != null) {
+                vo.setApplicantUsername((String) u.get("username"));
+                vo.setApplicantAvatar((String) u.get("avatar"));
+            }
+        }
+        return vo;
+    }
+
+    public static List<TeamApplicationVO> toTeamApplicationVOList(List<TeamApplication> apps, Map<Integer, Map<String, Object>> userMap) {
+        if (apps == null || apps.isEmpty()) return List.of();
+        return apps.stream().map(a -> toTeamApplicationVO(a, userMap)).collect(Collectors.toList());
     }
 }

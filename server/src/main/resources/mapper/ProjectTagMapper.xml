@@ -36,4 +36,9 @@
     <select id="selectProjectIdsByTagId" resultType="java.lang.Integer">
         SELECT project_id FROM project_tag WHERE tag_id = #{tagId}
     </select>
+
+    <select id="selectByProjectIds" resultType="com.bjutzxq.pojo.entity.ProjectTag">
+        SELECT id, project_id AS projectId, tag_id AS tagId, created_at AS createdAt FROM project_tag WHERE project_id IN
+        <foreach collection="projectIds" item="pid" open="(" separator="," close=")">#{pid}</foreach>
+    </select>
 </mapper>

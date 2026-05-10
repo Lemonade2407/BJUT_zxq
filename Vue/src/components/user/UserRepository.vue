@@ -5,7 +5,7 @@ import { getMyProjects } from '@/api/project'
 import { toast } from '@/utils/toast'
 import { log, error as logError, warn } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
-import UserSidebar from '@/components/UserSidebar.vue'
+import UserSidebar from '@/components/user/UserSidebar.vue'
 import { formatNumber } from '@/utils/helpers'
 
 
@@ -208,7 +208,6 @@ onMounted(() => {
   flex: 1;
   padding: 24px;
   overflow-y: auto;
-  min-height: calc(100vh - 200px);
   width: 100%;
   background-color: #f5f7fa;
 }
@@ -219,18 +218,22 @@ onMounted(() => {
   gap: 24px;
   max-width: 1400px;
   margin: 0 auto;
-  min-height: calc(100vh - 120px);
+  min-height: calc(100vh - 180px);
 }
 
 /* 主内容区 */
 .repository-main {
   flex: 1;
   min-width: 0;
+  display: flex;
 }
 
 .user-repository-container {
   max-width: 1200px;
-  margin: 0 auto;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
 }
 
 /* 页面头部 */
@@ -281,6 +284,7 @@ onMounted(() => {
   background-color: #ffffff;
   border: 1px solid #d9d9d9;
   border-radius: 6px;
+  flex: 1;
 }
 
 .loading-spinner {
@@ -301,6 +305,8 @@ onMounted(() => {
   grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
   gap: 16px;
   margin-bottom: 24px;
+  flex: 1;
+  align-content: start;
 }
 
 /* 项目卡片 */
@@ -389,7 +395,7 @@ onMounted(() => {
   background-color: #ffffff;
   border: 1px solid #d9d9d9;
   border-radius: 6px;
-  margin-bottom: 24px;
+  flex: 1;
 }
 
 .empty-icon {
@@ -423,53 +429,17 @@ onMounted(() => {
 }
 
 /* 分页控件 */
-.pagination-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  padding-top: 24px;
-  border-top: 1px solid #e0e0e0;
-}
-
-.pagination {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
+.pagination-container { display: flex; flex-direction: column; align-items: center; gap: 16px; margin-top: 32px; padding-top: 24px; border-top: 1px solid #e0e0e0; }
+.pagination { display: flex; align-items: center; gap: 8px; }
 .page-btn {
-  min-width: 40px;
-  height: 40px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 12px;
-  background-color: #ffffff;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  color: #333333;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
+  min-width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
+  padding: 0 12px; background-color: #fff; border: 1px solid #d9d9d9;
+  border-radius: 6px; color: #333; font-size: 14px; cursor: pointer; transition: all 0.2s;
 }
-
-.page-btn:hover:not(:disabled) {
-  background-color: #10b981;
-  border-color: #10b981;
-  color: #ffffff;
-}
-
-.page-btn:disabled {
-  background-color: #f5f5f5;
-  color: #cccccc;
-  cursor: not-allowed;
-}
-
-.page-info {
-  font-size: 13px;
-  color: #666666;
-}
+.page-btn:hover:not(:disabled) { background-color: #10b981; border-color: #10b981; color: #fff; }
+.page-btn.active { background-color: #10b981; border-color: #10b981; color: #fff; font-weight: 600; }
+.page-btn:disabled { background-color: #f5f5f5; color: #ccc; cursor: not-allowed; opacity: 0.6; }
+.page-info { font-size: 13px; color: #666; }
 
 /* 响应式设计 */
 @media (max-width: 768px) {

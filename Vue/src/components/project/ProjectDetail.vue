@@ -2,17 +2,15 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getProjectDetail, starProject, unstarProject, watchProject, unwatchProject, downloadProject, updateProject, deleteProject, uploadFiles, overwriteUploadFiles, getAllProjectFiles, uploadProjectDocument, deleteProjectDocument, getProjectDocument, getProjectTypes } from '@/api/project'
-import { getProjectComments, createComment } from '@/api/comment'
 import { getTagsByCategory } from '@/api/tag'
 import { getActiveCourses } from '@/api/course'
-import { getUserById } from '@/api/auth'
 import { toast } from '@/utils/toast'
 import { error as logError, warn } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
-import FileTreeItem from './FileTreeItem.vue'
-import mammoth from 'mammoth'
-import { marked } from 'marked'
+import FileTreeItem from '../layout/FileTreeItem.vue'
 import { formatNumber, formatDateShort } from '@/utils/helpers'
+import { useFileTree } from '@/composables/useFileTree'
+import ProjectCommentsTab from './ProjectCommentsTab.vue'
 
 
 const route = useRoute()
@@ -32,9 +30,6 @@ const project = ref(null)
 const isLoading = ref(false)
 
 // 评论列表
-const comments = ref([])
-const newComment = ref('')
-
 // 标签页
 const activeTab = ref('readme') // readme, code, comments, settings
 
@@ -87,9 +82,6 @@ const isOverwriteMode = ref(true) // 默认开启覆盖模式
 const projectFiles = ref([])
 const isLoadingFiles = ref(false)
 
-// 文件夹展开状态（存储展开的文件夹 ID）
-const expandedFolders = ref(new Set())
-
 // 项目文档相关
 const documentUrl = ref('')
 const documentName = ref('') // 原始文件名
@@ -108,33 +100,15 @@ const loadProjectDetail = async () => {
 
   isLoading.value = true
   try {
-    // 调用真实 API 获取项目详情（后端会自动增加浏览量）
     const res = await getProjectDetail(projectId.value)
-    
     if (res.code === 200 && res.data) {
       project.value = res.data
-      
-      // 格式化时间字段
-      if (project.value.createdAt) {
-        project.value.createdAt = formatDateShort(project.value.createdAt)
-      }
-      if (project.value.updatedAt) {
-        project.value.updatedAt = formatDateShort(project.value.updatedAt)
-      }
-      
-      // 加载评论数据
-      await loadComments()
-      
-      // 加载项目文件列表
-      await loadProjectFiles()
-      
-      // 加载项目文档
-      await loadProjectDocument()
-      
-      // 如果是所有者，初始化编辑表单
-      if (isOwner.value) {
-        initEditForm()
-      }
+      if (project.value.createdAt) project.value.createdAt = formatDateShort(project.value.createdAt)
+      if (project.value.updatedAt) project.value.updatedAt = formatDateShort(project.value.updatedAt)
+      if (isOwner.value) initEditForm()
+
+      // 并行加载文件和文档（不阻塞页面渲染）
+      Promise.all([loadProjectFiles(), loadProjectDocument()])
     } else {
       logError('API 返回数据异常:', res)
       toast.error(res.message || '加载项目详情失败')
@@ -144,57 +118,6 @@ const loadProjectDetail = async () => {
     toast.error(error.message || '加载项目详情失败，请稍后重试')
   } finally {
     isLoading.value = false
-  }
-}
-
-// 加载评论列表
-const loadComments = async () => {
-  try {
-    const res = await getProjectComments(projectId.value)
-    if (res.code === 200 && res.data && res.data.records) {
-      comments.value = res.data.records
-      
-      // 批量加载评论者的用户信息
-      await loadCommentUsers()
-    }
-  } catch (error) {
-    logError('加载评论失败:', error)
-    // 评论加载失败不影响主流程
-  }
-}
-
-// 加载评论者的用户信息
-const loadCommentUsers = async () => {
-  try {
-    // 收集所有唯一的 userId
-    const userIds = [...new Set(comments.value.map(c => c.userId).filter(id => id))]
-    
-    if (userIds.length === 0) return
-    
-    // 批量查询用户信息
-    const userPromises = userIds.map(userId => getUserById(userId))
-    const userResults = await Promise.all(userPromises)
-    
-    // 创建 userId -> userInfo 的映射
-    const userMap = {}
-    userResults.forEach((res, index) => {
-      if (res.code === 200 && res.data) {
-        userMap[userIds[index]] = res.data
-      }
-    })
-    
-    // 为每条评论添加用户信息
-    comments.value = comments.value.map(comment => {
-      const user = userMap[comment.userId]
-      return {
-        ...comment,
-        userName: user ? user.username : '未知用户',
-        userAvatar: user ? user.avatar : ''
-      }
-    })
-    
-  } catch (error) {
-    logError('加载评论用户信息失败:', error)
   }
 }
 
@@ -368,15 +291,12 @@ const isMarkdownDocument = () => {
 // 渲染 Word 文档为 HTML
 const renderWordDocument = async () => {
   if (!isWordDocument()) return
-  
   isRenderingDocument.value = true
   try {
-    // 下载 Word 文件
     const response = await fetch(documentUrl.value)
     const arrayBuffer = await response.arrayBuffer()
-    
-    // 使用 mammoth 转换为 HTML
-    const result = await mammoth.convertToHtml({ arrayBuffer })
+    const mammoth = await import('mammoth')
+    const result = await mammoth.default.convertToHtml({ arrayBuffer })
     documentContent.value = result.value
   } catch (error) {
     logError('渲染 Word 文档失败:', error)
@@ -397,7 +317,7 @@ const renderMarkdownDocument = async () => {
     const response = await fetch(documentUrl.value)
     const markdownText = await response.text()
     
-    // 使用 marked 转换为 HTML
+    const { marked } = await import('marked')
     documentContent.value = marked(markdownText)
   } catch (error) {
     logError('渲染 Markdown 文档失败:', error)
@@ -414,30 +334,6 @@ const switchTab = (tab) => {
 }
 
 // 提交评论
-const submitComment = async () => {
-  if (!newComment.value.trim()) {
-    toast.warning('请输入评论内容')
-    return
-  }
-
-  try {
-    // 调用真实 API 提交评论
-    const res = await createComment(projectId.value, {
-      content: newComment.value.trim()
-    })
-    
-    if (res.code === 200 && res.data) {
-      // 将新评论添加到列表开头
-      comments.value.unshift(res.data)
-      newComment.value = ''
-      toast.success('评论成功！')
-    }
-  } catch (error) {
-    logError('提交评论失败:', error)
-    toast.error(error.message || '评论失败，请稍后重试')
-  }
-}
-
 // 点赞项目
 const toggleLike = async () => {
   try {
@@ -640,7 +536,7 @@ const confirmDelete = async () => {
       showDeleteConfirm.value = false
       // 跳转到项目广场
       setTimeout(() => {
-        router.push('/square')
+        router.push('/projects')
       }, 1000)
     }
   } catch (error) {
@@ -659,166 +555,36 @@ const toggleTag = (tagId) => {
   }
 }
 
-// 按文件夹结构组织文件
-const organizedFiles = computed(() => {
-  const fileTree = {}
-  
-  selectedFiles.value.forEach((file, index) => {
-    const path = file.relativePath || file.webkitRelativePath || file.name
-    const parts = path.split('/')
-    
-    // 如果没有路径，直接放在根目录
-    if (parts.length === 1) {
-      if (!fileTree['__root__']) {
-        fileTree['__root__'] = { type: 'folder', name: '根目录', children: [] }
-      }
-      fileTree['__root__'].children.push({ 
-        type: 'file', 
-        fileIndex: index,
-        name: file.name,
-        size: file.size
-      })
-    } else {
-      // 有路径，构建文件夹树
-      let currentLevel = fileTree
-      
-      parts.forEach((part, idx) => {
-        if (idx === parts.length - 1) {
-          // 最后一个部分是文件
-          if (!currentLevel['__files__']) {
-            currentLevel['__files__'] = []
-          }
-          currentLevel['__files__'].push({ 
-            type: 'file',
-            fileIndex: index,
-            name: part,
-            size: file.size
-          })
-        } else {
-          // 中间部分是文件夹
-          if (!currentLevel[part]) {
-            currentLevel[part] = { type: 'folder', name: part, children: {} }
-          }
-          currentLevel = currentLevel[part].children
-        }
-      })
-    }
-  })
-  
-  return fileTree
-})
+const { organizedFiles, displayFiles, toggleFolder, expandedFolders } = useFileTree(selectedFiles)
 
-// 递归渲染文件树
-const renderFileTree = (tree, level = 0, parentKey = '') => {
-  const result = []
-  
-  // 先显示当前层的文件
-  if (tree['__files__']) {
-    tree['__files__'].forEach(file => {
-      result.push({ ...file, level })
-    })
-  }
-  
-  // 再递归显示子文件夹
-  Object.keys(tree).forEach(key => {
-    if (key !== '__files__' && key !== '__root__') {
-      const folder = tree[key]
-      const folderKey = parentKey ? `${parentKey}/${key}` : key
-      const isExpanded = expandedFolders.value.has(folderKey)
-      
-      result.push({ 
-        type: 'folder', 
-        name: folder.name, 
-        level, 
-        isFolder: true,
-        folderKey,
-        isExpanded
-      })
-      
-      // 如果文件夹已展开，递归显示子内容
-      if (isExpanded) {
-        result.push(...renderFileTree(folder.children, level + 1, folderKey))
-      }
-    }
-  })
-  
-  // 处理根目录的文件
-  if (tree['__root__']) {
-    tree['__root__'].children.forEach(file => {
-      result.push({ ...file, level })
-    })
-  }
-  
-  return result
-}
+// OSS 文件树（代码 Tab）
+const ossExpandedFolders = ref(new Set())
 
-// 展平的文件列表（用于显示）
-const displayFiles = computed(() => {
-  return renderFileTree(organizedFiles.value)
-})
-
-// OSS 文件树形结构（用于代码展示）
 const ossFileTree = computed(() => {
-  if (!projectFiles.value || projectFiles.value.length === 0) {
-    return []
-  }
-  
-  // 构建树形结构
+  if (!projectFiles.value || projectFiles.value.length === 0) return []
   const tree = []
   const fileMap = new Map()
-  
-  // 第一遍：创建所有节点
   projectFiles.value.forEach(file => {
-    fileMap.set(file.id, {
-      ...file,
-      children: [],
-      level: 0
-    })
+    fileMap.set(file.id, { ...file, children: [], level: 0 })
   })
-  
-  // 第二遍：建立父子关系
   projectFiles.value.forEach(file => {
     const node = fileMap.get(file.id)
     if (file.parentId !== null && fileMap.has(file.parentId)) {
-      // 有父节点，添加到父节点的children
       const parent = fileMap.get(file.parentId)
       node.level = parent.level + 1
       parent.children.push(node)
     } else {
-      // 根节点
       tree.push(node)
     }
   })
-  
   return tree
 })
 
-// 将文件树展平为列表（递归）
-const flattenFileTree = (tree) => {
-  const result = []
-  
-  const traverse = (nodes) => {
-    nodes.forEach(node => {
-      result.push(node)
-      if (node.children && node.children.length > 0) {
-        traverse(node.children)
-      }
-    })
-  }
-  
-  traverse(tree)
-  return result
-}
-
-// 切换文件夹展开/折叠状态
-const toggleFolder = (fileId) => {
-  const newSet = new Set(expandedFolders.value)
-  if (newSet.has(fileId)) {
-    newSet.delete(fileId)
-  } else {
-    newSet.add(fileId)
-  }
-  expandedFolders.value = newSet
+const toggleOssFolder = (fileId) => {
+  const newSet = new Set(ossExpandedFolders.value)
+  if (newSet.has(fileId)) newSet.delete(fileId)
+  else newSet.add(fileId)
+  ossExpandedFolders.value = newSet
 }
 
 // 处理文件选择
@@ -1220,7 +986,7 @@ onMounted(() => {
               :class="['tab-btn', { active: activeTab === 'comments' }]"
               @click="switchTab('comments')"
             >
-              💬 评论 ({{ comments.length }})
+              💬 评论
             </button>
             <button 
               v-if="isOwner"
@@ -1365,10 +1131,10 @@ onMounted(() => {
             <!-- 文件列表 -->
             <ul v-else class="file-list">
               <template v-for="file in ossFileTree" :key="file.id">
-                <FileTreeItem 
-                  :file="file" 
-                  :expanded-folders="expandedFolders"
-                  @toggle="toggleFolder"
+                <FileTreeItem
+                  :file="file"
+                  :expanded-folders="ossExpandedFolders"
+                  @toggle="toggleOssFolder"
                 />
               </template>
             </ul>
@@ -1376,44 +1142,7 @@ onMounted(() => {
         </div>
 
         <!-- 评论内容 -->
-        <div v-if="activeTab === 'comments'" class="content-section comments-content">
-          <!-- 评论输入框 -->
-          <div class="comment-input-section">
-            <textarea 
-              v-model="newComment"
-              placeholder="写下你的评论..."
-              class="comment-textarea"
-              rows="4"
-            ></textarea>
-            <button class="submit-comment-btn" @click="submitComment">
-              提交评论
-            </button>
-          </div>
-
-          <!-- 评论列表 -->
-          <div class="comments-list">
-            <div 
-              v-for="comment in comments" 
-              :key="comment.id"
-              class="comment-item"
-            >
-              <div class="comment-header">
-                <img 
-                  v-if="comment.userAvatar" 
-                  :src="comment.userAvatar" 
-                  :alt="comment.userName"
-                  class="comment-avatar-img"
-                />
-                <span v-else class="comment-avatar-text">
-                  {{ (comment.userName || 'U').charAt(0).toUpperCase() }}
-                </span>
-                <span class="comment-user">{{ comment.userName || '未知用户' }}</span>
-                <span class="comment-time">{{ formatCommentTime(comment.createdAt) }}</span>
-              </div>
-              <p class="comment-content">{{ comment.content }}</p>
-            </div>
-          </div>
-        </div>
+        <ProjectCommentsTab v-if="activeTab === 'comments'" :project-id="projectId" />
 
         <!-- 设置内容 -->
         <div v-if="activeTab === 'settings' && isOwner" class="content-section settings-content">
@@ -2519,104 +2248,6 @@ onMounted(() => {
 
 .create-issue-btn:hover {
   background-color: #059669;
-}
-
-/* 评论区域 */
-.comment-input-section {
-  margin-bottom: 24px;
-  padding-bottom: 24px;
-  border-bottom: 1px solid #e0e0e0;
-}
-
-.comment-textarea {
-  width: 100%;
-  padding: 12px;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 14px;
-  font-family: inherit;
-  resize: vertical;
-  margin-bottom: 12px;
-}
-
-.comment-textarea:focus {
-  outline: none;
-  border-color: #10b981;
-  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.1);
-}
-
-.submit-comment-btn {
-  padding: 10px 24px;
-  background-color: #10b981;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.submit-comment-btn:hover {
-  background-color: #059669;
-}
-
-.comments-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.comment-item {
-  padding: 16px;
-  background-color: #f9f9f9;
-  border-radius: 6px;
-  border-left: 3px solid #10b981;
-}
-
-.comment-header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 8px;
-}
-
-.comment-avatar-img {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #e0e0e0;
-}
-
-.comment-avatar-text {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background-color: #10b981;
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 16px;
-  font-weight: 600;
-  flex-shrink: 0;
-}
-
-.comment-user {
-  font-weight: 600;
-  color: #333333;
-}
-
-.comment-time {
-  font-size: 12px;
-  color: #999999;
-}
-
-.comment-content {
-  font-size: 14px;
-  color: #666666;
-  line-height: 1.6;
-  margin: 0;
 }
 
 /* 设置页面 */

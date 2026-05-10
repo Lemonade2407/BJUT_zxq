@@ -175,4 +175,107 @@ public class CommentService {
         log.debug("统计评论总数，项目 ID: {}", projectId);
         return commentMapper.countByProjectId(projectId);
     }
+
+    /**
+     * 管理员获取所有评论（分页）
+     * @param pageNum 页码
+     * @param pageSize 每页数量
+     * @param status 评论状态（null查全部）
+     * @return 评论VO列表
+     */
+    public List<CommentVO> getAllCommentsForAdmin(Integer pageNum, Integer pageSize, Integer status) {
+        log.info("管理员获取评论列表，页码：{}，每页数量：{}，状态：{}", pageNum, pageSize, status);
+        PageHelper.startPage(pageNum, pageSize);
+        List<Comment> comments = commentMapper.selectAllWithPage(status);
+        return enrichCommentsWithUserAndProject(comments);
+    }
+
+    /**
+     * 管理员搜索评论（分页）
+     * @param keyword 关键词
+     * @param pageNum 页码
+     * @param pageSize 每页数量
+     * @return 评论VO列表
+     */
+    public List<CommentVO> searchCommentsForAdmin(String keyword, Integer pageNum, Integer pageSize) {
+        log.info("管理员搜索评论，关键词：{}，页码：{}，每页数量：{}", keyword, pageNum, pageSize);
+        PageHelper.startPage(pageNum, pageSize);
+        List<Comment> comments = commentMapper.searchByKeyword(keyword);
+        return enrichCommentsWithUserAndProject(comments);
+    }
+
+    /**
+     * 管理员物理删除评论
+     * @param commentId 评论 ID
+     */
+    @Transactional(rollbackFor = Exception.class)
+    @CacheEvict(value = "commentList", allEntries = true)
+    public void adminDeleteComment(Integer commentId) {
+        log.info("管理员删除评论，ID: {}", commentId);
+        Comment comment = commentMapper.selectById(commentId);
+        if (comment == null) {
+            throw new RuntimeException("评论不存在");
+        }
+        commentMapper.forceDeleteById(commentId);
+        log.info("管理员删除评论成功，ID: {}", commentId);
+    }
+
+    /**
+     * 统计评论数量（管理员，按状态）
+     * @param status 评论状态（null查全部）
+     */
+    public long countByStatus(Integer status) {
+        return commentMapper.countByStatus(status);
+    }
+
+    /**
+     * 统计评论数量（管理员，按关键词）
+     * @param keyword 关键词
+     */
+    public long countByKeywordForAdmin(String keyword) {
+        return commentMapper.countByKeyword(keyword);
+    }
+
+    /**
+     * 批量填充评论的用户信息和项目名称
+     */
+    private List<CommentVO> enrichCommentsWithUserAndProject(List<Comment> comments) {
+        if (comments.isEmpty()) {
+            return List.of();
+        }
+        // 批量查询用户信息
+        List<Integer> userIds = comments.stream()
+            .map(Comment::getUserId)
+            .distinct()
+            .collect(Collectors.toList());
+        Map<Integer, Map<String, Object>> userMap;
+        if (!userIds.isEmpty()) {
+            List<Map<String, Object>> users = commentMapper.selectUserBatch(userIds);
+            userMap = users.stream()
+                .collect(Collectors.toMap(
+                    u -> (Integer) u.get("id"),
+                    u -> u
+                ));
+        } else {
+            userMap = new java.util.HashMap<>();
+        }
+        // 批量查询项目名称
+        List<Integer> projectIds = comments.stream()
+            .map(Comment::getProjectId)
+            .distinct()
+            .collect(Collectors.toList());
+        Map<Integer, String> projectNameMap = new java.util.HashMap<>();
+        if (!projectIds.isEmpty()) {
+            List<Map<String, Object>> projectNames = commentMapper.getProjectNamesBatch(projectIds);
+            for (Map<String, Object> row : projectNames) {
+                projectNameMap.put((Integer) row.get("id"), (String) row.get("name"));
+            }
+        }
+        // 转换为VO
+        List<CommentVO> vos = DtoConverter.toCommentVOList(comments, userMap);
+        for (CommentVO vo : vos) {
+            vo.setProjectName(projectNameMap.get(vo.getProjectId()));
+        }
+        return vos;
+    }
 }

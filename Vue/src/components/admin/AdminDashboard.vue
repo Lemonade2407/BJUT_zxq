@@ -1,10 +1,11 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import UserManagement from './admin/UserManagement.vue'
-import ProjectManagement from './admin/ProjectManagement.vue'
-import TagManagement from './admin/TagManagement.vue'
-import CourseManagement from './admin/CourseManagement.vue'
-import CommentManagement from './admin/CommentManagement.vue'
+import UserManagement from './UserManagement.vue'
+import ProjectManagement from './ProjectManagement.vue'
+import TagManagement from './TagManagement.vue'
+import CourseManagement from './CourseManagement.vue'
+import CommentManagement from './CommentManagement.vue'
+import TeamManagement from './TeamManagement.vue'
 import { useRouter } from 'vue-router'
 import { toast } from '@/utils/toast'
 import { error as logError } from '@/utils/logger'
@@ -21,7 +22,8 @@ const menuItems = [
   { key: 'projects', label: '项目管理', icon: '📁' },
   { key: 'tags', label: '标签管理', icon: '🏷️' },
   { key: 'courses', label: '课程管理', icon: '📚' },
-  { key: 'comments', label: '评论管理', icon: '💬' }
+  { key: 'comments', label: '评论管理', icon: '💬' },
+  { key: 'teams', label: '组队管理', icon: '👥' }
 ]
 
 // 切换菜单
@@ -67,6 +69,9 @@ const switchMenu = (key) => {
       
       <!-- 评论管理 -->
       <CommentManagement v-else-if="activeMenu === 'comments'" />
+
+      <!-- 组队管理 -->
+      <TeamManagement v-else-if="activeMenu === 'teams'" />
     </main>
   </div>
 </template>

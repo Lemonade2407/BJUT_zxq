@@ -5,7 +5,7 @@ import { getCurrentUser, updateProfile, changePassword, uploadAvatar } from '@/a
 import { toast } from '@/utils/toast'
 import { error as logError } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
-import UserSidebar from '@/components/UserSidebar.vue'
+import UserSidebar from '@/components/user/UserSidebar.vue'
 import { formatDateShort } from '@/utils/helpers'
 
 const router = useRouter()
@@ -66,7 +66,6 @@ const toggleEdit = () => {
 
 // 保存用户信息
 const handleSave = async () => {
-  // TODO: 添加表单验证（手机号、邮箱格式等）
   try {
     const updateData = {
       username: userInfo.value.username,

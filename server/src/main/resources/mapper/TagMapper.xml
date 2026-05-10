@@ -83,4 +83,10 @@
     <select id="selectHotTags" resultMap="BaseResultMap">
         SELECT * FROM tag ORDER BY usage_count DESC LIMIT #{limit}
     </select>
+
+    <!-- 批量查询标签 -->
+    <select id="selectByIds" resultMap="BaseResultMap">
+        SELECT * FROM tag WHERE id IN
+        <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
+    </select>
 </mapper>

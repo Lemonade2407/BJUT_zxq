@@ -25,7 +25,12 @@ public enum NotificationType {
     /**
      * 系统通知
      */
-    SYSTEM(4, "系统通知");
+    SYSTEM(4, "系统通知"),
+
+    /**
+     * 组队申请通知
+     */
+    TEAM_APPLICATION(5, "组队申请");
     
     private final int code;
     private final String description;

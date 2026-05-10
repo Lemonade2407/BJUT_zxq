@@ -91,4 +91,46 @@ public interface CommentMapper {
      * @return 项目名称
      */
     String getProjectName(@Param("projectId") Integer projectId);
+
+    /**
+     * 批量获取项目名称
+     * @param projectIds 项目 ID 列表
+     * @return 项目名称映射
+     */
+    List<Map<String, Object>> getProjectNamesBatch(@Param("projectIds") List<Integer> projectIds);
+
+    /**
+     * 分页查询所有评论（管理员）
+     * @param status 评论状态（null查全部）
+     * @return 评论列表
+     */
+    List<Comment> selectAllWithPage(@Param("status") Integer status);
+
+    /**
+     * 按关键词搜索评论（管理员）
+     * @param keyword 关键词
+     * @return 评论列表
+     */
+    List<Comment> searchByKeyword(@Param("keyword") String keyword);
+
+    /**
+     * 统计关键词匹配的评论数
+     * @param keyword 关键词
+     * @return 评论数
+     */
+    int countByKeyword(@Param("keyword") String keyword);
+
+    /**
+     * 统计按状态的评论数（管理员）
+     * @param status 评论状态（null查全部）
+     * @return 评论数
+     */
+    int countByStatus(@Param("status") Integer status);
+
+    /**
+     * 物理删除评论
+     * @param id 评论 ID
+     * @return 影响行数
+     */
+    int forceDeleteById(@Param("id") Integer id);
 }

@@ -8,6 +8,7 @@ import com.bjutzxq.pojo.entity.User;
 import com.bjutzxq.server.context.UserIdContext;
 import com.bjutzxq.server.service.UserService;
 import com.bjutzxq.server.util.CaptchaUtil;
+import com.bjutzxq.server.util.DtoConverter;
 import com.bjutzxq.server.util.JwtUtil;
 import com.bjutzxq.server.util.RegistrationRateLimiter;
 import lombok.extern.slf4j.Slf4j;
@@ -15,7 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.validation.Valid;
+import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -189,7 +190,7 @@ public class AuthController {
         
         // 获取用户信息并转换为 VO
         User user = userService.getCurrentUser(userId);
-        UserVO response = convertToUserResponse(user);
+        UserVO response = DtoConverter.toUserVO(user);
         log.info("获取用户信息成功：{}, {}", user.getId(), user.getUsername());
         return Result.success(response);
     }
@@ -223,7 +224,7 @@ public class AuthController {
         log.debug("Token 解析成功，用户 ID: {}", userId);
         
         User updatedUser = userService.updateProfile(userId, avatar, phone, sex, bio);
-        UserVO response = convertToUserResponse(updatedUser);
+        UserVO response = DtoConverter.toUserVO(updatedUser);
         log.info("用户信息更新成功：{}", userId);
         return Result.success("更新成功", response);
     }
@@ -304,35 +305,9 @@ public class AuthController {
         }
         
         // 转换为 VO
-        UserVO response = convertToUserResponse(user);
+        UserVO response = DtoConverter.toUserVO(user);
         log.info("获取用户信息成功：{}, {}", user.getId(), user.getUsername());
         return Result.success(response);
     }
     
-    /**
-     * 将 User Entity 转换为 UserVO
-     */
-    private UserVO convertToUserResponse(User user) {
-        if (user == null) {
-            return null;
-        }
-        
-        UserVO vo = new UserVO();
-        vo.setId(user.getId());
-        vo.setUsername(user.getUsername());
-        vo.setEmployeeId(user.getEmployeeId());
-        vo.setRealName(user.getRealName());
-        vo.setClassName(user.getClassName());
-        vo.setEmail(user.getEmail());
-        vo.setAvatar(user.getAvatar());
-        vo.setPhone(user.getPhone());
-        vo.setSex(user.getSex());
-        vo.setBio(user.getBio());
-        vo.setRole(user.getRole() != null ? user.getRole().name() : null);
-        vo.setStatus(user.getStatus());
-        vo.setCreatedAt(user.getCreatedAt());
-        vo.setUpdatedAt(user.getUpdatedAt());
-        
-        return vo;
-    }
 }

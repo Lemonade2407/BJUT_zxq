@@ -120,8 +120,6 @@ const loadNotifications = async () => {
       showAll.value = false
     }
   } catch (error) {
-    // Token 过期或无效时，request.js 会自动跳转到登录页，这里不需要额外处理
-    // 只在非认证错误时才记录日志和显示提示
     if (!error.message.includes('未授权') && 
         !error.message.includes('Token') && 
         !error.message.includes('expired')) {
