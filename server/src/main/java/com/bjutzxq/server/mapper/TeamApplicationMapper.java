@@ -26,4 +26,5 @@ public interface TeamApplicationMapper {
     Integer getTeamCreatorId(@Param("teamId") Integer teamId);
 
     List<Map<String, Object>> selectUserBatch(@Param("userIds") List<Integer> userIds);
+    int countByStatus(@Param("status") Integer status);
 }

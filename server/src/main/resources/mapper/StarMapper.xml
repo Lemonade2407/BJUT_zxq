@@ -54,4 +54,5 @@
         <foreach collection="projectIds" item="pid" open="(" separator="," close=")">#{pid}</foreach>
     </select>
 
+  <select id="countByProjectOwner" resultType="int">SELECT COUNT(*) FROM star s JOIN project p ON s.project_id=p.id WHERE p.owner_id=#{userId}</select>
 </mapper>

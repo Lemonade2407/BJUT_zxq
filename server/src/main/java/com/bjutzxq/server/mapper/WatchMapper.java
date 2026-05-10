@@ -65,4 +65,5 @@ public interface WatchMapper {
     java.util.List<Integer> selectWatchedProjectIds(
             @Param("userId") Integer userId,
             @Param("projectIds") java.util.List<Integer> projectIds);
+    int countByUserId(@Param("userId") Integer userId);
 }

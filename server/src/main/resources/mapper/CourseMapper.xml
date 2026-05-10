@@ -60,4 +60,5 @@
         ORDER BY course_name ASC
     </select>
 
+  <select id="countAll" resultType="int">SELECT COUNT(*) FROM course</select>
 </mapper>

@@ -133,4 +133,7 @@ public interface CommentMapper {
      * @return 影响行数
      */
     int forceDeleteById(@Param("id") Integer id);
+    int countByUserId(@Param("userId") Integer userId);
+    int countByMonth(@Param("month") String month);
+    int countByUserIdAndMonth(@Param("userId") Integer userId, @Param("month") String month);
 }

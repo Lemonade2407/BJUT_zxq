@@ -82,4 +82,6 @@ public interface ProjectFileMapper {
      * @return 影响行数
      */
     int deleteByProjectId(@Param("projectId") Integer projectId);
+    int countAllFiles();
+    int countByUserId(@Param("userId") Integer userId);
 }

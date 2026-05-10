@@ -84,6 +84,13 @@ const routes = [
   },
 
   {
+    path: '/my-stats',
+    name: 'MyStats',
+    component: () => import('@/components/user/MyStats.vue'),
+    meta: { title: '我的统计', requiresAuth: true }
+  },
+
+  {
     path: '/my-teams',
     name: 'MyTeams',
     component: () => import('@/components/team/MyTeams.vue'),

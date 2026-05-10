@@ -57,6 +57,10 @@ onMounted(() => {
         <span class="nav-icon">⭐</span>
         <span class="nav-label">我的收藏</span>
       </router-link>
+      <router-link to="/my-stats" class="nav-item" active-class="active">
+        <span class="nav-icon">📊</span>
+        <span class="nav-label">我的统计</span>
+      </router-link>
       <router-link
         v-if="userInfo.role === 'TEACHER'"
         to="/class-management"

@@ -171,4 +171,7 @@
         <foreach collection="projectIds" item="pid" open="(" separator="," close=")">#{pid}</foreach>
     </select>
 
+  <select id="countByUserId" resultType="int">SELECT COUNT(*) FROM comment WHERE user_id=#{userId}</select>
+  <select id="countByMonth" resultType="int">SELECT COUNT(*) FROM comment WHERE DATE_FORMAT(created_at,'%Y-%m')=#{month}</select>
+  <select id="countByUserIdAndMonth" resultType="int">SELECT COUNT(*) FROM comment WHERE user_id=#{userId} AND DATE_FORMAT(created_at,'%Y-%m')=#{month}</select>
 </mapper>

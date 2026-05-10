@@ -335,5 +335,12 @@
         </if>
         ORDER BY p.updated_at DESC, p.created_at DESC
     </select>
-    
+
+    <!-- ===== 统计查询 ===== -->
+    <select id="sumDownloadsByUserId" resultType="int">SELECT COALESCE(SUM(download_count),0) FROM project WHERE owner_id=#{userId}</select>
+    <select id="countByType" resultType="java.util.HashMap">SELECT project_type as type, COUNT(*) as cnt FROM project GROUP BY project_type</select>
+    <select id="countByMonth" resultType="int">SELECT COUNT(*) FROM project WHERE DATE_FORMAT(created_at,'%Y-%m')=#{month}</select>
+    <select id="countByUserIdGroupByType" resultType="java.util.HashMap">SELECT project_type as type, COUNT(*) as cnt FROM project WHERE owner_id=#{userId} GROUP BY project_type</select>
+    <select id="countByUserIdAndMonth" resultType="int">SELECT COUNT(*) FROM project WHERE owner_id=#{userId} AND DATE_FORMAT(created_at,'%Y-%m')=#{month}</select>
+
 </mapper>

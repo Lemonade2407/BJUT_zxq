@@ -99,4 +99,5 @@
         </foreach>
     </select>
 
+  <select id="countByUserId" resultType="int">SELECT COUNT(*) FROM team WHERE user_id=#{userId}</select>
 </mapper>

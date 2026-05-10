@@ -51,4 +51,5 @@ public interface StarMapper {
     java.util.List<Integer> selectStarredProjectIds(
             @Param("userId") Integer userId,
             @Param("projectIds") java.util.List<Integer> projectIds);
+    int countByProjectOwner(@Param("userId") Integer userId);
 }

@@ -56,4 +56,5 @@
         <foreach collection="userIds" item="uid" open="(" separator="," close=")">#{uid}</foreach>
     </select>
 
+  <select id="countByStatus" resultType="int">SELECT COUNT(*) FROM team_application WHERE status=#{status}</select>
 </mapper>

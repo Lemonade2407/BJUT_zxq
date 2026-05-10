@@ -25,4 +25,5 @@ public interface TeamMapper {
     int countAll(@Param("tag") String tag, @Param("status") Integer status, @Param("courseName") String courseName);
 
     List<Map<String, Object>> selectUserBatch(@Param("userIds") List<Integer> userIds);
+    int countByUserId(@Param("userId") Integer userId);
 }

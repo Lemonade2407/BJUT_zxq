@@ -118,4 +118,5 @@
         <foreach collection="ids" item="id" open="(" separator="," close=")">#{id}</foreach>
     </select>
 
+  <select id="countByUserId" resultType="int">SELECT COUNT(*) FROM notification WHERE user_id=#{userId}</select>
 </mapper>

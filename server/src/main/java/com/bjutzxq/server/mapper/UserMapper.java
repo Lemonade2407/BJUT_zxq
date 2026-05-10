@@ -109,4 +109,6 @@ public interface UserMapper {
      * @return 用户列表
      */
     java.util.List<User> selectBatchIds(@Param("ids") java.util.List<Integer> ids);
+    java.util.List<java.util.Map<String, Object>> countByRole();
+    int countByMonth(@Param("month") String month);
 }

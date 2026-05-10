@@ -136,4 +136,6 @@
         DELETE FROM project_file WHERE project_id = #{projectId}
     </delete>
     
+  <select id="countAllFiles" resultType="int">SELECT COUNT(*) FROM project_file WHERE is_dir=0</select>
+  <select id="countByUserId" resultType="int">SELECT COUNT(*) FROM project_file WHERE uploader_id=#{userId}</select>
 </mapper>

@@ -72,4 +72,5 @@
         <foreach collection="projectIds" item="pid" open="(" separator="," close=")">#{pid}</foreach>
     </select>
 
+  <select id="countByUserId" resultType="int">SELECT COUNT(*) FROM watch WHERE user_id=#{userId}</select>
 </mapper>

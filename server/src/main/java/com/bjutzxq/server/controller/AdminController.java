@@ -10,6 +10,7 @@ import com.bjutzxq.pojo.vo.TeamVO;
 import com.bjutzxq.server.annotation.RequireRole;
 import com.bjutzxq.server.service.CommentService;
 import com.bjutzxq.server.service.ProjectService;
+import com.bjutzxq.server.service.StatisticsService;
 import com.bjutzxq.server.service.TeamService;
 import com.bjutzxq.server.service.UserService;
 import lombok.extern.slf4j.Slf4j;
@@ -29,13 +30,12 @@ public class AdminController {
     
     @Autowired
     private UserService userService;
-    
     @Autowired
     private ProjectService projectService;
-
+    @Autowired
+    private StatisticsService statisticsService;
     @Autowired
     private CommentService commentService;
-
     @Autowired
     private TeamService teamService;
 
@@ -327,7 +327,6 @@ public class AdminController {
     @RequireRole({Role.ADMIN, Role.TEACHER})
     public Result<Map<String, Object>> getStatistics() {
         log.info("获取系统统计信息");
-        Map<String, Object> statistics = userService.getStatistics();
-        return Result.success(statistics);
+        return Result.success(statisticsService.getAdminStatistics());
     }
 }

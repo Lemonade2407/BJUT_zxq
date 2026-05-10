@@ -5,6 +5,7 @@ import com.bjutzxq.pojo.entity.Project;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
 import java.util.List;
+import java.util.Map;
 
 
 /**
@@ -219,4 +220,9 @@ public interface ProjectMapper {
         @Param("projectType") String projectType
     );
 
+    int sumDownloadsByUserId(@Param("userId") Integer userId);
+    java.util.List<java.util.Map<String, Object>> countByType();
+    int countByMonth(@Param("month") String month);
+    java.util.List<java.util.Map<String, Object>> countByUserIdGroupByType(@Param("userId") Integer userId);
+    int countByUserIdAndMonth(@Param("userId") Integer userId, @Param("month") String month);
 }

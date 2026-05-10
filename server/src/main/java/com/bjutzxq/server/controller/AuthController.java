@@ -6,6 +6,7 @@ import com.bjutzxq.pojo.dto.*;
 import com.bjutzxq.pojo.vo.*;
 import com.bjutzxq.pojo.entity.User;
 import com.bjutzxq.server.context.UserIdContext;
+import com.bjutzxq.server.service.StatisticsService;
 import com.bjutzxq.server.service.UserService;
 import com.bjutzxq.server.util.CaptchaUtil;
 import com.bjutzxq.server.util.DtoConverter;
@@ -30,6 +31,9 @@ public class AuthController {
     
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private StatisticsService statisticsService;
     
     /**
      * 用户注册（使用 DTO）
@@ -310,4 +314,13 @@ public class AuthController {
         return Result.success(response);
     }
     
+    /**
+     * 获取当前用户的统计数据
+     * GET /api/auth/user/statistics
+     */
+    @GetMapping("/user/statistics")
+    public Result<Map<String, Object>> getMyStatistics() {
+        Integer userId = UserIdContext.getCurrentUserId();
+        return Result.success(statisticsService.getUserStatistics(userId));
+    }
 }

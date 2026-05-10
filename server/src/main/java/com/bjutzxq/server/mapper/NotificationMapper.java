@@ -88,4 +88,5 @@ public interface NotificationMapper {
      * @return 影响行数
      */
     int deleteReadBeforeDate(@Param("beforeDate") LocalDateTime beforeDate);
+    int countByUserId(@Param("userId") Integer userId);
 }

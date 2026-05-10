@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
+import StatsOverview from './StatsOverview.vue'
 import UserManagement from './UserManagement.vue'
 import ProjectManagement from './ProjectManagement.vue'
 import TagManagement from './TagManagement.vue'
@@ -14,10 +15,11 @@ import tokenManager from '@/utils/tokenManager'
 const router = useRouter()
 
 // 当前激活的菜单项
-const activeMenu = ref('users')
+const activeMenu = ref('stats')
 
 // 菜单项配置
 const menuItems = [
+  { key: 'stats', label: '数据概览', icon: '📊' },
   { key: 'users', label: '用户管理', icon: '👥' },
   { key: 'projects', label: '项目管理', icon: '📁' },
   { key: 'tags', label: '标签管理', icon: '🏷️' },
@@ -56,6 +58,7 @@ const switchMenu = (key) => {
     <!-- 主内容区 -->
     <main class="admin-main">
       <!-- 用户管理 -->
+      <StatsOverview v-if="activeMenu === 'stats'" />
       <UserManagement v-if="activeMenu === 'users'" />
       
       <!-- 项目管理 -->

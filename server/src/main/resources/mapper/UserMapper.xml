@@ -182,4 +182,6 @@
         </foreach>
     </select>
     
+  <select id="countByRole" resultType="java.util.HashMap">SELECT role, COUNT(*) as cnt FROM user GROUP BY role</select>
+  <select id="countByMonth" resultType="int">SELECT COUNT(*) FROM user WHERE DATE_FORMAT(created_at,'%Y-%m')=#{month}</select>
 </mapper>

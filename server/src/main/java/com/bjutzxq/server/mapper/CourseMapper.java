@@ -45,4 +45,5 @@ public interface CourseMapper {
      * 模糊搜索课程
      */
     List<Course> searchCourses(@Param("keyword") String keyword);
+    int countAll();
 }
