@@ -1,6 +1,7 @@
 # ProjecTree 知享圈
 
 > Plant your ideas, grow your future. —— 北京工业大学项目协作与组队平台
+> https://www.bjut-zxq.cn/
 
 ## 技术栈
 
