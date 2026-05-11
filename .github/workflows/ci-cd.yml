@@ -1,0 +1,65 @@
+name: CI/CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+      - run: mvn test -B
+
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: Vue
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: Vue/package-lock.json
+      - run: npm ci
+      - run: npm run build
+
+  deploy:
+    needs: [backend-test, frontend-build]
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: webfactory/ssh-agent@v0.9.1
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+      - name: Deploy to server
+        run: |
+          ssh -o StrictHostKeyChecking=accept-new ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} '
+            set -e
+            cd /opt/bjut-zxq
+            echo "[1/4] Pulling latest code..."
+            git fetch origin main
+            git reset --hard origin/main
+            echo "[2/4] Stopping old services..."
+            docker compose down --remove-orphans
+            echo "[3/4] Building images..."
+            docker compose build
+            echo "[4/4] Starting services..."
+            docker compose up -d
+            for i in $(seq 1 40); do
+              curl -sf http://localhost:8080/api/actuator/health && break
+              sleep 3
+            done
+            curl -sf http://localhost/ && echo "Deploy complete"
+          '
