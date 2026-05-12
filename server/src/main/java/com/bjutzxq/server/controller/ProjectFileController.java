@@ -9,12 +9,15 @@ import com.bjutzxq.server.mapper.UserMapper;
 import com.bjutzxq.server.service.ProjectFileService;
 import com.bjutzxq.server.service.ProjectService;
 import com.bjutzxq.server.util.DtoConverter;
+import com.bjutzxq.server.util.OssUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * 项目文件控制器
@@ -32,58 +35,9 @@ public class ProjectFileController {
 
     @Autowired
     private ProjectService projectService;
-    
-    /**
-     * 批量上传文件（支持文件夹）
-     * POST /api/projects/{projectId}/files/upload-batch
-     */
-    @PostMapping("/upload-batch")
-    public Result<List<FileVO>> uploadFiles(
-            @PathVariable Integer projectId,
-            @RequestParam("files") MultipartFile[] files,
-            @RequestParam(value = "parentId", required = false) Integer parentId) {
-            
-        log.info("收到批量文件上传请求，项目 ID: {}, 文件数量：{}", projectId, files.length);
-            
-        // 获取当前用户 ID 并批量上传
-        Integer userId = UserIdContext.getCurrentUserId();
-        List<ProjectFile> projectFiles = projectFileService.uploadFiles(projectId, files, parentId, userId);
-        
-        // 转换为 VO（批量查询上传者信息）
-        List<FileVO> responses = convertToVOListWithBatchQuery(projectFiles);
-            
-        log.info("批量文件上传成功，成功数量：{}", responses.size());
-        return Result.success("批量文件上传成功", responses);
-    }
-    
-    /**
-     * 覆盖上传文件（先删除再上传）
-     * POST /api/projects/{projectId}/files/overwrite-upload
-     */
-    @PostMapping("/overwrite-upload")
-    public Result<List<FileVO>> overwriteUploadFiles(
-            @PathVariable Integer projectId,
-            @RequestParam("files") MultipartFile[] files,
-            @RequestParam(value = "parentId", required = false) Integer parentId) {
-            
-        log.info("收到覆盖上传请求，项目 ID: {}, 文件数量：{}", projectId, files.length);
-            
-        // 获取当前用户 ID
-        Integer userId = UserIdContext.getCurrentUserId();
-        
-        // 先删除项目的所有文件
-        int deletedCount = projectFileService.deleteAllProjectFiles(projectId);
-        log.info("已删除旧文件 {} 个", deletedCount);
-            
-        // 批量上传新文件
-        List<ProjectFile> projectFiles = projectFileService.uploadFiles(projectId, files, parentId, userId);
-        
-        // 转换为 VO（批量查询上传者信息）
-        List<FileVO> responses = convertToVOListWithBatchQuery(projectFiles);
-            
-        log.info("覆盖上传成功，删除 {} 个旧文件，上传 {} 个新文件", deletedCount, responses.size());
-        return Result.success("覆盖上传成功，已替换 " + deletedCount + " 个旧文件", responses);
-    }
+
+    @Autowired
+    private OssUtil ossUtil;
     
     /**
      * 获取所有文件（用于构建完整的树形结构）
@@ -172,6 +126,126 @@ public class ProjectFileController {
         return Result.success(documentUrl);
     }
     
+    /**
+     * 删除项目所有文件
+     * DELETE /api/projects/{projectId}/files/all
+     */
+    @DeleteMapping("/all")
+    public Result<Integer> deleteAllFiles(@PathVariable Integer projectId) {
+        Integer userId = UserIdContext.getCurrentUserId();
+        log.info("删除项目所有文件，项目 ID: {}", projectId);
+        int count = projectFileService.deleteAllProjectFiles(projectId);
+        log.info("已删除 {} 条文件记录", count);
+        return Result.success("已删除 " + count + " 个文件", count);
+    }
+
+    /**
+     * 确认 OSS 直传完成，创建文件记录
+     * POST /api/projects/{projectId}/files/confirm
+     */
+    @PostMapping("/confirm")
+    public Result<List<FileVO>> confirmUpload(
+            @PathVariable Integer projectId,
+            @RequestBody List<Map<String, Object>> files) {
+
+        Integer userId = UserIdContext.getCurrentUserId();
+        log.info("确认 OSS 直传，项目 ID: {}, 文件数: {}", projectId, files.size());
+
+        // 目录缓存：path -> directoryId
+        java.util.Map<String, Integer> dirCache = new java.util.HashMap<>();
+
+        List<ProjectFile> projectFiles = new ArrayList<>();
+        for (Map<String, Object> f : files) {
+            String objectKey = (String) f.get("objectKey");
+            String fileName = (String) f.get("fileName");
+            String filePath = (String) f.get("path");
+            Long fileSize = f.get("fileSize") != null
+                ? ((Number) f.get("fileSize")).longValue() : 0L;
+
+            String ossUrl = ossUtil.getFileAccessUrl(objectKey);
+
+            // 如果有文件夹路径，创建目录记录
+            Integer parentId = null;
+            if (filePath != null && !filePath.isEmpty()) {
+                // 去掉文件名，只保留目录部分
+                String dirPath = filePath.replace("\\", "/");
+                int lastSlash = dirPath.lastIndexOf('/');
+                if (lastSlash > 0) {
+                    dirPath = dirPath.substring(0, lastSlash);
+                } else {
+                    dirPath = "";
+                }
+
+                if (!dirPath.isEmpty()) {
+                    String[] parts = dirPath.split("/");
+                    StringBuilder currentPath = new StringBuilder();
+                    Integer currentParentId = null;
+
+                    for (String dirName : parts) {
+                        if (dirName.isEmpty()) continue;
+                        currentPath.append("/").append(dirName);
+                        String cacheKey = currentPath.toString();
+
+                        Integer dirId = dirCache.get(cacheKey);
+                        if (dirId == null) {
+                            // 查找或创建目录
+                            dirId = findOrCreateDirectory(projectId, dirName,
+                                currentParentId, userId);
+                            dirCache.put(cacheKey, dirId);
+                        }
+                        currentParentId = dirId;
+                    }
+                    parentId = currentParentId;
+                }
+            }
+
+            ProjectFile pf = new ProjectFile();
+            pf.setProjectId(projectId);
+            pf.setFileName(fileName);
+            pf.setStorageUrl(ossUrl);
+            pf.setFileSize(fileSize);
+            pf.setFileType(ossUtil.getFileExtension(fileName));
+            pf.setParentId(parentId);
+            pf.setUploaderId(userId);
+            pf.setIsDir(0);
+            projectFiles.add(pf);
+        }
+
+        projectFiles = projectFileService.batchCreate(projectFiles);
+        List<FileVO> result = convertToVOListWithBatchQuery(projectFiles);
+        log.info("OSS 直传确认完成，创建 {} 条文件记录", result.size());
+        return Result.success("确认成功", result);
+    }
+
+    /**
+     * 查找或创建目录记录
+     */
+    private Integer findOrCreateDirectory(Integer projectId, String dirName,
+                                          Integer parentId, Integer userId) {
+        // 查找已存在的目录
+        List<ProjectFile> existing = projectFileService.getAllFiles(projectId);
+        for (ProjectFile f : existing) {
+            if (f.getIsDir() != null && f.getIsDir() == 1
+                && dirName.equals(f.getFileName())
+                && java.util.Objects.equals(f.getParentId(), parentId)) {
+                return f.getId();
+            }
+        }
+
+        // 创建新目录
+        ProjectFile dir = new ProjectFile();
+        dir.setProjectId(projectId);
+        dir.setFileName(dirName);
+        dir.setParentId(parentId);
+        dir.setIsDir(1);
+        dir.setUploaderId(userId);
+        dir.setFileType("");
+        dir.setFileSize(0L);
+        dir.setStorageUrl("");
+        projectFileService.insertSingle(dir);
+        return dir.getId();
+    }
+
     /**
      * 将 ProjectFile 列表转换为 FileVO 列表（批量查询优化）
      * @param projectFiles 项目文件列表

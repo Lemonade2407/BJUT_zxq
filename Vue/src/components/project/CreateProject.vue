@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { createProject, uploadFiles, uploadProjectDocument, getProjectTypes } from '@/api/project'
+import { createProject, getUploadSignatures, uploadToPresignedUrl, confirmUpload, getProjectTypes } from '@/api/project'
 import { getTagsByCategory } from '@/api/tag'
 import { getActiveCourses } from '@/api/course'
 import { useFileTree } from '@/composables/useFileTree'
@@ -178,6 +178,41 @@ const validateForm = () => {
 }
 
 // 提交表单
+  // 直传文件到 OSS
+  const uploadDirectToOss = async (files) => {
+    const fileList = files.map(f => ({ name: f.name, size: f.size }))
+    const sigRes = await getUploadSignatures(fileList)
+    if (sigRes.code !== 200) throw new Error('获取上传签名失败')
+
+    const signatures = sigRes.data
+    isUploading.value = true
+    uploadProgress.value = 0
+
+    const totalBytes = files.reduce((sum, f) => sum + f.size, 0)
+    let uploadedBytes = 0
+
+    const uploaded = []
+    for (let i = 0; i < signatures.length; i++) {
+      const sig = signatures[i]
+      const file = files[i]
+      let fileLoadedPrev = 0
+
+      await uploadToPresignedUrl(sig, file, (loaded, total) => {
+        uploadedBytes += loaded - fileLoadedPrev
+        fileLoadedPrev = loaded
+        uploadProgress.value = totalBytes > 0
+          ? Math.round((uploadedBytes / totalBytes) * 100)
+          : Math.round(((i + 1) / signatures.length) * 100)
+      })
+      uploaded.push({
+        objectKey: sig.objectKey,
+        fileName: sig.fileName,
+        fileSize: file.size
+      })
+    }
+    return uploaded
+  }
+
   const handleSubmit = async () => {
     if (!validateForm()) {
       return
@@ -188,9 +223,8 @@ const validateForm = () => {
     try {
       log('开始创建项目:', form.value)
 
-      // 1. 先创建项目（获取 ID 才能上传文件）
+      // 1. 先创建项目（获取 ID）
       const res = await createProject(form.value)
-
       if (res.code !== 200) {
         toast.error(res.message || '创建项目失败')
         return
@@ -199,21 +233,26 @@ const validateForm = () => {
       const projectId = res.data.id
       log('项目已创建，ID:', projectId)
 
-      // 2. 上传项目文档（使用专用文档接口）
+      // 2. 直传项目文档到 OSS
       if (documentFile.value) {
-        const docRes = await uploadProjectDocument(projectId, documentFile.value)
-        if (docRes.code !== 200) {
-          toast.warning('项目文档上传失败：' + (docRes.message || '未知错误'))
+        try {
+          const uploaded = await uploadDirectToOss([documentFile.value])
+          await confirmUpload(projectId, uploaded)
+        } catch (e) {
+          toast.warning('项目文档上传失败：' + (e.message || '未知错误'))
         }
       }
 
-      // 3. 上传项目代码文件
+      // 3. 直传项目文件到 OSS
       if (selectedFiles.value.length > 0) {
-        const fileRes = await uploadFiles(projectId, selectedFiles.value)
-        if (fileRes.code === 200) {
-          uploadedFiles.value = fileRes.data
-        } else {
-          toast.warning('项目文件上传失败：' + (fileRes.message || '未知错误'))
+        try {
+          const uploaded = await uploadDirectToOss(selectedFiles.value)
+          const fileRes = await confirmUpload(projectId, uploaded)
+          if (fileRes.code === 200) {
+            uploadedFiles.value = fileRes.data
+          }
+        } catch (e) {
+          toast.warning('项目文件上传失败：' + (e.message || '未知错误'))
         }
       }
 
@@ -224,6 +263,7 @@ const validateForm = () => {
       toast.error(error.message || '创建项目失败，请稍后重试')
     } finally {
       isSubmitting.value = false
+      isUploading.value = false
     }
   }
 

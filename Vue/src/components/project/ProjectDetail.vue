@@ -1,7 +1,7 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getProjectDetail, starProject, unstarProject, watchProject, unwatchProject, downloadProject, updateProject, deleteProject, uploadFiles, overwriteUploadFiles, getAllProjectFiles, uploadProjectDocument, deleteProjectDocument, getProjectDocument, getProjectTypes } from '@/api/project'
+import { getProjectDetail, starProject, unstarProject, watchProject, unwatchProject, downloadProject, updateProject, deleteProject, getAllProjectFiles, deleteAllProjectFiles, getUploadSignatures, uploadToPresignedUrl, confirmUpload, uploadProjectDocument, deleteProjectDocument, getProjectDocument, getProjectTypes } from '@/api/project'
 import { getTagsByCategory } from '@/api/tag'
 import { getActiveCourses } from '@/api/course'
 import { toast } from '@/utils/toast'
@@ -755,96 +755,81 @@ const formatCommentTime = (timeStr) => {
   return `${year}-${month}-${day}`
 }
 
-// 上传项目文件（分批上传）
+// 上传项目文件（OSS 直传，分批获取签名）
 const uploadProjectFiles = async () => {
   if (selectedFiles.value.length === 0) {
     toast.warning('请先选择要上传的文件')
     return
   }
-  
-  // 计算总文件大小
-  const totalSize = selectedFiles.value.reduce((sum, file) => sum + file.size, 0)
+
+  const totalSize = selectedFiles.value.reduce((sum, f) => sum + f.size, 0)
   const totalSizeMB = (totalSize / 1024 / 1024).toFixed(2)
-  
-  // 如果是覆盖模式，给出提示
+
   if (isOverwriteMode.value && projectFiles.value.length > 0) {
-    const confirmUpload = await new Promise((resolve) => {
+    const confirmed = await new Promise((resolve) => {
       toast.confirm(
         `即将删除现有的 ${projectFiles.value.length} 个文件并上传新文件，是否继续？`,
         '确认覆盖上传',
         resolve
       )
     })
-    
-    if (!confirmUpload) {
-      return
-    }
+    if (!confirmed) return
+
+    // 先删除旧文件记录
+    await deleteAllProjectFiles(projectId.value)
   }
-  
-  // 如果文件数量多或体积大，给出提示
+
   if (selectedFiles.value.length > 100 || totalSize > 50 * 1024 * 1024) {
     toast.info(`正在上传 ${selectedFiles.value.length} 个文件（${totalSizeMB} MB），请耐心等待...`)
   }
-  
+
   isUploading.value = true
   uploadProgress.value = 0
-  
+
   try {
-    // 分批上传，每批50个文件
-    const batchSize = 50
-    const totalBatches = Math.ceil(selectedFiles.value.length / batchSize)
-    let uploadedCount = 0
-    let res
-    
-    for (let i = 0; i < totalBatches; i++) {
-      const start = i * batchSize
-      const end = Math.min(start + batchSize, selectedFiles.value.length)
-      const batch = selectedFiles.value.slice(start, end)
-      
-      if (isOverwriteMode.value && i === 0) {
-        // 覆盖模式：第一批使用覆盖上传接口（会先删除旧文件）
-        res = await overwriteUploadFiles(
-          projectId.value,
-          batch,
-          null,
-          (progress) => {
-            // 计算总体进度
-            const batchProgress = progress / 100
-            const overallProgress = ((uploadedCount + batch.length * batchProgress) / selectedFiles.value.length) * 100
-            uploadProgress.value = Math.round(overallProgress)
-          }
-        )
-      } else {
-        // 其他批次使用普通上传接口
-        res = await uploadFiles(
-          projectId.value,
-          batch,
-          null,
-          (progress) => {
-            // 计算总体进度
-            const batchProgress = progress / 100
-            const overallProgress = ((uploadedCount + batch.length * batchProgress) / selectedFiles.value.length) * 100
-            uploadProgress.value = Math.round(overallProgress)
-          }
-        )
+    const allFiles = selectedFiles.value
+    const totalBytes = allFiles.reduce((sum, f) => sum + f.size, 0)
+    let uploadedBytes = 0
+    let fileLoadedPrev = 0
+
+    // 分批获取签名，每批 200 个
+    const BATCH = 200
+    for (let i = 0; i < allFiles.length; i += BATCH) {
+      const batch = allFiles.slice(i, i + BATCH)
+      const fileList = batch.map(f => ({
+            name: f.name,
+            size: f.size,
+            path: f.webkitRelativePath || f.relativePath || ''
+          }))
+      const sigRes = await getUploadSignatures(fileList)
+      if (sigRes.code !== 200) throw new Error('获取上传签名失败')
+
+      const signatures = sigRes.data
+      const uploaded = []
+      for (let j = 0; j < signatures.length; j++) {
+        const sig = signatures[j]
+        const file = batch[j]
+        fileLoadedPrev = 0
+        await uploadToPresignedUrl(sig, file, (loaded, total) => {
+          uploadedBytes += loaded - fileLoadedPrev
+          fileLoadedPrev = loaded
+          uploadProgress.value = totalBytes > 0
+            ? Math.min(99, Math.round((uploadedBytes / totalBytes) * 100))
+            : Math.round(((i + j + 1) / allFiles.length) * 100)
+        })
+        uploaded.push({
+          objectKey: sig.objectKey,
+          fileName: sig.fileName,
+          fileSize: file.size,
+          path: sig.path || ''
+        })
       }
-      
-      uploadedCount += batch.length
+      await confirmUpload(projectId.value, uploaded)
     }
-    
+
     uploadProgress.value = 100
-    
-    // 显示成功消息
-    if (isOverwriteMode.value && res.message) {
-      toast.success(res.message || `成功上传 ${selectedFiles.value.length} 个文件`)
-    } else {
-      toast.success(`成功上传 ${selectedFiles.value.length} 个文件`)
-    }
-    
-    // 清空已选择的文件
+    toast.success(`成功上传 ${allFiles.length} 个文件`)
     selectedFiles.value = []
-    
-    // 延迟后重新加载项目详情
     setTimeout(() => {
       loadProjectDetail()
       isUploading.value = false
@@ -852,18 +837,7 @@ const uploadProjectFiles = async () => {
     }, 1500)
   } catch (error) {
     logError('文件上传失败:', error)
-    
-    // 更友好的错误提示
-    let errorMessage = '文件上传失败'
-    if (error.message?.includes('timeout')) {
-      errorMessage = '上传超时，文件较多时可能需要较长时间，请检查网络连接后重试'
-    } else if (error.message?.includes('network')) {
-      errorMessage = '网络连接异常，请检查网络后重试'
-    } else if (error.message) {
-      errorMessage = error.message
-    }
-    
-    toast.error(errorMessage)
+    toast.error(error.message || '文件上传失败')
     isUploading.value = false
     uploadProgress.value = 0
   }

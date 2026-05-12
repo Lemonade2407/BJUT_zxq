@@ -1,5 +1,6 @@
 package com.bjutzxq.server.util;
 
+import com.aliyun.oss.HttpMethod;
 import com.aliyun.oss.OSS;
 import com.aliyun.oss.OSSClientBuilder;
 import com.aliyun.oss.model.*;
@@ -13,9 +14,12 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.net.URL;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 /**
@@ -63,8 +67,11 @@ public class OssUtil {
     @PostConstruct
     public void init() {
         log.info("初始化 OSS 客户端...");
-        ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret);
-        log.info("OSS 客户端初始化成功");
+        com.aliyun.oss.ClientBuilderConfiguration conf =
+            new com.aliyun.oss.ClientBuilderConfiguration();
+        conf.setProtocol(com.aliyun.oss.common.comm.Protocol.HTTPS);
+        ossClient = new OSSClientBuilder().build(endpoint, accessKeyId, accessKeySecret, conf);
+        log.info("OSS 客户端初始化成功（使用 HTTPS）");
     }
     
     /**
@@ -102,12 +109,12 @@ public class OssUtil {
                 throw new IOException("文件名不能为空");
             }
             
-            // 验证文件大小（从配置读取）
-            if (file.getSize() > maxFileSize) {
+            // 验证文件大小（从配置读取，-1 表示不限制）
+            if (maxFileSize > 0 && file.getSize() > maxFileSize) {
                 long maxSizeMB = maxFileSize / 1024 / 1024;
                 throw new IOException("文件大小不能超过 " + maxSizeMB + "MB");
             }
-            
+
             // 验证文件类型
             String fileExtension = getFileExtension(originalFilename);
             if (!isAllowedType(fileExtension)) {
@@ -156,7 +163,7 @@ public class OssUtil {
     /**
      * 获取文件扩展名
      */
-    private String getFileExtension(String fileName) {
+    public String getFileExtension(String fileName) {
         int lastDotIndex = fileName.lastIndexOf(".");
         if (lastDotIndex > 0 && lastDotIndex < fileName.length() - 1) {
             return fileName.substring(lastDotIndex + 1).toLowerCase();
@@ -191,7 +198,7 @@ public class OssUtil {
      * @param objectName 对象名称
      * @return 文件访问 URL
      */
-    private String getFileAccessUrl(String objectName) {
+    public String getFileAccessUrl(String objectName) {
         if (cdnEnabled && cdnDomain != null && !cdnDomain.isEmpty()) {
             // 使用 CDN 加速域名
             return cdnDomain + "/" + objectName;
@@ -358,7 +365,7 @@ public class OssUtil {
             }
             
             // 验证文件大小
-            if (file.getSize() > maxFileSize) {
+            if (maxFileSize > 0 && file.getSize() > maxFileSize) {
                 long maxSizeMB = maxFileSize / 1024 / 1024;
                 throw new IOException("文件大小不能超过 " + maxSizeMB + "MB");
             }
@@ -463,6 +470,62 @@ public class OssUtil {
             
             throw new IOException("OSS 分片上传失败: " + e.getMessage(), e);
         }
+    }
+
+    /**
+     * 生成预签名 PUT URL（用于前端直接上传到 OSS）
+     * @param objectKey OSS 对象路径，如 projects/2026/05/12/uuid.pdf
+     * @return 预签名 URL，前端可对其发起 PUT 请求上传文件
+     */
+    /**
+     * 生成 OSS PostObject 直传所需的 policy + 签名
+     * 签名算法：base64(hmac-sha1(accessKeySecret, base64(policy)))
+     */
+    public Map<String, String> generatePostSignature(String objectKey) {
+        long expireEnd = System.currentTimeMillis() + 600 * 1000;
+        String expireStr = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+            .format(new Date(expireEnd));
+
+        String policy = "{\"expiration\":\"" + expireStr + "\"," +
+            "\"conditions\":[" +
+            "{\"bucket\":\"" + bucketName + "\"}," +
+            "{\"key\":\"" + objectKey + "\"}," +
+            "[\"content-length-range\",1,10737418240]" +
+            "]}";
+
+        String encodedPolicy = java.util.Base64.getEncoder()
+            .encodeToString(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
+        // 手动计算 HMAC-SHA1 签名
+        String signature = "";
+        try {
+            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA1");
+            javax.crypto.spec.SecretKeySpec keySpec = new javax.crypto.spec.SecretKeySpec(
+                accessKeySecret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA1");
+            mac.init(keySpec);
+            byte[] signData = mac.doFinal(encodedPolicy.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            signature = java.util.Base64.getEncoder().encodeToString(signData);
+        } catch (Exception e) {
+            throw new RuntimeException("OSS 签名计算失败", e);
+        }
+
+        Map<String, String> result = new java.util.HashMap<>();
+        result.put("host", "https://" + bucketName + "." + endpoint);
+        result.put("accessKeyId", accessKeyId);
+        result.put("policy", encodedPolicy);
+        result.put("signature", signature);
+        result.put("objectKey", objectKey);
+        return result;
+    }
+
+    /**
+     * 生成完整的 OSS 对象 key（包含日期和 UUID）
+     */
+    public String generateObjectKey(String originalFilename) {
+        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        String uuid = UUID.randomUUID().toString().replace("-", "");
+        String ext = getFileExtension(originalFilename);
+        return fileHost + "/" + datePath + "/" + uuid + (ext.isEmpty() ? "" : "." + ext);
     }
 }
 

@@ -26,18 +26,6 @@ public class WebMvcConfig implements WebMvcConfigurer {
     public JwtUserIdInterceptor jwtUserIdInterceptor() {
         return new JwtUserIdInterceptor();
     }
-    
-    /**
-     * 配置 Tomcat 上传限制（Spring Boot 3.x 不暴露 max-file-count 属性）
-     */
-    @Bean
-    public WebServerFactoryCustomizer<TomcatServletWebServerFactory> tomcatCustomizer() {
-        return factory -> factory.addContextCustomizers(context -> {
-            if (context instanceof StandardContext standardContext) {
-                standardContext.setMaxFileCount(50000);
-            }
-        });
-    }
 
     /**
      * 配置跨域过滤器

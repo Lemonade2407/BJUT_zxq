@@ -222,58 +222,6 @@ export async function batchDownloadProjects(data) {
   window.URL.revokeObjectURL(downloadUrl)
 }
 
-// 批量上传文件
-export function uploadFiles(projectId, files, parentId = null, onProgress = null) {
-  const formData = new FormData()
-  // 添加多个文件
-  files.forEach(file => {
-    formData.append('files', file)
-  })
-  if (parentId !== null) {
-    formData.append('parentId', parentId)
-  }
-  
-  return request({
-    url: `/projects/${projectId}/files/upload-batch`,
-    method: 'post',
-    data: formData,
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    },
-    timeout: 300000, // 文件上传超时时间设置为5分钟（300秒）
-    onUploadProgress: onProgress ? (progressEvent) => {
-      const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-      onProgress(percentCompleted)
-    } : undefined
-  })
-}
-
-// 覆盖上传文件（先删除再上传）
-export function overwriteUploadFiles(projectId, files, parentId = null, onProgress = null) {
-  const formData = new FormData()
-  // 添加多个文件
-  files.forEach(file => {
-    formData.append('files', file)
-  })
-  if (parentId !== null) {
-    formData.append('parentId', parentId)
-  }
-  
-  return request({
-    url: `/projects/${projectId}/files/overwrite-upload`,
-    method: 'post',
-    data: formData,
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    },
-    timeout: 300000, // 文件上传超时时间设置为5分钟（300秒）
-    onUploadProgress: onProgress ? (progressEvent) => {
-      const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-      onProgress(percentCompleted)
-    } : undefined
-  })
-}
-
 // 获取项目的所有文件（用于构建完整的树形结构）
 export function getAllProjectFiles(projectId) {
   return request({
@@ -317,5 +265,59 @@ export function getProjectDocument(projectId) {
   return request({
     url: `/projects/${projectId}/files/document`,
     method: 'get'
+  })
+}
+
+// OSS 直传 — 获取上传签名
+export function getUploadSignatures(files) {
+  return request({
+    url: '/oss/upload-signatures',
+    method: 'post',
+    data: { files }
+  })
+}
+
+// OSS 直传 — 通过 POST 表单上传到 OSS
+// onProgress 回调参数为 (loadedBytes, totalBytes)
+export function uploadToPresignedUrl(sig, file, onProgress) {
+  return new Promise((resolve, reject) => {
+    const formData = new FormData()
+    formData.append('OSSAccessKeyId', sig.accessKeyId)
+    formData.append('policy', sig.policy)
+    formData.append('signature', sig.signature)
+    formData.append('key', sig.objectKey)
+    formData.append('success_action_status', '200')
+    formData.append('file', file, file.name)
+
+    const xhr = new XMLHttpRequest()
+    xhr.open('POST', sig.host)
+    if (onProgress) {
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable) onProgress(e.loaded, e.total)
+      }
+    }
+    xhr.onload = () => {
+      if (xhr.status >= 200 && xhr.status < 300) resolve()
+      else reject(new Error(`Upload failed: ${xhr.status}`))
+    }
+    xhr.onerror = () => reject(new Error('网络错误'))
+    xhr.send(formData)
+  })
+}
+
+// OSS 直传 — 确认上传完成
+export function confirmUpload(projectId, files) {
+  return request({
+    url: `/projects/${projectId}/files/confirm`,
+    method: 'post',
+    data: files
+  })
+}
+
+// OSS 直传 — 删除项目所有文件
+export function deleteAllProjectFiles(projectId) {
+  return request({
+    url: `/projects/${projectId}/files/all`,
+    method: 'delete'
   })
 }
