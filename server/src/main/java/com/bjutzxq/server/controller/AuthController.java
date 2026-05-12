@@ -233,10 +233,12 @@ public class AuthController {
     @PutMapping("/user/password")
     public Result<Void> changePassword(
             @RequestHeader(value = "Authorization") String authorization,
-            @RequestParam String oldPassword,
-            @RequestParam String newPassword) {
+            @RequestBody java.util.Map<String, String> body) {
         log.debug("修改密码请求");
-        
+
+        String oldPassword = body.get("oldPassword");
+        String newPassword = body.get("newPassword");
+
         // 1. 验证参数
         if (oldPassword == null || oldPassword.trim().isEmpty()) {
             throw new IllegalArgumentException("原密码不能为空");
@@ -244,25 +246,25 @@ public class AuthController {
         if (newPassword == null || newPassword.trim().isEmpty()) {
             throw new IllegalArgumentException("新密码不能为空");
         }
-        
+
         // 2. 验证新密码长度
         if (newPassword.length() < 6 || newPassword.length() > 20) {
             throw new IllegalArgumentException("密码长度应为 6-20 位");
         }
-        
+
         // 3. 验证新密码强度（必须包含字母和数字）
         if (!newPassword.matches("^(?=.*[a-zA-Z])(?=.*\\d).+$")) {
             throw new IllegalArgumentException("密码必须包含字母和数字");
         }
-        
+
         String token = authorization;
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
-        
+
         Integer userId = JwtUtil.getUserIdFromToken(token);
         log.debug("Token 解析成功，用户 ID: {}", userId);
-        
+
         userService.changePassword(userId, oldPassword.trim(), newPassword.trim());
         log.info("密码修改成功，用户 ID: {}", userId);
         return Result.success("密码修改成功", null);

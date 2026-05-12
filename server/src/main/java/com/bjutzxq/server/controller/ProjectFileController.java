@@ -164,6 +164,8 @@ public class ProjectFileController {
 
             String ossUrl = ossUtil.getFileAccessUrl(objectKey);
 
+            log.info("confirmUpload 文件: fileName={}, filePath={}", fileName, filePath);
+
             // 如果有文件夹路径，创建目录记录
             Integer parentId = null;
             if (filePath != null && !filePath.isEmpty()) {

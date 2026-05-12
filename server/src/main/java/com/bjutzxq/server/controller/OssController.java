@@ -37,6 +37,7 @@ public class OssController {
         for (Map<String, Object> fileInfo : files) {
             String fileName = (String) fileInfo.get("name");
             String path = (String) fileInfo.get("path");
+            log.info("收到文件签名请求: name={}, path={}", fileName, path);
             String objectKey = ossUtil.generateObjectKey(fileName);
             Map<String, String> sig = ossUtil.generatePostSignature(objectKey);
             sig.put("fileName", fileName);
