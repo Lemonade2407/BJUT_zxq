@@ -1,7 +1,7 @@
 server:
   port: 8080
   tomcat:
-    max-http-form-post-size: 524288000  # 500MB，与 servlet multipart 一致
+    max-http-form-post-size: 2147483648  # 2GB，与 servlet multipart 一致
   servlet:
     context-path: /api
 
@@ -42,9 +42,9 @@ spring:
   
   servlet:
     multipart:
-      max-file-size: 100MB
-      max-request-size: 500MB  # 批量上传支持最大500MB
-      max-file-count: 1000  # 批量上传支持最多1000个文件
+      max-file-size: 1024MB
+      max-request-size: 2048MB  # 批量上传支持最大2GB
+      max-file-count: 5000  # 批量上传支持最多5000个文件
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
@@ -105,5 +105,5 @@ jwt:
 # 文件上传配置
 file:
   upload:
-    max-size: 104857600  # 单个文件最大大小 100MB (字节)
+    max-size: 1073741824  # 单个文件最大大小 1GB (字节)
     allowed-types: "*"  # 支持所有文件类型
