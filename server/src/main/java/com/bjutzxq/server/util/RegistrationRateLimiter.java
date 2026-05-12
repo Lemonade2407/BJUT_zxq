@@ -12,74 +12,20 @@ import java.util.concurrent.ConcurrentHashMap;
 public class RegistrationRateLimiter {
     
     /**
-     * IP 地址注册记录存储（生产环境应使用 Redis）
+     * 邮箱注册记录存储（生产环境应使用 Redis）
      */
     // TODO: 当前使用内存存储，重启后数据丢失，生产环境应迁移到 Redis
-    private static final Map<String, RegistrationRecord> IP_REGISTRATION_RECORDS = new ConcurrentHashMap<>();
-    
-    /**
-     * 邮箱注册记录存储
-     */
     private static final Map<String, RegistrationRecord> EMAIL_REGISTRATION_RECORDS = new ConcurrentHashMap<>();
-    
-    /**
-     * 同一 IP 最大注册次数（每小时）
-     */
-    private static final int MAX_REGISTRATIONS_PER_IP_PER_HOUR = 5;
-    
+
     /**
      * 同一邮箱最大注册次数（每天）
      */
     private static final int MAX_REGISTRATIONS_PER_EMAIL_PER_DAY = 3;
-    
+
     /**
      * 时间窗口（毫秒）
      */
-    private static final long IP_TIME_WINDOW = 60 * 60 * 1000; // 1小时
     private static final long EMAIL_TIME_WINDOW = 24 * 60 * 60 * 1000; // 24小时
-    
-    /**
-     * 检查 IP 是否超过注册频率限制
-     * @param ipAddress IP 地址
-     * @return 是否允许注册
-     */
-    public static RateLimitResult checkIpLimit(String ipAddress) {
-        if (ipAddress == null || ipAddress.trim().isEmpty()) {
-            log.warn("IP 地址为空");
-            return new RateLimitResult(false, "IP 地址无效");
-        }
-        
-        String ip = ipAddress.trim();
-        RegistrationRecord record = IP_REGISTRATION_RECORDS.get(ip);
-        long currentTime = System.currentTimeMillis();
-        
-        // 如果没有记录或记录已过期，创建新记录
-        if (record == null || (currentTime - record.getFirstAttemptTime()) > IP_TIME_WINDOW) {
-            IP_REGISTRATION_RECORDS.put(ip, new RegistrationRecord(1, currentTime));
-            log.debug("IP 注册记录初始化：{}", ip);
-            return new RateLimitResult(true, "");
-        }
-        
-        // 检查是否在时间窗口内
-        if ((currentTime - record.getFirstAttemptTime()) <= IP_TIME_WINDOW) {
-            // 检查是否超过限制
-            if (record.getCount() >= MAX_REGISTRATIONS_PER_IP_PER_HOUR) {
-                long remainingTime = IP_TIME_WINDOW - (currentTime - record.getFirstAttemptTime());
-                long minutes = remainingTime / (60 * 1000);
-                log.warn("IP 注册频率超限：{}, 剩余时间: {} 分钟", ip, minutes);
-                return new RateLimitResult(false, 
-                    String.format("该 IP 注册过于频繁，请 %d 分钟后再试", minutes + 1));
-            }
-            
-            // 增加计数
-            record.increment();
-            log.debug("IP 注册计数：{}, 次数：{}", ip, record.getCount());
-        } else {
-            // 时间窗口已过，重置计数
-            IP_REGISTRATION_RECORDS.put(ip, new RegistrationRecord(1, currentTime));
-        }
-        return new RateLimitResult(true, "");
-    }
     
     /**
      * 检查邮箱是否超过注册频率限制
@@ -130,10 +76,6 @@ public class RegistrationRateLimiter {
     public static void cleanupExpiredRecords() {
         long currentTime = System.currentTimeMillis();
         
-        // 清理 IP 记录
-        IP_REGISTRATION_RECORDS.entrySet().removeIf(entry -> 
-            (currentTime - entry.getValue().getFirstAttemptTime()) > IP_TIME_WINDOW);
-        
         // 清理邮箱记录
         EMAIL_REGISTRATION_RECORDS.entrySet().removeIf(entry -> 
             (currentTime - entry.getValue().getFirstAttemptTime()) > EMAIL_TIME_WINDOW);
@@ -145,7 +87,6 @@ public class RegistrationRateLimiter {
      * 清空所有记录（仅用于测试）
      */
     public static void clearAllRecords() {
-        IP_REGISTRATION_RECORDS.clear();
         EMAIL_REGISTRATION_RECORDS.clear();
         log.debug("清空所有注册记录");
     }

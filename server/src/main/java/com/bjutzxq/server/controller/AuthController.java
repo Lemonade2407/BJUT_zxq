@@ -41,8 +41,7 @@ public class AuthController {
      */
     @PostMapping("/register")
     public Result<User> register(
-            @Valid @RequestBody RegisterDTO request,
-            @RequestHeader(value = "X-Forwarded-For", required = false) String ipAddress) {
+            @Valid @RequestBody RegisterDTO request) {
         log.info("收到用户注册请求，用户名：{}", request.getUsername());
         
         // 1. 验证图形验证码
@@ -62,23 +61,14 @@ public class AuthController {
             throw new IllegalArgumentException("两次输入的密码不一致");
         }
         
-        // 3. 检查注册频率限制（IP）
-        if (ipAddress != null && !ipAddress.isEmpty()) {
-            RegistrationRateLimiter.RateLimitResult ipResult = 
-                RegistrationRateLimiter.checkIpLimit(ipAddress);
-            if (!ipResult.allowed()) {
-                throw new IllegalArgumentException(ipResult.message());
-            }
-        }
-        
-        // 4. 检查注册频率限制（邮箱）
+        // 3. 检查注册频率限制（邮箱）
         RegistrationRateLimiter.RateLimitResult emailResult = 
             RegistrationRateLimiter.checkEmailLimit(request.getEmail());
         if (!emailResult.allowed()) {
             throw new IllegalArgumentException(emailResult.message());
         }
         
-        // 5. 构建 User 对象
+        // 4. 构建 User 对象
         User user = new User();
         user.setUsername(request.getUsername());
         user.setPassword(request.getPassword());
@@ -90,7 +80,7 @@ public class AuthController {
         user.setSex(request.getSex());
         user.setBio(request.getBio());
         
-        // 6. 设置角色（默认为学生）
+        // 5. 设置角色（默认为学生）
         if (request.getRole() != null && !request.getRole().trim().isEmpty()) {
             try {
                 user.setRole(com.bjutzxq.common.Role.valueOf(request.getRole().toUpperCase()));
@@ -102,7 +92,7 @@ public class AuthController {
             user.setRole(com.bjutzxq.common.Role.USER);
         }
         
-        // 7. 调用服务层注册
+        // 6. 调用服务层注册
         User registeredUser = userService.register(user);
         registeredUser.setPassword(null);
         
