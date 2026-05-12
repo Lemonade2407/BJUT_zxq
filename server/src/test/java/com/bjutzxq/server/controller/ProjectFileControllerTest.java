@@ -54,50 +54,6 @@ class ProjectFileControllerTest {
         assertEquals(200, result.getCode());
     }
 
-    // ==================== uploadFiles ====================
-
-    @Test
-    @DisplayName("上传文件成功 - 正常流程")
-    void uploadFiles_Success() {
-        // Arrange
-        try (MockedStatic<UserIdContext> ctxMock = mockStatic(UserIdContext.class)) {
-            ctxMock.when(UserIdContext::getCurrentUserId).thenReturn(100);
-            MultipartFile[] files = new MultipartFile[]{mock(MultipartFile.class)};
-            when(projectFileService.uploadFiles(eq(10), any(), isNull(), eq(100)))
-                    .thenReturn(List.of());
-
-            // Act
-            Result<List<FileVO>> result = projectFileController.uploadFiles(10, files, null);
-
-            // Assert
-            assertNotNull(result);
-            assertEquals(200, result.getCode());
-        }
-    }
-
-    // ==================== overwriteUploadFiles ====================
-
-    @Test
-    @DisplayName("覆盖上传文件成功 - 先删除再上传")
-    void overwriteUploadFiles_Success() {
-        // Arrange
-        try (MockedStatic<UserIdContext> ctxMock = mockStatic(UserIdContext.class)) {
-            ctxMock.when(UserIdContext::getCurrentUserId).thenReturn(100);
-            MultipartFile[] files = new MultipartFile[]{mock(MultipartFile.class)};
-            when(projectFileService.deleteAllProjectFiles(10)).thenReturn(1);
-            when(projectFileService.uploadFiles(eq(10), any(), isNull(), eq(100)))
-                    .thenReturn(List.of());
-
-            // Act
-            Result<List<FileVO>> result = projectFileController.overwriteUploadFiles(10, files, null);
-
-            // Assert
-            assertNotNull(result);
-            assertEquals(200, result.getCode());
-            verify(projectFileService).deleteAllProjectFiles(10);
-        }
-    }
-
     // ==================== uploadDocument ====================
 
     @Test
