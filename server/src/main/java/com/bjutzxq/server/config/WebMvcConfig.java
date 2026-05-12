@@ -1,6 +1,9 @@
 package com.bjutzxq.server.config;
 
 import com.bjutzxq.server.interceptor.JwtUserIdInterceptor;
+import org.apache.catalina.core.StandardContext;
+import org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory;
+import org.springframework.boot.web.server.WebServerFactoryCustomizer;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.cors.CorsConfiguration;
@@ -24,6 +27,18 @@ public class WebMvcConfig implements WebMvcConfigurer {
         return new JwtUserIdInterceptor();
     }
     
+    /**
+     * 配置 Tomcat 上传限制（Spring Boot 3.x 不暴露 max-file-count 属性）
+     */
+    @Bean
+    public WebServerFactoryCustomizer<TomcatServletWebServerFactory> tomcatCustomizer() {
+        return factory -> factory.addContextCustomizers(context -> {
+            if (context instanceof StandardContext standardContext) {
+                standardContext.setMaxFileCount(50000);
+            }
+        });
+    }
+
     /**
      * 配置跨域过滤器
      */
