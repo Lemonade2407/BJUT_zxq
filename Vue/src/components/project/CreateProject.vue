@@ -226,7 +226,6 @@ const validateForm = () => {
       isSubmitting.value = false
     }
   }
-}
 
 // 取消操作
 const handleCancel = () => {
