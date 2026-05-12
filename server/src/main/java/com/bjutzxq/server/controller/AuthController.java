@@ -196,28 +196,31 @@ public class AuthController {
     @PutMapping("/user/profile")
     public Result<UserVO> updateProfile(
             @RequestHeader(value = "Authorization") String authorization,
-            @RequestParam(required = false) String avatar,
-            @RequestParam(required = false) String phone,
-            @RequestParam(required = false) String sex,
-            @RequestParam(required = false) String bio) {
+            @RequestBody java.util.Map<String, Object> body) {
         log.debug("更新用户信息");
-        
+
+        String avatar = (String) body.get("avatar");
+        String phone = (String) body.get("phone");
+        String sex = (String) body.get("sex");
+        String bio = (String) body.get("bio");
+        String username = (String) body.get("username");
+
         // 验证手机号格式（如果提供）
         if (phone != null && !phone.trim().isEmpty()) {
             if (!phone.matches("^1[3-9]\\d{9}$")) {
                 throw new IllegalArgumentException("手机号格式不正确");
             }
         }
-        
+
         String token = authorization;
         if (token.startsWith("Bearer ")) {
             token = token.substring(7);
         }
-        
+
         Integer userId = JwtUtil.getUserIdFromToken(token);
         log.debug("Token 解析成功，用户 ID: {}", userId);
-        
-        User updatedUser = userService.updateProfile(userId, avatar, phone, sex, bio);
+
+        User updatedUser = userService.updateProfile(userId, avatar, phone, sex, bio, username);
         UserVO response = DtoConverter.toUserVO(updatedUser);
         log.info("用户信息更新成功：{}", userId);
         return Result.success("更新成功", response);

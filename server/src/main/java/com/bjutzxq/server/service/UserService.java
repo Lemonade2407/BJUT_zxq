@@ -194,31 +194,33 @@ public class UserService {
      */
     @CacheEvict(value = "userInfo", key = "#userId")
     @Transactional(rollbackFor = Exception.class)
-    public User updateProfile(Integer userId, String avatar, String phone, String sex, String bio) {
+    public User updateProfile(Integer userId, String avatar, String phone, String sex, String bio, String username) {
         log.info("更新用户信息，ID：{}", userId);
-        
+
         User existingUser = userMapper.selectById(userId);
         if (existingUser == null) {
             log.warn("用户不存在，ID：{}", userId);
             throw new BusinessException(404, "用户不存在");
         }
-        
-        // 只允许更新部分字段
-        if (avatar != null) {
+
+        if (avatar != null && !avatar.trim().isEmpty()) {
             existingUser.setAvatar(avatar);
         }
-        if (phone != null) {
+        if (phone != null && !phone.trim().isEmpty()) {
             existingUser.setPhone(phone);
         }
-        if (sex != null) {
+        if (sex != null && !sex.trim().isEmpty()) {
             existingUser.setSex(sex);
         }
         if (bio != null) {
             existingUser.setBio(bio);
         }
-        
+        if (username != null && !username.trim().isEmpty()) {
+            existingUser.setUsername(username.trim());
+        }
+
         userMapper.update(existingUser);
-        
+
         log.info("用户信息更新成功，ID：{}", userId);
         return existingUser;
     }
