@@ -31,9 +31,12 @@ public class WebSocketConfig implements WebSocketConfigurer {
         registry.addHandler(notificationWebSocketHandler, "/ws/notifications")
                 .addInterceptors(webSocketAuthInterceptor)
                 .setAllowedOrigins(
-                    "http://localhost:5173",      // 本地开发环境
-                    "http://127.0.0.1:5173",      // 本地开发环境（IP形式）
-                    "https://bjut-zxq.cn"         // 生产环境
+                    "http://localhost:5173",
+                    "http://127.0.0.1:5173",
+                    "https://bjut-zxq.cn",
+                    "https://www.bjut-zxq.cn",
+                    "https://60.205.210.11",
+                    "http://60.205.210.11"
                 );
         
         log.info("WebSocket 端点 /ws/notifications 已注册");
