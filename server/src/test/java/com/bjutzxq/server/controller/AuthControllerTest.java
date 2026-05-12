@@ -70,15 +70,13 @@ class AuthControllerTest {
 
             RegistrationRateLimiter.RateLimitResult allowedResult =
                 new RegistrationRateLimiter.RateLimitResult(true, "");
-            rateLimiterMock.when(() -> RegistrationRateLimiter.checkIpLimit(anyString()))
-                .thenReturn(allowedResult);
-            rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
+rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
                 .thenReturn(allowedResult);
 
             when(userService.register(any(User.class))).thenReturn(testUser);
 
             // Act
-            Result<User> result = authController.register(validRegisterRequest, "192.168.1.1");
+            Result<User> result = authController.register(validRegisterRequest);
 
             // Assert
             assertNotNull(result);
@@ -99,7 +97,7 @@ class AuthControllerTest {
 
         // Act & Assert
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> authController.register(validRegisterRequest, "192.168.1.1"));
+                () -> authController.register(validRegisterRequest));
         assertEquals("请输入图形验证码", exception.getMessage());
         verify(userService, never()).register(any(User.class));
     }
@@ -114,7 +112,7 @@ class AuthControllerTest {
 
             // Act & Assert
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                    () -> authController.register(validRegisterRequest, "192.168.1.1"));
+                    () -> authController.register(validRegisterRequest));
             assertEquals("验证码错误或已过期", exception.getMessage());
             verify(userService, never()).register(any(User.class));
         }
@@ -134,14 +132,12 @@ class AuthControllerTest {
 
             RegistrationRateLimiter.RateLimitResult allowedResult =
                 new RegistrationRateLimiter.RateLimitResult(true, "");
-            rateLimiterMock.when(() -> RegistrationRateLimiter.checkIpLimit(anyString()))
-                .thenReturn(allowedResult);
-            rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
+rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
                 .thenReturn(allowedResult);
 
             // Act & Assert
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                    () -> authController.register(validRegisterRequest, "192.168.1.1"));
+                    () -> authController.register(validRegisterRequest));
             assertEquals("两次输入的密码不一致", exception.getMessage());
             verify(userService, never()).register(any(User.class));
         }
@@ -164,7 +160,7 @@ class AuthControllerTest {
 
             // Act & Assert
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                    () -> authController.register(validRegisterRequest, "192.168.1.1"));
+                    () -> authController.register(validRegisterRequest));
             assertEquals("注册过于频繁，请稍后再试", exception.getMessage());
             verify(userService, never()).register(any(User.class));
         }
@@ -192,7 +188,7 @@ class AuthControllerTest {
 
             // Act & Assert
             IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                    () -> authController.register(validRegisterRequest, "192.168.1.1"));
+                    () -> authController.register(validRegisterRequest));
             assertEquals("该邮箱注册过于频繁", exception.getMessage());
             verify(userService, never()).register(any(User.class));
         }
@@ -210,9 +206,7 @@ class AuthControllerTest {
 
             RegistrationRateLimiter.RateLimitResult allowedResult =
                 new RegistrationRateLimiter.RateLimitResult(true, "");
-            rateLimiterMock.when(() -> RegistrationRateLimiter.checkIpLimit(anyString()))
-                .thenReturn(allowedResult);
-            rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
+rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
                 .thenReturn(allowedResult);
 
             when(userService.register(any(User.class)))
@@ -220,7 +214,7 @@ class AuthControllerTest {
 
             // Act & Assert
             RuntimeException exception = assertThrows(RuntimeException.class,
-                    () -> authController.register(validRegisterRequest, "192.168.1.1"));
+                    () -> authController.register(validRegisterRequest));
             assertEquals("用户名已存在", exception.getMessage());
         }
     }
