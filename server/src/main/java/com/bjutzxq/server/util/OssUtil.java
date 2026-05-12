@@ -483,8 +483,8 @@ public class OssUtil {
      */
     public Map<String, String> generatePostSignature(String objectKey) {
         long expireEnd = System.currentTimeMillis() + 600 * 1000;
-        String expireStr = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-            .format(new Date(expireEnd));
+        String expireStr = com.aliyun.oss.common.utils.DateUtil
+            .formatIso8601Date(new Date(expireEnd));
 
         String policy = "{\"expiration\":\"" + expireStr + "\"," +
             "\"conditions\":[" +
@@ -496,18 +496,7 @@ public class OssUtil {
         String encodedPolicy = java.util.Base64.getEncoder()
             .encodeToString(policy.getBytes(java.nio.charset.StandardCharsets.UTF_8));
 
-        // 手动计算 HMAC-SHA1 签名
-        String signature = "";
-        try {
-            javax.crypto.Mac mac = javax.crypto.Mac.getInstance("HmacSHA1");
-            javax.crypto.spec.SecretKeySpec keySpec = new javax.crypto.spec.SecretKeySpec(
-                accessKeySecret.getBytes(java.nio.charset.StandardCharsets.UTF_8), "HmacSHA1");
-            mac.init(keySpec);
-            byte[] signData = mac.doFinal(encodedPolicy.getBytes(java.nio.charset.StandardCharsets.UTF_8));
-            signature = java.util.Base64.getEncoder().encodeToString(signData);
-        } catch (Exception e) {
-            throw new RuntimeException("OSS 签名计算失败", e);
-        }
+        String signature = ossClient.calculatePostSignature(encodedPolicy);
 
         Map<String, String> result = new java.util.HashMap<>();
         result.put("host", "https://" + bucketName + "." + endpoint);
