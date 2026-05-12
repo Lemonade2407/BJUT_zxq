@@ -101,9 +101,9 @@ const handleLogin = async () => {
       tokenManager.startAutoRefresh()
       
       // 登录成功,根据角色跳转到不同页面
-      const userRole = res.data.user?.role
+      const userRole = loginData.role
       let redirect = route.query.redirect
-      
+
       // 如果没有指定重定向路径，根据角色决定跳转目标
       if (!redirect) {
         if (userRole === 'ADMIN') {
