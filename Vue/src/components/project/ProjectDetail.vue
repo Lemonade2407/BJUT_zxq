@@ -73,7 +73,6 @@ const showDeleteConfirm = ref(false)
 
 // 文件上传相关
 const selectedFiles = ref([])
-const uploadedFiles = ref([])
 const isUploading = ref(false)
 const uploadProgress = ref(0)
 const isOverwriteMode = ref(true) // 默认开启覆盖模式
@@ -167,21 +166,11 @@ const handleDocumentFileSelect = (event) => {
   if (!file) return
   
   // 验证文件类型
-  const allowedTypes = [
-    'application/pdf',
-    'application/msword',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-    'text/plain',
-    'text/markdown',
-    'application/vnd.ms-powerpoint',
-    'application/vnd.openxmlformats-officedocument.presentationml.presentation'
-  ]
-  
   const fileExtension = file.name.split('.').pop().toLowerCase()
-  const allowedExtensions = ['pdf', 'doc', 'docx', 'txt', 'md', 'ppt', 'pptx']
+  const allowedExtensions = ['pdf', 'doc', 'docx', 'txt', 'md']
   
   if (!allowedExtensions.includes(fileExtension)) {
-    toast.error('不支持的文件类型，仅支持 PDF、Word、TXT、Markdown、PPT 格式')
+    toast.error('不支持的文件类型，仅支持 PDF、Word、TXT、Markdown格式')
     event.target.value = '' // 清空选择
     return
   }
@@ -406,13 +395,6 @@ const downloadProjectHandler = async () => {
 }
 
 // 获取作者名称（从标签或分类中推断）
-const getAuthorName = () => {
-  if (!project.value) return '-'
-  // 如果有ownerId，可以显示用户信息
-  // 目前先显示项目ID作为标识
-  return `用户 #${project.value.ownerId || '未知'}`
-}
-
 // 初始化编辑表单
 const initEditForm = () => {
   if (!project.value) return
@@ -555,7 +537,7 @@ const toggleTag = (tagId) => {
   }
 }
 
-const { organizedFiles, displayFiles, toggleFolder, expandedFolders } = useFileTree(selectedFiles)
+const {displayFiles} = useFileTree(selectedFiles)
 
 // OSS 文件树（代码 Tab）
 const ossExpandedFolders = ref(new Set())
@@ -592,27 +574,18 @@ const handleFileSelect = (event) => {
   const files = Array.from(event.target.files)
   if (files.length === 0) return
   
-  // 验证文件大小（单个文件不超过 100MB）
-  const maxSize = 100 * 1024 * 1024
-  const oversizedFiles = files.filter(file => file.size > maxSize)
-  
-  if (oversizedFiles.length > 0) {
-    toast.warning(`以下文件超过 100MB，无法上传：${oversizedFiles.map(f => f.name).join(', ')}`)
-  }
-  
-  // 过滤出符合要求的文件
-  const validFiles = files.filter(file => file.size <= maxSize)
+  // OSS 直传支持大文件，无需前端限制大小
   
   // 如果是文件夹上传，保留相对路径信息
-  validFiles.forEach((file, index) => {
-    // webkitRelativePath 包含文件夹路径，如 "folder/subfolder/file.txt"
+  files.forEach((file) => {
     if (file.webkitRelativePath) {
       file.relativePath = file.webkitRelativePath
     }
   })
   
-  // 添加到待上传列表
-  selectedFiles.value.push(...validFiles)
+  // 添加到待上传列表并自动上传
+  selectedFiles.value.push(...files)
+  uploadProjectFiles()
 }
 
 // 拖拽处理
@@ -692,13 +665,8 @@ const handleDrop = (event) => {
 const processFiles = (files) => {
   if (files.length === 0) return
   
-  // 验证文件大小
-  const maxSize = 50 * 1024 * 1024
-  const validFiles = files.filter(file => file.size <= maxSize)
-  
-  if (validFiles.length < files.length) {
-    toast.warning('部分文件超过 50MB，已自动过滤')
-  }
+  // OSS 直传支持大文件，无需前端限制大小
+  const validFiles = files
   
   // 打印前3个文件的路径信息
   validFiles.forEach((file, index) => {
@@ -709,6 +677,7 @@ const processFiles = (files) => {
   })
   
   selectedFiles.value.push(...validFiles)
+  uploadProjectFiles()
 }
 
 // 按路径移除文件
@@ -731,39 +700,12 @@ const formatFileSize = (bytes) => {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
 }
 
-// 格式化评论时间
-const formatCommentTime = (timeStr) => {
-  if (!timeStr) return ''
-  
-  const date = new Date(timeStr)
-  const now = new Date()
-  const diff = now - date
-  
-  const minutes = Math.floor(diff / 60000)
-  const hours = Math.floor(diff / 3600000)
-  const days = Math.floor(diff / 86400000)
-  
-  if (minutes < 1) return '刚刚'
-  if (minutes < 60) return `${minutes}分钟前`
-  if (hours < 24) return `${hours}小时前`
-  if (days < 7) return `${days}天前`
-  
-  // 超过7天显示具体日期
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
-}
-
 // 上传项目文件（OSS 直传，分批获取签名）
 const uploadProjectFiles = async () => {
   if (selectedFiles.value.length === 0) {
     toast.warning('请先选择要上传的文件')
     return
   }
-
-  const totalSize = selectedFiles.value.reduce((sum, f) => sum + f.size, 0)
-  const totalSizeMB = (totalSize / 1024 / 1024).toFixed(2)
 
   if (isOverwriteMode.value && projectFiles.value.length > 0) {
     const confirmed = await new Promise((resolve) => {
@@ -779,8 +721,9 @@ const uploadProjectFiles = async () => {
     await deleteAllProjectFiles(projectId.value)
   }
 
-  if (selectedFiles.value.length > 100 || totalSize > 50 * 1024 * 1024) {
-    toast.info(`正在上传 ${selectedFiles.value.length} 个文件（${totalSizeMB} MB），请耐心等待...`)
+  // 显示上传进度提示
+  if (selectedFiles.value.length > 100) {
+    toast.info(`正在上传 ${selectedFiles.value.length} 个文件，请耐心等待...`)
   }
 
   isUploading.value = true
@@ -991,7 +934,6 @@ onMounted(() => {
               v-if="isPdfDocument()"
               :src="documentUrl"
               class="pdf-preview"
-              frameborder="0"
             ></iframe>
             
             <!-- Word 文档预览 -->
@@ -1038,13 +980,13 @@ onMounted(() => {
             <div class="upload-placeholder">
               <span class="upload-icon">📄</span>
               <p class="upload-text">暂无项目文档</p>
-              <p class="upload-hint">支持 PDF、Word、TXT、Markdown、PPT 格式</p>
+              <p class="upload-hint">支持 PDF、Word、TXT、Markdown 格式</p>
               
               <div class="file-select-wrapper">
                 <input 
                   type="file" 
                   id="document-file-input"
-                  accept=".pdf,.doc,.docx,.txt,.md,.ppt,.pptx"
+                  accept=".pdf,.doc,.docx,.txt,.md"
                   @change="handleDocumentFileSelect"
                   class="file-input"
                 />
@@ -1099,7 +1041,6 @@ onMounted(() => {
             <div v-else-if="ossFileTree.length === 0" class="empty-files">
               <span class="empty-icon">📁</span>
               <p>暂无文件</p>
-              <p class="hint">项目所有者可以在设置中上传文件</p>
             </div>
             
             <!-- 文件列表 -->
@@ -1295,7 +1236,6 @@ onMounted(() => {
                 />
                 <div class="upload-icon">📁</div>
                 <p class="upload-text">点击选择文件或文件夹，或直接拖拽到此处</p>
-                <p class="upload-hint">支持批量上传文件和整个文件夹，单个文件不超过 100MB（大文件自动分片上传）</p>
               </div>
 
               <!-- 覆盖模式选项（始终显示） -->
@@ -1307,7 +1247,7 @@ onMounted(() => {
                     :disabled="projectFiles.length === 0 || isUploading"
                   />
                   <span class="checkbox-text">
-                    🔄 覆盖模式（先删除现有文件再上传）
+                    覆盖模式（先删除现有文件再上传）
                     <span v-if="projectFiles.length > 0" class="file-count">
                       （当前有 {{ projectFiles.length }} 个文件将被替换）
                     </span>
@@ -1322,8 +1262,8 @@ onMounted(() => {
               </div>
 
               <!-- 文件列表 -->
-              <div v-if="selectedFiles.length > 0" class="file-list">
-                <div class="file-list-header">
+              <div v-if="selectedFiles.length > 0" class="upload-file-list">
+                <div class="upload-file-list-header">
                   <span>已选择 {{ selectedFiles.length }} 个文件</span>
                   <button
                     type="button"
@@ -1367,7 +1307,7 @@ onMounted(() => {
                     :style="{ width: uploadProgress + '%' }"
                   ></div>
                 </div>
-                <span class="progress-text">上传中... {{ uploadProgress }}%</span>
+                <span class="progress-text">{{ uploadProgress }}%</span>
               </div>
             </div>
 
@@ -1466,10 +1406,6 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
-}
-
-.project-icon {
-  font-size: 32px;
 }
 
 .project-title {
@@ -1625,19 +1561,6 @@ onMounted(() => {
   margin-bottom: 24px;
 }
 
-.readme-content {
-  border-radius: 0 0 6px 6px;
-}
-
-.readme-text {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
-  font-size: 14px;
-  line-height: 1.8;
-  color: #333333;
-  white-space: pre-wrap;
-  margin: 0;
-}
-
 /* 文件树 */
 .file-tree {
   background: linear-gradient(135deg, #fafbfc 0%, #f5f7fa 100%);
@@ -1748,35 +1671,11 @@ onMounted(() => {
   position: relative;
 }
 
-.document-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 2px solid #e0e0e0;
-}
-
 .document-header h3 {
   font-size: 20px;
   font-weight: 600;
   color: #333333;
   margin: 0;
-}
-
-.btn-delete-document {
-  padding: 8px 16px;
-  background-color: #ff4d4f;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.btn-delete-document:hover {
-  background-color: #ff7875;
 }
 
 /* 浮动删除按钮（不显示文档名时使用） */
@@ -2190,12 +2089,6 @@ onMounted(() => {
 }
 
 /* Issues */
-.empty-issues {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 60px 20px;
-}
 
 .empty-icon {
   font-size: 64px;
@@ -2207,21 +2100,6 @@ onMounted(() => {
   font-size: 16px;
   color: #999999;
   margin-bottom: 24px;
-}
-
-.create-issue-btn {
-  padding: 10px 24px;
-  background-color: #10b981;
-  color: #ffffff;
-  border: none;
-  border-radius: 6px;
-  font-size: 14px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.create-issue-btn:hover {
-  background-color: #059669;
 }
 
 /* 设置页面 */
@@ -2357,13 +2235,6 @@ onMounted(() => {
   background-color: rgba(16, 185, 129, 0.02);
 }
 
-.thesis-option.selected {
-  background-color: #10b981;
-  color: #ffffff;
-  border-color: #10b981;
-  font-weight: 600;
-}
-
 /* 非编辑模式下的标签显示 */
 .tags-display {
   display: flex;
@@ -2457,12 +2328,6 @@ onMounted(() => {
 }
 
 /* 文件上传区域样式 */
-.file-upload-group {
-  padding: 16px;
-  background-color: #f9f9f9;
-  border: 1px dashed #d9d9d9;
-  border-radius: 6px;
-}
 
 .upload-hint {
   font-size: 13px;
@@ -2471,52 +2336,8 @@ onMounted(() => {
   line-height: 1.5;
 }
 
-.file-select-area {
-  margin-bottom: 12px;
-}
-
 .file-input {
   display: none;
-}
-
-.file-input-label {
-  display: inline-block;
-  padding: 8px 16px;
-  background-color: #ffffff;
-  border: 1px solid #d9d9d9;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #333333;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.file-input-label:hover {
-  border-color: #10b981;
-  color: #10b981;
-  background-color: #ecfdf5;
-}
-
-.selected-files-list {
-  margin: 12px 0;
-}
-
-.files-list-title {
-  font-size: 13px;
-  font-weight: 500;
-  color: #333333;
-  margin: 0 0 8px 0;
-}
-
-.files-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
-  max-height: 200px;
-  overflow-y: auto;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  background-color: #ffffff;
 }
 
 .file-item {
@@ -2555,59 +2376,6 @@ onMounted(() => {
   color: #999999;
   white-space: nowrap;
   flex-shrink: 0;
-}
-
-.remove-file-btn {
-  width: 22px;
-  height: 22px;
-  padding: 0;
-  background-color: transparent;
-  border: 1px solid #d9d9d9;
-  border-radius: 4px;
-  color: #999999;
-  font-size: 12px;
-  cursor: pointer;
-  transition: all 0.2s;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.remove-file-btn:hover {
-  background-color: #dc3545;
-  border-color: #dc3545;
-  color: #ffffff;
-}
-
-.upload-progress {
-  margin: 12px 0;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 6px;
-  background-color: #e0e0e0;
-  border-radius: 3px;
-  overflow: hidden;
-  margin-bottom: 6px;
-}
-
-.progress-fill {
-  height: 100%;
-  background-color: #10b981;
-  transition: width 0.3s ease;
-}
-
-.progress-text {
-  font-size: 12px;
-  color: #666666;
-  margin: 0;
-  text-align: center;
-}
-
-.upload-actions {
-  margin-top: 12px;
 }
 
 .upload-btn {
@@ -2668,13 +2436,6 @@ onMounted(() => {
   background-color: #fff5f5;
   border: 1px solid #ffcdd2;
   border-radius: 6px;
-}
-
-.danger-title {
-  font-size: 16px;
-  font-weight: 600;
-  color: #dc3545;
-  margin: 0 0 8px 0;
 }
 
 .danger-description {
@@ -2746,8 +2507,8 @@ onMounted(() => {
   line-height: 1.5;
 }
 
-/* 文件列表 */
-.file-list {
+/* 上传文件列表 */
+.upload-file-list {
   margin-top: 16px;
   border: 1px solid #e8e8e8;
   border-radius: 8px;
@@ -2757,7 +2518,7 @@ onMounted(() => {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
 }
 
-.file-list-header {
+.upload-file-list-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -2809,10 +2570,6 @@ onMounted(() => {
 }
 
 /* 文件夹项样式 */
-.folder-item {
-  background: linear-gradient(90deg, #fafbfc 0%, #ffffff 100%);
-  font-weight: 500;
-}
 
 .folder-item .file-name {
   color: #10b981;
@@ -2883,10 +2640,9 @@ onMounted(() => {
 .upload-progress {
   margin-top: 16px;
   padding: 16px;
-  background: linear-gradient(135deg, #f0f9ff 0%, #e8f4ff 100%);
-  border: 1px solid #bae7ff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 89, 179, 0.08);
+  background-color: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  border-radius: 6px;
 }
 
 .progress-bar {
@@ -2895,35 +2651,20 @@ onMounted(() => {
   background-color: #e8e8e8;
   border-radius: 4px;
   overflow: hidden;
-  margin-bottom: 10px;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1);
+  margin-bottom: 8px;
 }
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #10b981, #34d399, #6ee7b7);
-  background-size: 200% 100%;
-  animation: progressShine 2s ease-in-out infinite;
+  background: #10b981;
   transition: width 0.3s ease;
   border-radius: 4px;
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.3);
-}
-
-@keyframes progressShine {
-  0%, 100% {
-    background-position: 0% 50%;
-  }
-  50% {
-    background-position: 100% 50%;
-  }
 }
 
 .progress-text {
   font-size: 13px;
-  color: #10b981;
-  font-weight: 600;
-  text-align: center;
-  letter-spacing: 0.3px;
+  color: #059669;
+  font-weight: 500;
 }
 
 /* 覆盖模式选项 */
