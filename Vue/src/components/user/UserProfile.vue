@@ -200,9 +200,12 @@ const getRoleText = (role) => {
   return roleMap[role] || '未知'
 }
 
-// 获取性别显示文本
+// 获取性别显示文本（兼容前后端两种编码）
 const getSexText = (sex) => {
   const sexMap = {
+    'M': '男',
+    'F': '女',
+    'U': '保密',
     '男': '男',
     '女': '女',
     '未知': '保密'
@@ -323,9 +326,9 @@ onMounted(() => {
                   v-model="userInfo.sex"
                   class="info-select"
                 >
-                  <option value="男">男</option>
-                  <option value="女">女</option>
-                  <option value="未知">保密</option>
+                  <option value="M">男</option>
+                  <option value="F">女</option>
+                  <option value="U">保密</option>
                 </select>
                 <div v-else class="info-value">{{ getSexText(userInfo.sex) }}</div>
               </div>
