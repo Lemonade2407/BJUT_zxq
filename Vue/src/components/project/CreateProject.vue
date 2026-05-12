@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { createProject, uploadFiles, getProjectTypes } from '@/api/project'
+import { createProject, uploadFiles, uploadProjectDocument, getProjectTypes } from '@/api/project'
 import { getTagsByCategory } from '@/api/tag'
 import { getActiveCourses } from '@/api/course'
 import { useFileTree } from '@/composables/useFileTree'
@@ -33,6 +33,12 @@ const thesisTypeOptions = [
   { value: 'UNDERGRADUATE', label: '本科生毕设' },
   { value: 'MASTER', label: '研究生毕设' },
   { value: 'DOCTOR', label: '博士生毕设' }
+]
+
+// 可见性选项
+const visibilityOptions = [
+  { value: 1, label: '公开' },
+  { value: 0, label: '私有' }
 ]
 
 // 标签列表（按分组）
@@ -172,86 +178,53 @@ const validateForm = () => {
 }
 
 // 提交表单
-const handleSubmit = async () => {
-  if (!validateForm()) {
-    return
-  }
-  
-  isSubmitting.value = true
-  
-  try {
-    log('开始创建项目:', form.value)
-    
-    // 1. 创建项目
-    const res = await createProject(form.value)
-    
-    if (res.code === 200) {
-      toast.success('项目创建成功！')
-      log('项目创建成功，ID:', res.data.id)
-      
+  const handleSubmit = async () => {
+    if (!validateForm()) {
+      return
+    }
+
+    isSubmitting.value = true
+
+    try {
+      log('开始创建项目:', form.value)
+
+      // 1. 先创建项目（获取 ID 才能上传文件）
+      const res = await createProject(form.value)
+
+      if (res.code !== 200) {
+        toast.error(res.message || '创建项目失败')
+        return
+      }
+
       const projectId = res.data.id
-      
-      // 2. 上传项目文档（如果选择了文档）
+      log('项目已创建，ID:', projectId)
+
+      // 2. 上传项目文档（使用专用文档接口）
       if (documentFile.value) {
-        await uploadProjectFiles(projectId, [documentFile.value])
+        const docRes = await uploadProjectDocument(projectId, documentFile.value)
+        if (docRes.code !== 200) {
+          toast.warning('项目文档上传失败：' + (docRes.message || '未知错误'))
+        }
       }
 
-      // 3. 如果有待上传的项目文件，则上传文件
+      // 3. 上传项目代码文件
       if (selectedFiles.value.length > 0) {
-        await uploadProjectFiles(projectId, selectedFiles.value)
+        const fileRes = await uploadFiles(projectId, selectedFiles.value)
+        if (fileRes.code === 200) {
+          uploadedFiles.value = fileRes.data
+        } else {
+          toast.warning('项目文件上传失败：' + (fileRes.message || '未知错误'))
+        }
       }
 
-      // 跳转到项目详情
-      setTimeout(() => {
-        router.push(`/project/${projectId}`)
-      }, 1000)
-    } else {
-      toast.error(res.message || '创建项目失败')
-    }
-  } catch (error) {
-    logError('创建项目失败:', error)
-    toast.error(error.message || '创建项目失败，请稍后重试')
-  } finally {
-    isSubmitting.value = false
-  }
-}
-
-// 上传文件
-const uploadProjectFiles = async (projectId, files) => {
-  isUploading.value = true
-  uploadProgress.value = 0
-
-  try {
-    log('开始上传文件，数量:', files.length)
-
-    const res = await uploadFiles(projectId, files)
-    
-    if (res.code === 200) {
-      uploadedFiles.value = res.data
-      uploadProgress.value = 100
-      toast.success(`成功上传 ${uploadedFiles.value.length} 个文件`)
-      log('文件上传成功')
-      
-      // 延迟跳转，让用户看到上传成功的提示
-      setTimeout(() => {
-        router.push(`/project/${projectId}`)
-      }, 1500)
-    } else {
-      toast.warning('项目创建成功，但文件上传失败：' + (res.message || '未知错误'))
-      // 即使文件上传失败，也跳转到项目页
-      setTimeout(() => {
-        router.push(`/project/${projectId}`)
-      }, 2000)
-    }
-  } catch (error) {
-    logError('文件上传失败:', error)
-    toast.warning('项目创建成功，但文件上传失败')
-    // 即使文件上传失败，也跳转到项目页
-    setTimeout(() => {
+      toast.success('项目创建成功！')
       router.push(`/project/${projectId}`)
-    }, 2000)
-  } finally {
-    isUploading.value = false
+    } catch (error) {
+      logError('创建项目失败:', error)
+      toast.error(error.message || '创建项目失败，请稍后重试')
+    } finally {
+      isSubmitting.value = false
+    }
   }
 }
 
