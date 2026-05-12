@@ -649,7 +649,7 @@ onMounted(() => {
               <input
                 ref="docInput"
                 type="file"
-                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip,.rar,.7z"
+                accept=".pdf,.doc,.docx,.txt"
                 style="display: none"
                 @change="handleDocSelect"
               />

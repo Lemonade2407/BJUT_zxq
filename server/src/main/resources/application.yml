@@ -1,5 +1,7 @@
 server:
   port: 8080
+  tomcat:
+    max-http-form-post-size: 524288000  # 500MB，与 servlet multipart 一致
   servlet:
     context-path: /api
 
@@ -42,6 +44,7 @@ spring:
     multipart:
       max-file-size: 100MB
       max-request-size: 500MB  # 批量上传支持最大500MB
+      max-file-count: 1000  # 批量上传支持最多1000个文件
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
