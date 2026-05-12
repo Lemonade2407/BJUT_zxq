@@ -1,11 +1,14 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
+import { useRouter } from 'vue-router'
 import { getProjectList, filterProjects, getProjectTypes, getProjectsByTag } from '@/api/project'
 import { getActiveCourses } from '@/api/course'
 import { getTags } from '@/api/tag'
 import { toast } from '@/utils/toast'
 import { log, error as logError } from '@/utils/logger'
 import { formatDate, formatNumber } from '@/utils/helpers'
+
+const router = useRouter()
 
 
 // TODO: 添加搜索防抖功能（避免频繁请求）
@@ -218,7 +221,7 @@ const handleProjectClick = (project) => {
             <h1 class="page-title">项目广场</h1>
             <p class="page-description">探索优秀项目，发现创新灵感</p>
           </div>
-          <button class="create-btn" @click="$router.push('/create-project')">
+          <button class="create-btn" @click="router.push('/create-project')">
             <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
               <path d="M8 1.25a.75.75 0 01.75.75v5.25H14a.75.75 0 010 1.5H8.75V14a.75.75 0 01-1.5 0V8.75H2a.75.75 0 010-1.5h5.25V2A.75.75 0 018 1.25z"/>
             </svg>

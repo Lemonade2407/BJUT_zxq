@@ -862,9 +862,8 @@ onMounted(() => {
 .form-container {
   background-color: #ffffff;
   border: 1px solid #d9d9d9;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 32px;
-  box-shadow: 0 2px 4px rgba(0, 51, 102, 0.05);
 }
 
 .project-form {
@@ -985,7 +984,7 @@ onMounted(() => {
 .tag-item {
   padding: 8px 16px;
   background-color: rgba(16, 185, 129, 0.08);
-  border: 2px solid transparent;
+  border: 1px solid transparent;
   border-radius: 6px;
   font-size: 13px;
   color: #059669;
@@ -996,7 +995,6 @@ onMounted(() => {
 
 .tag-item:hover {
   background-color: rgba(16, 185, 129, 0.15);
-  transform: translateY(-1px);
 }
 
 .tag-item.selected {
@@ -1016,8 +1014,8 @@ onMounted(() => {
 .type-option {
   padding: 16px;
   background-color: #ffffff;
-  border: 2px solid #d9d9d9;
-  border-radius: 8px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
   text-align: center;
@@ -1029,15 +1027,12 @@ onMounted(() => {
 
 .type-option:hover {
   border-color: #10b981;
-  background-color: rgba(16, 185, 129, 0.02);
-  transform: translateY(-2px);
-  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.1);
+  background-color: #f9f9f9;
 }
 
 .type-option.selected {
   border-color: #10b981;
   background-color: rgba(16, 185, 129, 0.05);
-  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.15);
 }
 
 .type-label {
@@ -1079,7 +1074,7 @@ onMounted(() => {
 .thesis-option {
   padding: 12px 20px;
   background-color: #ffffff;
-  border: 2px solid #d9d9d9;
+  border: 1px solid #d9d9d9;
   border-radius: 6px;
   font-size: 14px;
   color: #333333;
@@ -1091,7 +1086,7 @@ onMounted(() => {
 
 .thesis-option:hover {
   border-color: #10b981;
-  background-color: rgba(16, 185, 129, 0.02);
+  background-color: #f9f9f9;
 }
 
 .thesis-option.selected {
@@ -1110,7 +1105,7 @@ onMounted(() => {
 
 .visibility-option {
   padding: 16px;
-  border: 2px solid #d9d9d9;
+  border: 1px solid #d9d9d9;
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
@@ -1118,7 +1113,7 @@ onMounted(() => {
 
 .visibility-option:hover {
   border-color: #10b981;
-  background-color: rgba(16, 185, 129, 0.02);
+  background-color: #f9f9f9;
 }
 
 .visibility-option.selected {
@@ -1367,7 +1362,7 @@ onMounted(() => {
 
 .progress-fill {
   height: 100%;
-  background: linear-gradient(90deg, #10b981, #34d399);
+  background: #10b981;
   transition: width 0.3s ease;
   border-radius: 4px;
 }
@@ -1420,8 +1415,6 @@ onMounted(() => {
 
 .btn-submit:hover:not(:disabled) {
   background-color: #059669;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(16, 185, 129, 0.3);
 }
 
 /* 响应式设计 */
