@@ -333,7 +333,6 @@
         <if test="projectType != null and projectType != ''">
             AND p.project_type = #{projectType}
         </if>
-        ORDER BY p.updated_at DESC, p.created_at DESC
     </select>
 
     <!-- ===== 统计查询 ===== -->
