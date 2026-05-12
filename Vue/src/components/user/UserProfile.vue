@@ -326,9 +326,9 @@ onMounted(() => {
                   v-model="userInfo.sex"
                   class="info-select"
                 >
-                  <option value="M">男</option>
-                  <option value="F">女</option>
-                  <option value="U">保密</option>
+                  <option value="男">男</option>
+                  <option value="女">女</option>
+                  <option value="未知">保密</option>
                 </select>
                 <div v-else class="info-value">{{ getSexText(userInfo.sex) }}</div>
               </div>

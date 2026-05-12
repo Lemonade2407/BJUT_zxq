@@ -22,17 +22,17 @@ public class Constants {
         /**
          * 性别：男
          */
-        public static final String SEX_MALE = "M";
-        
+        public static final String SEX_MALE = "男";
+
         /**
          * 性别：女
          */
-        public static final String SEX_FEMALE = "F";
-        
+        public static final String SEX_FEMALE = "女";
+
         /**
          * 性别：未知
          */
-        public static final String SEX_UNKNOWN = "U";
+        public static final String SEX_UNKNOWN = "未知";
     }
     
     /**

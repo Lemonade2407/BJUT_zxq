@@ -21,17 +21,17 @@ class ConstantsTest {
 
     @Test
     void testUserSexMale() {
-        assertEquals("M", Constants.User.SEX_MALE);
+        assertEquals("男", Constants.User.SEX_MALE);
     }
 
     @Test
     void testUserSexFemale() {
-        assertEquals("F", Constants.User.SEX_FEMALE);
+        assertEquals("女", Constants.User.SEX_FEMALE);
     }
 
     @Test
     void testUserSexUnknown() {
-        assertEquals("U", Constants.User.SEX_UNKNOWN);
+        assertEquals("未知", Constants.User.SEX_UNKNOWN);
     }
 
     // Project 常量测试
