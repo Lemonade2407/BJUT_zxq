@@ -77,7 +77,7 @@ request.interceptors.response.use(
           }
           break
         case 403:
-          errorMessage = '拒绝访问'
+          errorMessage = data?.message || '拒绝访问'
           break
         case 404:
           errorMessage = '请求的资源不存在'
