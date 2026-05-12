@@ -25,17 +25,11 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-# 创建非root用户
-RUN addgroup -S appgroup && adduser -S appuser -G appgroup
-
 # 从构建阶段复制jar包
 COPY --from=builder /app/server/target/*.jar app.jar
 
-# 创建日志目录
-RUN mkdir -p /app/logs && chown -R appuser:appgroup /app
-
-# 切换到非root用户
-USER appuser
+# 创建日志目录（777 以确保 bind mount 挂载后可写入）
+RUN mkdir -p /app/logs && chmod 777 /app/logs
 
 # 暴露端口
 EXPOSE 8080
