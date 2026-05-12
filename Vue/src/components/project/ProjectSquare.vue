@@ -213,8 +213,18 @@ const handleProjectClick = (project) => {
     <div class="project-square-container">
       <!-- 页面头部 -->
       <div class="page-header">
-        <h1 class="page-title">项目广场</h1>
-        <p class="page-description">探索优秀项目，发现创新灵感</p>
+        <div class="header-row">
+          <div class="header-text">
+            <h1 class="page-title">项目广场</h1>
+            <p class="page-description">探索优秀项目，发现创新灵感</p>
+          </div>
+          <button class="create-btn" @click="$router.push('/create-project')">
+            <svg viewBox="0 0 16 16" width="16" height="16" fill="currentColor">
+              <path d="M8 1.25a.75.75 0 01.75.75v5.25H14a.75.75 0 010 1.5H8.75V14a.75.75 0 01-1.5 0V8.75H2a.75.75 0 010-1.5h5.25V2A.75.75 0 018 1.25z"/>
+            </svg>
+            新建项目
+          </button>
+        </div>
       </div>
 
       <!-- 筛选栏 -->
@@ -373,9 +383,36 @@ const handleProjectClick = (project) => {
 .header-row {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   gap: 24px;
   flex-wrap: wrap;
+}
+
+.create-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #064e3b 0%, #047857 100%);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.create-btn:hover {
+  background: linear-gradient(135deg, #047857 0%, #10b981 100%);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(6, 78, 59, 0.3);
+}
+
+.create-btn:active {
+  transform: translateY(0);
 }
 
 .page-title {

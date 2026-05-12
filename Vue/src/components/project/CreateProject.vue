@@ -56,6 +56,7 @@ const selectedFiles = ref([])
 const uploadedFiles = ref([])
 const isUploading = ref(false)
 const uploadProgress = ref(0)
+const documentFile = ref(null)
 
 // 可见性选项
 const { organizedFiles, displayFiles, toggleFolder } = useFileTree(selectedFiles)
@@ -190,15 +191,20 @@ const handleSubmit = async () => {
       
       const projectId = res.data.id
       
-      // 2. 如果有待上传的文件，则上传文件
-      if (selectedFiles.value.length > 0) {
-        await uploadProjectFiles(projectId)
-      } else {
-        // 没有文件，直接跳转
-        setTimeout(() => {
-          router.push(`/project/${projectId}`)
-        }, 1000)
+      // 2. 上传项目文档（如果选择了文档）
+      if (documentFile.value) {
+        await uploadProjectFiles(projectId, [documentFile.value])
       }
+
+      // 3. 如果有待上传的项目文件，则上传文件
+      if (selectedFiles.value.length > 0) {
+        await uploadProjectFiles(projectId, selectedFiles.value)
+      }
+
+      // 跳转到项目详情
+      setTimeout(() => {
+        router.push(`/project/${projectId}`)
+      }, 1000)
     } else {
       toast.error(res.message || '创建项目失败')
     }
@@ -210,16 +216,15 @@ const handleSubmit = async () => {
   }
 }
 
-// 上传项目文件
-const uploadProjectFiles = async (projectId) => {
+// 上传文件
+const uploadProjectFiles = async (projectId, files) => {
   isUploading.value = true
   uploadProgress.value = 0
-  
+
   try {
-    log('开始上传文件，数量:', selectedFiles.value.length)
-    
-    // 使用批量上传接口
-    const res = await uploadFiles(projectId, selectedFiles.value)
+    log('开始上传文件，数量:', files.length)
+
+    const res = await uploadFiles(projectId, files)
     
     if (res.code === 200) {
       uploadedFiles.value = res.data
@@ -292,6 +297,18 @@ const handleFileSelect = (event) => {
 }
 
 // 拖拽处理
+// 文档拖拽上传
+const handleDocDrop = (event) => {
+  const file = event.dataTransfer.files[0]
+  if (file) { documentFile.value = file }
+}
+
+// 文档文件选择
+const handleDocSelect = (event) => {
+  const file = event.target.files[0]
+  if (file) { documentFile.value = file }
+}
+
 const handleDragOver = (event) => {
   event.preventDefault()
   event.stopPropagation()
@@ -642,6 +659,43 @@ onMounted(() => {
                   <span class="option-label">{{ option.label }}</span>
                 </div>
               </div>
+            </div>
+          </div>
+
+          <!-- 项目文档上传 -->
+          <div class="form-group">
+            <label class="form-label">
+              项目文档 <span class="optional">(可选)</span>
+            </label>
+            <div
+              class="upload-area document-upload"
+              :class="{ 'has-file': documentFile }"
+              @dragover.prevent
+              @drop.prevent="handleDocDrop"
+              @click="$refs.docInput.click()"
+            >
+              <input
+                ref="docInput"
+                type="file"
+                accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.md,.zip,.rar,.7z"
+                style="display: none"
+                @change="handleDocSelect"
+              />
+              <template v-if="!documentFile">
+                <div class="upload-icon">📄</div>
+                <p class="upload-text">上传项目文档（说明文档、答辩PPT等）</p>
+                <p class="upload-hint">支持 PDF、Word、PPT、Excel、Markdown 等格式，单个文件不超过 100MB</p>
+              </template>
+              <template v-else>
+                <div class="doc-file-info">
+                  <span class="file-icon">📄</span>
+                  <div class="file-details">
+                    <span class="file-name">{{ documentFile.name }}</span>
+                    <span class="file-size">{{ formatFileSize(documentFile.size) }}</span>
+                  </div>
+                  <button type="button" class="remove-btn" @click.stop="documentFile = null">✕</button>
+                </div>
+              </template>
             </div>
           </div>
 
@@ -1121,6 +1175,55 @@ onMounted(() => {
   font-size: 12px;
   color: #999999;
   margin: 0;
+}
+
+.upload-area.has-file {
+  padding: 16px 20px;
+  border-color: #10b981;
+  background-color: rgba(16, 185, 129, 0.04);
+}
+
+.doc-file-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.doc-file-info .file-icon {
+  font-size: 32px;
+}
+
+.doc-file-info .file-details {
+  flex: 1;
+  text-align: left;
+}
+
+.doc-file-info .file-name {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+  display: block;
+}
+
+.doc-file-info .file-size {
+  font-size: 12px;
+  color: #999;
+}
+
+.doc-file-info .remove-btn {
+  background: none;
+  border: none;
+  color: #999;
+  cursor: pointer;
+  font-size: 18px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  transition: all 0.2s;
+}
+
+.doc-file-info .remove-btn:hover {
+  color: #d93025;
+  background: rgba(217, 48, 37, 0.08);
 }
 
 /* 文件列表 */
