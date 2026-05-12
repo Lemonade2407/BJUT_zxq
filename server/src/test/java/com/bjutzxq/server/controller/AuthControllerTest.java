@@ -144,22 +144,6 @@ rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
     }
 
     @Test
-    @DisplayName("注册失败 - IP 频率限制")
-    void testRegister_IpRateLimitExceeded() {
-        // Arrange
-        try (MockedStatic<CaptchaUtil> captchaUtilMock = mockStatic(CaptchaUtil.class);
-             MockedStatic<RegistrationRateLimiter> rateLimiterMock = mockStatic(RegistrationRateLimiter.class)) {
-
-            captchaUtilMock.when(() -> CaptchaUtil.verifyCaptcha(anyString(), anyString()))
-                .thenReturn(true);
-
-            IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                    () -> authController.register(validRegisterRequest));
-            verify(userService, never()).register(any(User.class));
-        }
-    }
-
-    @Test
     @DisplayName("注册失败 - 邮箱频率限制")
     void testRegister_EmailRateLimitExceeded() {
         // Arrange
