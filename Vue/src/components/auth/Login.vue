@@ -49,8 +49,6 @@ const validatePassword = () => {
 
 // 处理登录
 const handleLogin = async () => {
-  // TODO: 添加登录失败次数限制，防止暴力破解
-  // TODO: 添加图形验证码（失败 N 次后强制要求）
   
   // 验证表单
   const isUsernameValid = validateUsername()
@@ -91,7 +89,6 @@ const handleLogin = async () => {
       
       // 如果勾选了记住我，保存到 localStorage
       if (loginForm.rememberMe) {
-        // TODO: 对记住的用户名进行加密存储
         localStorage.setItem('rememberedUser', loginForm.username)
       } else {
         localStorage.removeItem('rememberedUser')

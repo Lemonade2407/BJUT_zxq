@@ -26,13 +26,26 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
         
         if (request instanceof ServletServerHttpRequest) {
             ServletServerHttpRequest servletRequest = (ServletServerHttpRequest) request;
-            
-            // 从请求参数中获取 Token
-            String token = servletRequest.getServletRequest().getParameter("token");
-            
-            if (token == null || token.trim().isEmpty()) {
-                // 尝试从 Authorization header 获取
-                String authHeader = servletRequest.getServletRequest().getHeader(Constants.JWT.TOKEN_HEADER);
+            jakarta.servlet.http.HttpServletRequest req = servletRequest.getServletRequest();
+
+            // 1. 优先从 httpOnly Cookie 读取
+            String token = null;
+            jakarta.servlet.http.Cookie[] cookies = req.getCookies();
+            if (cookies != null) {
+                for (jakarta.servlet.http.Cookie c : cookies) {
+                    if ("auth_token".equals(c.getName())) {
+                        token = c.getValue();
+                        break;
+                    }
+                }
+            }
+            // 2. 兼容 query 参数
+            if (token == null || token.isEmpty()) {
+                token = req.getParameter("token");
+            }
+            // 3. 兼容 Authorization header
+            if (token == null || token.isEmpty()) {
+                String authHeader = req.getHeader(Constants.JWT.TOKEN_HEADER);
                 if (authHeader != null && authHeader.startsWith("Bearer ")) {
                     token = authHeader.substring(7);
                 }

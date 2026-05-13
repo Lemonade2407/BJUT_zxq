@@ -12,6 +12,8 @@ import com.bjutzxq.server.util.CaptchaUtil;
 import com.bjutzxq.server.util.DtoConverter;
 import com.bjutzxq.server.util.JwtUtil;
 import com.bjutzxq.server.util.RegistrationRateLimiter;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
@@ -34,6 +36,28 @@ public class AuthController {
 
     @Autowired
     private StatisticsService statisticsService;
+
+    private static final String TOKEN_COOKIE = "auth_token";
+    private static final int COOKIE_MAX_AGE = (int)(Constants.JWT.TOKEN_EXPIRE_TIME / 1000);
+
+    private void setTokenCookie(HttpServletResponse response, String token) {
+        Cookie cookie = new Cookie(TOKEN_COOKIE, token);
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(COOKIE_MAX_AGE);
+        cookie.setAttribute("SameSite", "Strict");
+        response.addCookie(cookie);
+    }
+
+    private void clearTokenCookie(HttpServletResponse response) {
+        Cookie cookie = new Cookie(TOKEN_COOKIE, "");
+        cookie.setHttpOnly(true);
+        cookie.setSecure(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(0);
+        response.addCookie(cookie);
+    }
     
     /**
      * 用户注册（使用 DTO）
@@ -105,20 +129,22 @@ public class AuthController {
      * POST /api/auth/login
      */
     @PostMapping("/login")
-    public Result<LoginVO> login(@RequestBody Map<String, String> loginRequest) {
+    public Result<LoginVO> login(@RequestBody Map<String, String> loginRequest,
+                                  HttpServletResponse response) {
         String username = loginRequest.get("username");
         String password = loginRequest.get("password");
-        
+
         if (username == null || username.trim().isEmpty()) {
             throw new IllegalArgumentException("用户名不能为空");
         }
         if (password == null || password.trim().isEmpty()) {
             throw new IllegalArgumentException("密码不能为空");
         }
-        
+
         log.info("收到登录请求，用户名：{}", username);
-        
+
         LoginVO loginInfo = userService.login(username.trim(), password);
+        setTokenCookie(response, loginInfo.getToken());
         log.info("用户登录成功：{}", username);
         return Result.success("登录成功", loginInfo);
     }
@@ -128,8 +154,9 @@ public class AuthController {
      * POST /api/auth/logout
      */
     @PostMapping("/logout")
-    public Result<Void> logout() {
+    public Result<Void> logout(HttpServletResponse response) {
         log.info("用户退出登录");
+        clearTokenCookie(response);
         return Result.success("退出成功", null);
     }
     
@@ -139,28 +166,31 @@ public class AuthController {
      */
     @PostMapping("/refresh")
     public Result<Map<String, Object>> refreshToken(
-            @RequestHeader(value = "Authorization") String authorization) {
+            @CookieValue(value = "auth_token", required = false) String cookieToken,
+            @RequestHeader(value = "Authorization", required = false) String authorization,
+            HttpServletResponse response) {
         log.info("请求刷新 Token");
-        
-        String token = authorization;
-        if (token.startsWith("Bearer ")) {
-            token = token.substring(7);
+
+        String token = null;
+        if (cookieToken != null && !cookieToken.isEmpty()) {
+            token = cookieToken;
+        } else if (authorization != null && authorization.startsWith("Bearer ")) {
+            token = authorization.substring(7);
         }
-        
-        // 验证旧 Token
-        if (!JwtUtil.validateToken(token)) {
+
+        if (token == null || !JwtUtil.validateToken(token)) {
             throw new io.jsonwebtoken.JwtException("Token 无效");
         }
-        
-        // 生成新 Token
+
         String newToken = JwtUtil.refreshToken(token);
-        
+        setTokenCookie(response, newToken);
+
         log.info("Token 刷新成功");
-        
+
         Map<String, Object> result = new HashMap<>();
         result.put("token", newToken);
         result.put("expiresIn", Constants.JWT.TOKEN_EXPIRE_TIME / 1000);
-        
+
         return Result.success("Token 刷新成功", result);
     }
     

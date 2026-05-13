@@ -176,11 +176,9 @@ export function getTrendingProjects(params = {}) {
 
 // 下载项目（打包为 ZIP）
 export async function downloadProject(projectId) {
-  const token = tokenManager.getToken()
-  if (!token) throw new Error('未登录')
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
   const response = await fetch(`${baseUrl}/projects/${projectId}/download`, {
-    headers: { 'Authorization': `Bearer ${token}` }
+    credentials: 'include'
   })
   if (!response.ok) throw new Error(`下载失败: ${response.status}`)
   const blob = await response.blob()
@@ -196,12 +194,11 @@ export async function downloadProject(projectId) {
 
 // 批量下载学生项目（教师专用）
 export async function batchDownloadProjects(data) {
-  const token = tokenManager.getToken()
-  if (!token) throw new Error('未登录')
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
   const response = await fetch(`${baseUrl}/projects/batch-download`, {
     method: 'POST',
-    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data)
   })
   if (!response.ok) throw new Error(`下载失败: ${response.status}`)

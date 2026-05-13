@@ -248,8 +248,6 @@ const validateCaptcha = () => {
 
 // 处理注册
 const handleRegister = async () => {
-  // TODO: 添加表单提交防抖，防止重复提交
-  // TODO: 添加邮箱验证功能（发送验证邮件）
   
   // 验证所有字段
   const validations = [
@@ -292,8 +290,7 @@ const handleRegister = async () => {
     
     if (res.code === 200) {
       successMessage.value = '注册成功！即将跳转到登录页面...'
-      
-      // TODO: 考虑添加邮箱验证步骤，而非直接跳转
+
       // 2秒后跳转到登录页
       setTimeout(() => {
         router.push('/login')

@@ -1,4 +1,3 @@
-import tokenManager from './tokenManager'
 import { log, error as logError, warn } from './logger'
 
 /**
@@ -28,18 +27,9 @@ class NotificationWebSocket {
       return
     }
 
-    // 检查是否登录
-    const token = tokenManager.getToken()
-    if (!token) {
-      warn('未登录，无法建立 WebSocket 连接')
-      return
-    }
-
     try {
-      // 构建 WebSocket URL
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const host = window.location.host
-      const wsUrl = `${protocol}//${host}/api/ws/notifications?token=${token}`
+      const wsUrl = `${protocol}//${window.location.host}/api/ws/notifications`
       
       log('正在连接 WebSocket:', wsUrl)
       

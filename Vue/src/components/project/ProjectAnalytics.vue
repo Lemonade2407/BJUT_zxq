@@ -15,9 +15,6 @@ const stats = ref({
 // 加载数据
 const loadData = () => {
   log('加载项目数据分析')
-  // TODO: 调用后端 API 获取真实统计数据
-  // TODO: 添加数据可视化图表（使用 ECharts 或 Chart.js）
-  // TODO: 添加数据刷新功能
   stats.value = {
     totalProjects: 5,
     totalStars: 23,

@@ -2,9 +2,6 @@
  * 统一的日志工具
  */
 
-// TODO: 集成错误监控服务（如 Sentry），收集生产环境错误
-// TODO: 添加日志上报功能，便于问题排查
-
 // 是否启用控制台日志（开发环境启用，生产环境禁用）
 const ENABLE_CONSOLE = import.meta.env.VITE_ENABLE_CONSOLE !== 'false'
 

@@ -3,6 +3,7 @@ package com.bjutzxq.server.interceptor;
 import com.bjutzxq.common.Result;
 import com.bjutzxq.server.context.UserIdContext;
 import com.bjutzxq.server.util.JwtUtil;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -17,11 +18,25 @@ public class JwtUserIdInterceptor implements HandlerInterceptor {
     
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
-        // 从请求头中获取 Token
-        String token = request.getHeader("Authorization");
-        
-        if (token != null && token.startsWith("Bearer ")) {
-            token = token.substring(7);
+        // 优先从 Cookie 读取 Token，兼容 Authorization header
+        String token = null;
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie c : cookies) {
+                if ("auth_token".equals(c.getName())) {
+                    token = c.getValue();
+                    break;
+                }
+            }
+        }
+        if (token == null) {
+            String header = request.getHeader("Authorization");
+            if (header != null && header.startsWith("Bearer ")) {
+                token = header.substring(7);
+            }
+        }
+
+        if (token != null) {
             
             try {
                 // 验证 Token 并获取用户ID

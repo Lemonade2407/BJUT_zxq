@@ -1,206 +1,67 @@
 /**
  * Token 管理工具
+ * Token 通过 httpOnly Cookie 存储，前端无法读写，XSS 安全
+ * 用户信息（非敏感）存在 sessionStorage，关标签页自动清除
  */
 class TokenManager {
   constructor() {
-    this.tokenKey = 'auth_token'
     this.userInfoKey = 'user_info'
-    this.refreshTimer = null
   }
 
-  /**
-   * 保存 Token
-   */
-  // TODO: 考虑使用 sessionStorage 或 cookie，提高安全性
-  saveToken(token) {
-    localStorage.setItem(this.tokenKey, token)
-  }
+  // Token 不再由前端管理（httpOnly Cookie）
+  // 保留以下方法用于兼容：登录状态通过请求 /api/auth/me 判断
 
   /**
-   * 获取 Token
+   * @deprecated Token 已在 httpOnly Cookie 中，前端无需读取
    */
   getToken() {
-    return localStorage.getItem(this.tokenKey)
+    return '' // 后端从 Cookie 读，前端不需要
   }
 
   /**
-   * 删除 Token
+   * 清除用户信息
    */
   removeToken() {
-    localStorage.removeItem(this.tokenKey)
-    localStorage.removeItem(this.userInfoKey)
-    this.stopAutoRefresh()
+    sessionStorage.removeItem(this.userInfoKey)
   }
 
   /**
-   * 保存用户信息
+   * 保存用户信息（存 sessionStorage，关标签页清空）
    */
   saveUserInfo(userInfo) {
-    localStorage.setItem(this.userInfoKey, JSON.stringify(userInfo))
+    sessionStorage.setItem(this.userInfoKey, JSON.stringify(userInfo))
   }
 
   /**
    * 获取用户信息
    */
   getUserInfo() {
-    const info = localStorage.getItem(this.userInfoKey)
-    
-    // 检查是否存在且不是 "undefined" 字符串
-    if (!info || info === 'undefined' || info === 'null') {
-      return null
-    }
-    
+    const info = sessionStorage.getItem(this.userInfoKey)
+    if (!info || info === 'undefined' || info === 'null') return null
     try {
       return JSON.parse(info)
-    } catch (error) {
-      console.error('解析用户信息失败:', error)
-      // 清除无效数据
-      localStorage.removeItem(this.userInfoKey)
+    } catch {
+      sessionStorage.removeItem(this.userInfoKey)
       return null
     }
   }
 
   /**
-   * 检查是否已登录
+   * 检查是否已登录（通过调用 /api/auth/me 验证）
    */
   isLoggedIn() {
-    return !!this.getToken()
+    return !!this.getUserInfo()
   }
 
   /**
-   * 更新 Token（从响应头获取新 Token）
-   */
-  updateTokenFromResponse(response) {
-    const newToken = response.headers.get('X-New-Token')
-    if (newToken) {
-      this.saveToken(newToken)
-      return true
-    }
-    return false
-  }
-
-  /**
-   * 手动刷新 Token
-   */
-  async refreshToken() {
-    const token = this.getToken()
-    if (!token) return false
-
-    try {
-      const response = await fetch('/api/auth/refresh', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      const result = await response.json()
-      
-      if (result.code === 200) {
-        this.saveToken(result.data.token)
-        return true
-      } else {
-        this.handleTokenExpired()
-        return false
-      }
-    } catch (error) {
-      this.handleTokenExpired()
-      return false
-    }
-  }
-
-  /**
-   * 启动自动刷新定时器
-   * 每 30 分钟检查一次，如果 Token 即将过期则刷新
-   */
-  startAutoRefresh() {
-    this.stopAutoRefresh()
-    
-    // 每 30 分钟检查一次
-    this.refreshTimer = setInterval(async () => {
-      const token = this.getToken()
-      if (!token) {
-        this.stopAutoRefresh()
-        return
-      }
-
-      try {
-        // 尝试请求一个需要认证的接口，检查是否需要刷新
-        const response = await fetch('/api/auth/me', {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-
-        // 如果返回 401，说明 Token 已过期
-        if (response.status === 401) {
-          this.handleTokenExpired()
-          return
-        }
-
-        // 检查响应头是否有新 Token
-        this.updateTokenFromResponse(response)
-      } catch (error) {
-        // 静默失败，不影响用户体验
-      }
-    }, 30 * 60 * 1000) // 30 分钟
-  }
-
-  /**
-   * 停止自动刷新
-   */
-  stopAutoRefresh() {
-    if (this.refreshTimer) {
-      clearInterval(this.refreshTimer)
-      this.refreshTimer = null
-    }
-  }
-
-  /**
-   * 处理 Token 过期
+   * 处理 Token 过期（收到 401 时调用）
    */
   handleTokenExpired() {
-    this.removeToken()
-    
-    // 跳转到登录页
+    sessionStorage.removeItem(this.userInfoKey)
     if (window.location.pathname !== '/login') {
       window.location.href = '/login?redirect=' + encodeURIComponent(window.location.pathname)
     }
   }
-
-  /**
-   * 创建带有认证信息的 fetch 请求
-   */
-  authenticatedFetch(url, options = {}) {
-    const token = this.getToken()
-    
-    const headers = {
-      'Content-Type': 'application/json',
-      ...options.headers
-    }
-
-    if (token) {
-      headers['Authorization'] = `Bearer ${token}`
-    }
-
-    return fetch(url, {
-      ...options,
-      headers
-    }).then(async response => {
-      // 检查是否有新 Token
-      this.updateTokenFromResponse(response)
-
-      // 如果返回 401，处理 Token 过期
-      if (response.status === 401) {
-        this.handleTokenExpired()
-        throw new Error('Token 已过期，请重新登录')
-      }
-
-      return response
-    })
-  }
 }
 
-// 导出单例
 export default new TokenManager()

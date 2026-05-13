@@ -13,7 +13,6 @@ const activeMenu = computed(() => {
 })
 
 // 菜单项配置
-// TODO: 添加更多设置选项（通知设置、隐私设置、账号安全等）
 const menuItems = [
   { key: 'profile', label: '个人中心', icon: 'user' },
   { key: 'analytics', label: '项目数据分析', icon: 'bar-chart-2' }
