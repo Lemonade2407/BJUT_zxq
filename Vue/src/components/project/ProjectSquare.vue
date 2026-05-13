@@ -6,13 +6,9 @@ import { getActiveCourses } from '@/api/course'
 import { getTags } from '@/api/tag'
 import { toast } from '@/utils/toast'
 import { log, error as logError } from '@/utils/logger'
-import { formatDate, formatNumber } from '@/utils/helpers'
+import { debounce, formatDate, formatNumber } from '@/utils/helpers'
 
 const router = useRouter()
-
-
-// TODO: 添加搜索防抖功能（避免频繁请求）
-// TODO: 添加筛选条件持久化（记住用户选择）
 
 // 每页显示的项目数量
 const PAGE_SIZE = 12
@@ -101,6 +97,8 @@ const fetchProjects = async () => {
   }
 }
 
+const debouncedFetch = debounce(fetchProjects, 300)
+
 // 排序项目
 const sortProjects = (projects) => {
   return [...projects].sort((a, b) => {
@@ -167,7 +165,7 @@ const resetFilters = () => {
 // 监听筛选条件变化
 watch([() => filters.value.projectType, () => filters.value.courseName, () => filters.value.tagId, sortBy], () => {
   currentPageNum.value = 1
-  fetchProjects()  // 重新从后端获取数据
+  debouncedFetch()  // 重新从后端获取数据
 })
 
 // 组件挂载时获取数据

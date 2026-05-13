@@ -52,26 +52,6 @@ export function formatDate(dateString) {
   const day = String(date.getDate()).padStart(2, '0')
   return `${year}-${month}-${day}`
 }
-
-/**
- * 格式化日期时间为完整格式
- * @param {string} dateTime - 日期时间字符串
- * @returns {string} 格式化后的日期时间
- */
-export function formatDateTime(dateTime) {
-  if (!dateTime) return '未知时间'
-  
-  const date = new Date(dateTime)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  const seconds = String(date.getSeconds()).padStart(2, '0')
-  
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
-}
-
 /**
  * 格式化日期为简短格式（仅年月日）
  * @param {string} dateTime - 日期时间字符串
@@ -86,19 +66,6 @@ export function formatDateShort(dateTime) {
     day: '2-digit'
   })
 }
-
-/**
- * 截断文本，超出部分用省略号表示
- * @param {string} text - 原始文本
- * @param {number} maxLength - 最大长度
- * @returns {string} 截断后的文本
- */
-export function truncateText(text, maxLength = 50) {
-  if (!text) return ''
-  if (text.length <= maxLength) return text
-  return text.substring(0, maxLength) + '...'
-}
-
 /**
  * 防抖函数
  * @param {Function} func - 需要防抖的函数
@@ -114,24 +81,6 @@ export function debounce(func, delay = 300) {
     }, delay)
   }
 }
-
-/**
- * 节流函数
- * @param {Function} func - 需要节流的函数
- * @param {number} interval - 间隔时间（毫秒）
- * @returns {Function} 节流后的函数
- */
-export function throttle(func, interval = 300) {
-  let lastTime = 0
-  return function (...args) {
-    const now = Date.now()
-    if (now - lastTime >= interval) {
-      lastTime = now
-      func.apply(this, args)
-    }
-  }
-}
-
 /**
  * 深拷贝对象
  * @param {*} obj - 需要拷贝的对象
@@ -151,35 +100,6 @@ export function deepClone(obj) {
     return clonedObj
   }
 }
-
-/**
- * 生成唯一 ID
- * @returns {string} 唯一 ID
- */
-export function generateId() {
-  return Date.now().toString(36) + Math.random().toString(36).substr(2)
-}
-
-/**
- * 验证邮箱格式
- * @param {string} email - 邮箱地址
- * @returns {boolean} 是否为有效邮箱
- */
-export function isValidEmail(email) {
-  const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-  return regex.test(email)
-}
-
-/**
- * 验证手机号格式（中国大陆）
- * @param {string} phone - 手机号
- * @returns {boolean} 是否为有效手机号
- */
-export function isValidPhone(phone) {
-  const regex = /^1[3-9]\d{9}$/
-  return regex.test(phone)
-}
-
 /**
  * 文件大小格式化
  * @param {number} bytes - 字节数

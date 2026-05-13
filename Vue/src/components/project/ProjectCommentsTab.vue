@@ -10,6 +10,7 @@ const props = defineProps({ projectId: { type: [String, Number], required: true 
 const comments = ref([])
 const newComment = ref('')
 const isLoading = ref(false)
+const isSending = ref(false)
 
 const formatCommentTime = (timeStr) => {
   if (!timeStr) return ''
@@ -56,17 +57,20 @@ const loadComments = async () => {
 
 const submitComment = async () => {
   if (!newComment.value.trim()) { toast.warning('请输入评论内容'); return }
+  isSending.value = true
   try {
     const res = await createComment(props.projectId, { content: newComment.value.trim() })
     if (res.code === 200 && res.data) {
       comments.value.unshift({ ...res.data, userName: '我', userAvatar: '' })
       newComment.value = ''
       toast.success('评论成功！')
-      loadComments() // reload to get proper user info
+      loadComments()
     }
   } catch (e) {
     logError('提交评论失败:', e)
     toast.error(e.message || '评论失败，请稍后重试')
+  } finally {
+    isSending.value = false
   }
 }
 
@@ -77,7 +81,7 @@ onMounted(() => loadComments())
   <div class="content-section comments-content">
     <div class="comment-input-section">
       <textarea v-model="newComment" placeholder="写下你的评论..." class="comment-textarea" rows="4"></textarea>
-      <button class="submit-comment-btn" @click="submitComment">提交评论</button>
+      <button class="submit-comment-btn" @click="submitComment" :disabled="isSending">{{ isSending ? '提交中...' : '提交评论' }}</button>
     </div>
     <div v-if="isLoading" style="text-align:center;padding:24px;color:#999">加载中...</div>
     <div v-else class="comments-list">

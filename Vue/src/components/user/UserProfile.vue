@@ -24,6 +24,10 @@ const userInfo = ref({
 })
 
 // 编辑模式
+const isSaving = ref(false)
+const isChangingPwd = ref(false)
+const isUploadingAvatar = ref(false)
+
 const isEditing = ref(false)
 
 // 修改密码对话框
@@ -65,6 +69,7 @@ const toggleEdit = () => {
 
 // 保存用户信息
 const handleSave = async () => {
+  isSaving.value = true
   try {
     const updateData = {
       username: userInfo.value.username,
@@ -86,6 +91,8 @@ const handleSave = async () => {
   } catch (error) {
     logError('保存用户信息失败:', error)
     toast.error('保存失败，请稍后重试')
+  } finally {
+    isSaving.value = false
   }
 }
 
@@ -129,12 +136,13 @@ const handleChangePassword = async () => {
     return
   }
   
+  isChangingPwd.value = true
   try {
     const response = await changePassword({
       oldPassword: passwordForm.value.oldPassword,
       newPassword: passwordForm.value.newPassword
     })
-    
+
     if (response.code === 200) {
       toast.success('密码修改成功')
       closePasswordDialog()
@@ -143,8 +151,9 @@ const handleChangePassword = async () => {
     }
   } catch (error) {
     logError('修改密码失败:', error)
-    // request.js 已经将错误消息提取到 error.message 中
     toast.error(error.message || '修改密码失败，请检查原密码是否正确')
+  } finally {
+    isChangingPwd.value = false
   }
 }
 
@@ -165,11 +174,9 @@ const handleAvatarUpload = async (event) => {
     return
   }
   
+  isUploadingAvatar.value = true
   try {
-    // 显示加载提示
     toast.info('正在上传头像...')
-    
-    // 调用后端 API 上传到 OSS
     const response = await uploadAvatar(file)
     
     if (response.code === 200) {
@@ -187,8 +194,9 @@ const handleAvatarUpload = async (event) => {
     }
   } catch (error) {
     logError('上传头像失败:', error)
-    // request.js 已经将错误消息提取到 error.message 中
     toast.error(error.message || '头像上传失败，请稍后重试')
+  } finally {
+    isUploadingAvatar.value = false
   }
 }
 
@@ -271,7 +279,7 @@ onMounted(() => {
               </button>
               <div v-else class="edit-actions">
                 <button @click="toggleEdit" class="cancel-btn">取消</button>
-                <button @click="handleSave" class="save-btn">保存</button>
+                <button @click="handleSave" class="save-btn" :disabled="isSaving">{{ isSaving ? '保存中...' : '保存' }}</button>
               </div>
             </div>
 
@@ -397,7 +405,7 @@ onMounted(() => {
         </div>
         <div class="modal-footer">
           <button @click="closePasswordDialog" class="modal-btn cancel">取消</button>
-          <button @click="handleChangePassword" class="modal-btn confirm">确定</button>
+          <button @click="handleChangePassword" class="modal-btn confirm" :disabled="isChangingPwd">{{ isChangingPwd ? '修改中...' : '确定' }}</button>
         </div>
       </div>
     </div>

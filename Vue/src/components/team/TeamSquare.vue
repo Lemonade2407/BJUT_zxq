@@ -12,6 +12,8 @@ const totalPages = computed(() => Math.max(1, Math.ceil(total.value / PAGE_SIZE)
 
 const teams = ref([])
 const isLoading = ref(false)
+const isSaving = ref(false)
+const isApplying = ref(false)
 const tagFilter = ref('')
 const statusFilter = ref(null)
 const courseFilter = ref('')
@@ -58,6 +60,7 @@ const openApply = (team) => {
 }
 
 const submitApply = async () => {
+  isApplying.value = true
   try {
     await applyToTeam(applyTeam.value.id, applyMessage.value)
     toast.success('申请已提交')
@@ -65,6 +68,8 @@ const submitApply = async () => {
     showApplyDialog.value = false
   } catch (e) {
     toast.error(e.message || '申请失败')
+  } finally {
+    isApplying.value = false
   }
 }
 
@@ -157,6 +162,7 @@ const submitForm = async () => {
   if (!form.value.title.trim()) { toast.error('请输入组队标题'); return }
   if (!form.value.neededMembers || form.value.neededMembers < 2) { toast.error('需要成员至少为2人'); return }
   if (form.value.currentMembers < 1) { toast.error('已有成员至少为1人'); return }
+  isSaving.value = true
   try {
     if (isEditing.value) {
       await updateTeam(editingId.value, form.value)
@@ -169,6 +175,8 @@ const submitForm = async () => {
     loadTeams()
   } catch (e) {
     toast.error(e.message || '操作失败')
+  } finally {
+    isSaving.value = false
   }
 }
 
@@ -331,7 +339,7 @@ onMounted(() => {
         </div>
         <div class="modal-footer">
           <button @click="closeDialog" class="btn btn-cancel">取消</button>
-          <button @click="submitForm" class="btn btn-save">{{ isEditing ? '保存修改' : '发布' }}</button>
+          <button @click="submitForm" class="btn btn-save" :disabled="isSaving">{{ isSaving ? '提交中...' : (isEditing ? '保存修改' : '发布') }}</button>
         </div>
       </div>
     </div>
@@ -383,7 +391,7 @@ onMounted(() => {
         </div>
         <div class="modal-footer">
           <button @click="showApplyDialog = false" class="btn btn-cancel">取消申请</button>
-          <button @click="submitApply" class="btn btn-save">确认申请</button>
+          <button @click="submitApply" class="btn btn-save" :disabled="isApplying">{{ isApplying ? '提交中...' : '确认申请' }}</button>
         </div>
       </div>
     </div>

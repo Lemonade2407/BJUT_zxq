@@ -75,7 +75,8 @@ const showDeleteConfirm = ref(false)
 const selectedFiles = ref([])
 const isUploading = ref(false)
 const uploadProgress = ref(0)
-const isOverwriteMode = ref(true) // 默认开启覆盖模式
+const isOverwriteMode = ref(true)
+const isSaving = ref(false)
 
 // 项目文件列表（从 OSS 获取）
 const projectFiles = ref([])
@@ -485,6 +486,7 @@ const saveChanges = async () => {
     return
   }
 
+  isSaving.value = true
   try {
     // 1. 先上传文件（如果有选中的文件）
     if (selectedFiles.value.length > 0) {
@@ -520,6 +522,7 @@ const saveChanges = async () => {
     logError('更新项目失败:', error)
     toast.error(error.message || '更新失败，请稍后重试')
   } finally {
+    isSaving.value = false
     isUploading.value = false
     uploadProgress.value = 0
   }
@@ -1287,8 +1290,8 @@ onMounted(() => {
                 <button class="btn btn-secondary" @click="cancelEdit">
                   取消
                 </button>
-                <button class="btn btn-primary" @click="saveChanges">
-                  {{ isUploading ? '上传中...' : '保存修改' }}
+                <button class="btn btn-primary" @click="saveChanges" :disabled="isSaving || isUploading">
+                  {{ isSaving ? '保存中...' : (isUploading ? '上传中...' : '保存修改') }}
                 </button>
               </template>
             </div>
