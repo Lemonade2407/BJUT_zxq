@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { createProject, getUploadSignatures, uploadToPresignedUrl, confirmUpload, getProjectTypes } from '@/api/project'
+import { createProject, getUploadSignatures, uploadToPresignedUrl, confirmUpload, uploadProjectDocument, getProjectTypes } from '@/api/project'
 import { getTagsByCategory } from '@/api/tag'
 import { getActiveCourses } from '@/api/course'
 import { useFileTree } from '@/composables/useFileTree'
@@ -178,39 +178,38 @@ const validateForm = () => {
 }
 
 // 提交表单
-  // 直传文件到 OSS
+  // 直传文件到 OSS（5 路并发上传）
   const uploadDirectToOss = async (files) => {
-    const fileList = files.map(f => ({ name: f.name, size: f.size }))
-    const sigRes = await getUploadSignatures(fileList)
+    const sigRes = await getUploadSignatures(files.map(f => ({ name: f.name, size: f.size })))
     if (sigRes.code !== 200) throw new Error('获取上传签名失败')
 
-    const signatures = sigRes.data
     isUploading.value = true
     uploadProgress.value = 0
 
     const totalBytes = files.reduce((sum, f) => sum + f.size, 0)
     let uploadedBytes = 0
 
-    const uploaded = []
-    for (let i = 0; i < signatures.length; i++) {
-      const sig = signatures[i]
-      const file = files[i]
-      let fileLoadedPrev = 0
+    const results = new Array(files.length)
+    const CONCURRENCY = 5
+    let idx = 0
 
-      await uploadToPresignedUrl(sig, file, (loaded, total) => {
-        uploadedBytes += loaded - fileLoadedPrev
-        fileLoadedPrev = loaded
-        uploadProgress.value = totalBytes > 0
-          ? Math.round((uploadedBytes / totalBytes) * 100)
-          : Math.round(((i + 1) / signatures.length) * 100)
-      })
-      uploaded.push({
-        objectKey: sig.objectKey,
-        fileName: sig.fileName,
-        fileSize: file.size
-      })
+    const uploadOne = async () => {
+      while (idx < files.length) {
+        const i = idx++
+        const file = files[i]
+        const sig = sigRes.data[i]
+        let prev = 0
+        await uploadToPresignedUrl(sig, file, (loaded) => {
+          uploadedBytes += loaded - prev
+          prev = loaded
+          uploadProgress.value = Math.round((uploadedBytes / totalBytes) * 100)
+        })
+        results[i] = { objectKey: sig.objectKey, fileName: sig.fileName, fileSize: file.size }
+      }
     }
-    return uploaded
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, files.length) }, () => uploadOne()))
+    return results.filter(Boolean)
   }
 
   const handleSubmit = async () => {
@@ -233,11 +232,13 @@ const validateForm = () => {
       const projectId = res.data.id
       log('项目已创建，ID:', projectId)
 
-      // 2. 直传项目文档到 OSS
+      // 2. 上传项目文档（走专用接口，存入项目 document_url 字段）
       if (documentFile.value) {
         try {
-          const uploaded = await uploadDirectToOss([documentFile.value])
-          await confirmUpload(projectId, uploaded)
+          const docRes = await uploadProjectDocument(projectId, documentFile.value)
+          if (docRes.code !== 200) {
+            toast.warning('项目文档上传失败：' + (docRes.message || '未知错误'))
+          }
         } catch (e) {
           toast.warning('项目文档上传失败：' + (e.message || '未知错误'))
         }
@@ -297,9 +298,6 @@ const handleFileSelect = async (event) => {
   // 添加到待上传列表
   selectedFiles.value.push(...files)
   log('已选择文件:', files.length, '个')
-  
-  // 自动触发上传
-  await autoUploadFiles()
 }
 
 // 拖拽处理
@@ -423,76 +421,6 @@ const removeFileByPath = (path) => {
     log('移除文件，剩余:', selectedFiles.value.length, '个')
   }
 }
-
-// 自动上传文件
-const autoUploadFiles = async () => {
-  if (selectedFiles.value.length === 0) return
-  
-  try {
-    isUploading.value = true
-    uploadProgress.value = 0
-    
-    const allFiles = selectedFiles.value
-    const totalBytes = allFiles.reduce((sum, f) => sum + f.size, 0)
-    let uploadedBytes = 0
-    let fileLoadedPrev = 0
-    
-    // 分批获取签名，每批 200 个
-    const BATCH = 200
-    for (let i = 0; i < allFiles.length; i += BATCH) {
-      const batch = allFiles.slice(i, i + BATCH)
-      const fileList = batch.map(f => ({
-        name: f.name,
-        size: f.size,
-        path: f.webkitRelativePath || f.relativePath || ''
-      }))
-      const sigRes = await getUploadSignatures(fileList)
-      if (sigRes.code !== 200) throw new Error('获取上传签名失败')
-      
-      const signatures = sigRes.data
-      const uploaded = []
-      for (let j = 0; j < signatures.length; j++) {
-        const sig = signatures[j]
-        const file = batch[j]
-        fileLoadedPrev = 0
-        await uploadToPresignedUrl(sig, file, (loaded, total) => {
-          uploadedBytes += loaded - fileLoadedPrev
-          fileLoadedPrev = loaded
-          uploadProgress.value = totalBytes > 0
-            ? Math.min(99, Math.round((uploadedBytes / totalBytes) * 100))
-            : Math.round(((i + j + 1) / allFiles.length) * 100)
-        })
-        uploaded.push({
-          objectKey: sig.objectKey,
-          fileName: sig.fileName,
-          fileSize: file.size,
-          path: sig.path || ''
-        })
-      }
-      
-      // 如果项目已存在，立即确认上传
-      if (projectId.value) {
-        await confirmUpload(projectId.value, uploaded)
-      }
-    }
-    
-    uploadProgress.value = 100
-    toast.success(`成功上传 ${allFiles.length} 个文件`)
-    
-    setTimeout(() => {
-      isUploading.value = false
-      uploadProgress.value = 0
-    }, 1500)
-  } catch (error) {
-    logError('文件上传失败:', error)
-    toast.error(error.message || '文件上传失败')
-    isUploading.value = false
-    uploadProgress.value = 0
-  }
-}
-
-// 项目 ID（用于自动上传）
-const projectId = ref(null)
 
 // 格式化文件大小
 const formatFileSize = (bytes) => {

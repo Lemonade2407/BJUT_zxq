@@ -1,59 +1,39 @@
 package com.bjutzxq.server.util;
 
 import com.bjutzxq.common.Constants;
-import com.github.benmanes.caffeine.cache.Cache;
-import com.github.benmanes.caffeine.cache.Caffeine;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
+import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Component;
+
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
-import java.time.Duration;
 import java.util.Date;
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.TimeUnit;
 
-/**
- * JWT 工具类
- */
 @Slf4j
+@Component
 public class JwtUtil {
-    
-    /**
-     * 密钥
-     * SecretKey：用于 HMAC-SHA256 签名算法
-     * Keys.hmacShaKeyFor()：将字节数组转换为 HMAC 密钥对象
-     * .getBytes(StandardCharsets.UTF_8)：将字符串转为 UTF-8 编码的字节数组
-     */
+
     private static final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(
         Constants.JWT.TOKEN_SECRET.getBytes(StandardCharsets.UTF_8)
     );
-    
-    /**
-     * Token 黑名单缓存（key: token, value: 过期时间）
-     * 用于防止旧 Token 被重用
-     * 缓存过期时间设置为 Token 有效期的 2 倍，确保完全覆盖
-     */
-    private static final Cache<String, Long> TOKEN_BLACKLIST = Caffeine.newBuilder()
-        .maximumSize(10000) // 最大存储 10000 个黑名单 Token
-        .expireAfterWrite(Duration.ofMillis(Constants.JWT.TOKEN_EXPIRE_TIME * 2))
-        .recordStats() // 记录统计信息
-        .build();
-    
-    /**
-     * Token 刷新次数计数器（key: userId, value: 刷新次数）
-     * 用于限制单个用户的 Token 刷新次数，防止无限续期
-     * 缓存过期时间为 1 小时，每小时重置计数
-     */
-    private static final Cache<Integer, AtomicInteger> REFRESH_COUNTER = Caffeine.newBuilder()
-        .maximumSize(5000) // 最大存储 5000 个用户
-        .expireAfterWrite(Duration.ofHours(1))
-        .recordStats()
-        .build();
-    
-    /**
-     * 最大刷新次数：每个用户每小时最多刷新 10 次
-     */
+
     private static final int MAX_REFRESH_COUNT = 10;
+    private static final int TOKEN_EXPIRE_SECONDS = (int)(Constants.JWT.TOKEN_EXPIRE_TIME / 1000);
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    private static JwtUtil instance;
+
+    @PostConstruct
+    void init() {
+        instance = this;
+    }
     
     /**
      * 生成 Token
@@ -142,64 +122,50 @@ public class JwtUtil {
      * @param token Token 字符串
      * @return true-在黑名单中，false-不在黑名单中
      */
+    private static final String BLACKLIST_PREFIX = "jwt:blacklist:";
+    private static final String REFRESH_PREFIX = "jwt:refresh:";
+
     public static boolean isTokenBlacklisted(String token) {
-        return TOKEN_BLACKLIST.getIfPresent(token) != null;
+        return Boolean.TRUE.equals(
+            instance.redisTemplate.hasKey(BLACKLIST_PREFIX + token));
     }
-    
-    /**
-     * 将 Token 加入黑名单
-     * @param token Token 字符串
-     */
+
     public static void addToBlacklist(String token) {
         try {
             Claims claims = parseToken(token);
-            long expireTime = claims.getExpiration().getTime();
-            TOKEN_BLACKLIST.put(token, expireTime);
-            log.debug("Token 已加入黑名单");
+            long expireMs = claims.getExpiration().getTime() - System.currentTimeMillis();
+            if (expireMs > 0) {
+                instance.redisTemplate.opsForValue()
+                    .set(BLACKLIST_PREFIX + token, "1", expireMs, TimeUnit.MILLISECONDS);
+                log.debug("Token 已加入黑名单");
+            }
         } catch (Exception e) {
             log.warn("加入黑名单失败：{}", e.getMessage());
         }
     }
-    
-    /**
-     * 检查用户是否超过刷新次数限制
-     * @param userId 用户 ID
-     * @return true-未超过限制，false-超过限制
-     */
+
     private static boolean checkRefreshLimit(Integer userId) {
-        AtomicInteger counter = REFRESH_COUNTER.getIfPresent(userId);
-        if (counter == null) {
-            return true; // 首次刷新，允许
-        }
-        return counter.get() < MAX_REFRESH_COUNT;
+        String key = REFRESH_PREFIX + userId;
+        String count = instance.redisTemplate.opsForValue().get(key);
+        return count == null || Integer.parseInt(count) < MAX_REFRESH_COUNT;
     }
-    
-    /**
-     * 增加用户的刷新计数
-     * @param userId 用户 ID
-     */
+
     private static void incrementRefreshCount(Integer userId) {
-        // 使用 get 方法，如果不存在则创建新的计数器
-        AtomicInteger counter = REFRESH_COUNTER.get(userId, k -> new AtomicInteger(0));
-        counter.incrementAndGet();
+        String key = REFRESH_PREFIX + userId;
+        Long count = instance.redisTemplate.opsForValue().increment(key);
+        if (count != null && count == 1) {
+            instance.redisTemplate.expire(key, 1, TimeUnit.HOURS);
+        }
     }
-    
-    /**
-     * 获取用户的当前刷新次数
-     * @param userId 用户 ID
-     * @return 刷新次数
-     */
+
     public static int getRefreshCount(Integer userId) {
-        AtomicInteger counter = REFRESH_COUNTER.getIfPresent(userId);
-        return counter != null ? counter.get() : 0;
+        String count = instance.redisTemplate.opsForValue()
+            .get(REFRESH_PREFIX + userId);
+        return count != null ? Integer.parseInt(count) : 0;
     }
-    
-    /**
-     * 清除用户的刷新计数（例如用户重新登录后）
-     * @param userId 用户 ID
-     */
+
     public static void clearRefreshCount(Integer userId) {
-        REFRESH_COUNTER.invalidate(userId);
+        instance.redisTemplate.delete(REFRESH_PREFIX + userId);
         log.debug("已清除用户 {} 的刷新计数", userId);
     }
     

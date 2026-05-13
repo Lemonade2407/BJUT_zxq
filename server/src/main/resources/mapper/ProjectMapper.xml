@@ -199,7 +199,14 @@
             updated_at = NOW()
         WHERE id = #{id}
     </update>
-    
+
+    <update id="incrementViewCountBy">
+        UPDATE project
+        SET view_count = COALESCE(view_count, 0) + #{count},
+            updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
     <!-- 增加项目下载次数 -->
     <update id="incrementDownloadCount">
         UPDATE project

@@ -3,11 +3,14 @@ package com.bjutzxq.server.service;
 import com.bjutzxq.pojo.entity.*;
 import com.bjutzxq.server.mapper.*;
 import com.bjutzxq.server.util.OssUtil;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
 import com.github.pagehelper.PageHelper;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.*;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.io.File;
@@ -44,7 +47,12 @@ public class ProjectService {
     
     @Autowired
     private WatchMapper watchMapper;
-    
+
+    @Autowired
+    private StringRedisTemplate redisTemplate;
+
+    private static final ObjectMapper objectMapper = new ObjectMapper();
+
     @Autowired
     private ProjectFileMapper projectFileMapper;
     
@@ -220,13 +228,26 @@ public class ProjectService {
             log.error("删除项目点赞/关注记录失败，项目 ID: {}, 错误: {}", id, e.getMessage(), e);
         }
         
-        // 5. 最后删除项目本身
+        // 5. 清理 Redis 缓存
+        try {
+            redisTemplate.delete("pv:project:" + id);
+            redisTemplate.delete("cache:trending:projects");
+        } catch (Exception e) {
+            log.warn("清理 Redis 缓存失败: {}", e.getMessage());
+        }
+
+        // 6. 最后删除项目本身
         int rows = projectMapper.deleteById(id);
         if (rows == 0) {
+            Project check = projectMapper.selectById(id);
+            if (check == null) {
+                log.info("项目已被级联删除，ID: {}", id);
+                return true;
+            }
             log.error("删除项目失败：数据库删除失败，ID: {}", id);
             throw new RuntimeException("删除项目失败");
         }
-        
+
         log.info("项目删除成功，ID: {}", id);
         return true;
     }
@@ -289,8 +310,110 @@ public class ProjectService {
      */
     public List<Project> getPublicProjects(Integer pageNum, Integer pageSize) {
         log.info("获取公开项目列表，页码：{}, 每页数量：{}", pageNum, pageSize);
+        
+        // 获取当前用户 ID
+        Integer userId = com.bjutzxq.server.context.UserIdContext.getCurrentUserId();
+        
+        // 尝试从缓存获取（只缓存静态数据：标签、作者信息）
+        String cacheKey = "cache:public:projects:p" + pageNum + ":s" + pageSize;
+        try {
+            String cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                log.debug("命中项目广场缓存: {}", cacheKey);
+                List<Project> cachedProjects = objectMapper.readValue(cached, new TypeReference<List<Project>>() {});
+                // 补充用户交互状态
+                return enrichUserInteraction(cachedProjects, userId);
+            }
+        } catch (Exception e) {
+            log.warn("项目广场缓存异常: {}", e.getMessage());
+        }
+        
+        // 缓存未命中，查询数据库
         PageHelper.startPage(pageNum, pageSize);
-        return projectMapper.selectPublicProjects();
+        List<Project> projects = projectMapper.selectPublicProjects();
+        
+        // 丰富静态数据（标签、作者）
+        projects = enrichStaticData(projects);
+        
+        // 写入缓存（5分钟过期）
+        try {
+            String json = objectMapper.writeValueAsString(projects);
+            redisTemplate.opsForValue().set(cacheKey, json, 5, java.util.concurrent.TimeUnit.MINUTES);
+            log.debug("项目广场缓存已设置: {}", cacheKey);
+        } catch (Exception e) {
+            log.warn("缓存项目广场失败: {}", e.getMessage());
+        }
+        
+        // 补充用户交互状态
+        return enrichUserInteraction(projects, userId);
+    }
+    
+    /**
+     * 只丰富静态数据（标签、作者信息），不包含用户交互状态
+     * @param projects 项目列表
+     * @return 丰富后的项目列表
+     */
+    private List<Project> enrichStaticData(List<Project> projects) {
+        if (projects == null || projects.isEmpty()) return projects;
+
+        // 批量查询项目标签
+        List<Integer> projectIds = projects.stream().map(Project::getId).collect(Collectors.toList());
+        Map<Integer, List<Tag>> tagMap = projectTagService.getProjectTagsBatch(projectIds);
+        Map<Integer, String> ownerNameMap = new java.util.HashMap<>();
+        Map<Integer, String> ownerClassNameMap = new java.util.HashMap<>();
+
+        // 批量查询所有者
+        List<Integer> ownerIds = projects.stream().map(Project::getOwnerId).distinct().collect(Collectors.toList());
+        if (!ownerIds.isEmpty()) {
+            List<User> owners = userMapper.selectBatchIds(ownerIds);
+            for (User o : owners) {
+                ownerNameMap.put(o.getId(), o.getUsername());
+                ownerClassNameMap.put(o.getId(), o.getClassName());
+            }
+        }
+
+        for (Project project : projects) {
+            project.setTags(tagMap.getOrDefault(project.getId(), List.of()));
+            String ownerName = ownerNameMap.get(project.getOwnerId());
+            project.setOwnerUsername(ownerName != null ? ownerName : "未知用户");
+            project.setOwnerClassName(ownerClassNameMap.get(project.getOwnerId()));
+            project.setAuthor(ownerName != null ? ownerName : "未知用户");
+            // 不设置 isStarred 和 isWatched，留给 enrichUserInteraction 处理
+        }
+        return projects;
+    }
+    
+    /**
+     * 补充用户交互状态（点赞/关注）
+     * @param projects 项目列表
+     * @param userId 当前用户 ID
+     * @return 补充后的项目列表
+     */
+    private List<Project> enrichUserInteraction(List<Project> projects, Integer userId) {
+        if (projects == null || projects.isEmpty()) return projects;
+        
+        if (userId != null) {
+            List<Integer> projectIds = projects.stream().map(Project::getId).collect(Collectors.toList());
+            java.util.Set<Integer> starredIds = new java.util.HashSet<>(
+                starMapper.selectStarredProjectIds(userId, projectIds)
+            );
+            java.util.Set<Integer> watchedIds = new java.util.HashSet<>(
+                watchMapper.selectWatchedProjectIds(userId, projectIds)
+            );
+            
+            for (Project project : projects) {
+                project.setIsStarred(starredIds.contains(project.getId()));
+                project.setIsWatched(watchedIds.contains(project.getId()));
+            }
+        } else {
+            // 未登录用户，默认为 false
+            for (Project project : projects) {
+                project.setIsStarred(false);
+                project.setIsWatched(false);
+            }
+        }
+        
+        return projects;
     }
     
     /**
@@ -490,20 +613,29 @@ public class ProjectService {
      * @return 热门项目列表
      */
     public List<Project> getTrendingProjects(Integer limit) {
-        log.info("获取热门项目，限制数量：{}", limit);
-        
-        // 参数验证
-        if (limit == null || limit < 1) {
-            limit = 10;
+        if (limit == null || limit < 1) limit = 10;
+        if (limit > 50) limit = 50;
+
+        String cacheKey = "cache:trending:projects";
+        try {
+            String cached = redisTemplate.opsForValue().get(cacheKey);
+            if (cached != null) {
+                return objectMapper.readValue(cached, new TypeReference<List<Project>>() {});
+            }
+        } catch (Exception e) {
+            log.warn("热门项目缓存异常: {}", e.getMessage());
         }
-        if (limit > 50) {
-            limit = 50; // 最多返回 50 个
-        }
-        
+
         List<Project> projects = projectMapper.selectTrendingProjects(limit);
-        
-        // 丰富项目信息（热门项目不需要用户交互状态，传 null）
-        return enrichProjects(projects, null);
+        projects = enrichProjects(projects, null);
+
+        try {
+            String json = objectMapper.writeValueAsString(projects);
+            redisTemplate.opsForValue().set(cacheKey, json, 3, java.util.concurrent.TimeUnit.MINUTES);
+        } catch (Exception e) {
+            log.warn("缓存热门项目失败: {}", e.getMessage());
+        }
+        return projects;
     }
     
     /**
@@ -511,15 +643,9 @@ public class ProjectService {
      * @param id 项目 ID
      */
     public void incrementViewCount(Integer id) {
-        log.debug("增加项目浏览次数，项目 ID: {}", id);
-        try {
-            projectMapper.incrementViewCount(id);
-            log.debug("项目浏览次数 +1，项目 ID: {}", id);
-        } catch (Exception e) {
-            log.warn("增加项目浏览次数失败，项目 ID: {}, 错误: {}", id, e.getMessage());
-        }
+        redisTemplate.opsForValue().increment("pv:project:" + id);
     }
-    
+
     /**
      * 增加项目下载次数
      * @param id 项目 ID

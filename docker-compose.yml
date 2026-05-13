@@ -19,6 +19,16 @@ services:
       timeout: 5s
       retries: 5
 
+  # Redis 缓存
+  redis:
+    image: redis:7-alpine
+    container_name: bjut-zxq-redis
+    restart: always
+    network_mode: host
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+
   # Spring Boot后端
   backend:
     build:
@@ -91,4 +101,6 @@ volumes:
   mysql_data:
     driver: local
   maven_cache:
+    driver: local
+  redis_data:
     driver: local

@@ -118,7 +118,9 @@ public interface ProjectMapper {
      * @return 影响行数
      */
     int incrementViewCount(@Param("id") Integer id);
-    
+
+    int incrementViewCountBy(@Param("id") Integer id, @Param("count") int count);
+
     /**
      * 增加项目下载次数
      * @param id 项目 ID

@@ -69,11 +69,8 @@ const handleLogin = async () => {
     })
     
     if (res.code === 200) {
-      // 使用 tokenManager 保存 token 和用户信息
-      // 注意：后端返回的 LoginResponse 结构是扁平的，不是嵌套的 { user: {...} }
+      // 使用 tokenManager 保存用户信息（Token 由后端通过 httpOnly Cookie 管理）
       const loginData = res.data
-      
-      tokenManager.saveToken(loginData.token)
       
       // 构建用户信息对象（从 LoginResponse 中提取）
       const userInfo = {
@@ -86,16 +83,6 @@ const handleLogin = async () => {
       }
       
       tokenManager.saveUserInfo(userInfo)
-      
-      // 如果勾选了记住我，保存到 localStorage
-      if (loginForm.rememberMe) {
-        localStorage.setItem('rememberedUser', loginForm.username)
-      } else {
-        localStorage.removeItem('rememberedUser')
-      }
-      
-      // 启动 Token 自动刷新
-      tokenManager.startAutoRefresh()
       
       // 登录成功,根据角色跳转到不同页面
       const userRole = loginData.role

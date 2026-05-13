@@ -70,6 +70,7 @@ const editForm = ref({
 })
 const isEditing = ref(false)
 const showDeleteConfirm = ref(false)
+const isDeleting = ref(false)
 
 // 文件上传相关
 const selectedFiles = ref([])
@@ -148,11 +149,11 @@ const loadProjectDocument = async () => {
       const urlParts = res.data.split('/')
       documentName.value = urlParts[urlParts.length - 1] || '未知文档'
       
-      // 自动渲染 Word 或 Markdown 文档
+      // 立即开始渲染文档
       if (isWordDocument()) {
-        await renderWordDocument()
+        renderWordDocument()
       } else if (isMarkdownDocument()) {
-        await renderMarkdownDocument()
+        renderMarkdownDocument()
       }
     }
   } catch (error) {
@@ -205,12 +206,7 @@ const uploadDocument = async () => {
       selectedDocumentFile.value = null
       toast.success('文档上传成功！')
       
-      // 自动渲染 Word 或 Markdown 文档
-      if (isWordDocument()) {
-        await renderWordDocument()
-      } else if (isMarkdownDocument()) {
-        await renderMarkdownDocument()
-      }
+      // 不立即渲染，等用户切换到文档标签页时再渲染（懒加载）
       
       // 清空文件选择
       const fileInput = document.getElementById('document-file-input')
@@ -281,16 +277,55 @@ const isMarkdownDocument = () => {
 // 渲染 Word 文档为 HTML
 const renderWordDocument = async () => {
   if (!isWordDocument()) return
+  
+  // 如果已经渲染过，直接返回（缓存）
+  if (documentContent.value) {
+    isRenderingDocument.value = false
+    return
+  }
+  
   isRenderingDocument.value = true
   try {
+    // 动态导入 mammoth
+    const mammothModule = await import('mammoth')
+    
+    // mammoth 可能是 default 导出或命名导出
+    const mammoth = mammothModule.default || mammothModule
+    
+    // 下载 Word 文件
     const response = await fetch(documentUrl.value)
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+    }
+    
     const arrayBuffer = await response.arrayBuffer()
-    const mammoth = await import('mammoth')
-    const result = await mammoth.default.convertToHtml({ arrayBuffer })
+    
+    // 转换为 HTML
+    const result = await mammoth.convertToHtml({ arrayBuffer })
+    
     documentContent.value = result.value
+    
+    // 记录警告信息（如果有）
+    if (result.messages && result.messages.length > 0) {
+      logError('Word 转换警告:', result.messages.slice(0, 5)) // 只显示前5条
+    }
   } catch (error) {
     logError('渲染 Word 文档失败:', error)
-    toast.error('Word 文档渲染失败，请下载后查看')
+    
+    // 根据错误类型给出不同提示
+    let errorMsg = 'Word 文档渲染失败'
+    if (error.name === 'AbortError') {
+      errorMsg = '文档加载超时（超过30秒）'
+    } else if (error.message.includes('403') || error.message.includes('404')) {
+      errorMsg = '文档不存在或无权限访问'
+    } else if (error.message.includes('CORS')) {
+      errorMsg = '跨域访问被阻止'
+    } else if (error.message.includes('HTTP')) {
+      errorMsg = `网络错误: ${error.message}`
+    }
+    
+    toast.error(`${errorMsg}，请下载后查看`)
     documentContent.value = ''
   } finally {
     isRenderingDocument.value = false
@@ -491,6 +526,7 @@ const saveChanges = async () => {
     // 1. 先上传文件（如果有选中的文件）
     if (selectedFiles.value.length > 0) {
       if (isOverwriteMode.value && projectFiles.value.length > 0) {
+        toast.info('正在删除旧文件，请耐心等待...')
         await deleteAllProjectFiles(projectId.value)
       }
       const uploaded = await doUploadFiles()
@@ -530,20 +566,21 @@ const saveChanges = async () => {
 
 // 删除项目
 const confirmDelete = async () => {
+  isDeleting.value = true
+  toast.info('正在删除项目...')
   try {
     const res = await deleteProject(projectId.value)
-    
+
     if (res.code === 200) {
       toast.success('项目删除成功！')
       showDeleteConfirm.value = false
-      // 跳转到项目广场
-      setTimeout(() => {
-        router.push('/projects')
-      }, 1000)
+      setTimeout(() => router.push('/projects'), 1000)
     }
   } catch (error) {
     logError('删除项目失败:', error)
     toast.error(error.message || '删除失败，请稍后重试')
+  } finally {
+    isDeleting.value = false
   }
 }
 
@@ -559,27 +596,70 @@ const toggleTag = (tagId) => {
 
 const {displayFiles} = useFileTree(selectedFiles)
 
-// OSS 文件树（代码 Tab）
+// OSS 文件树（代码 Tab）- 基于 filePath 构建树形结构
 const ossExpandedFolders = ref(new Set())
 
 const ossFileTree = computed(() => {
   if (!projectFiles.value || projectFiles.value.length === 0) return []
-  const tree = []
-  const fileMap = new Map()
+  
+  const rootNodes = []
+  const nodeMap = new Map() // path -> node
+  
+  // 1. 为每个文件和目录创建节点
   projectFiles.value.forEach(file => {
-    fileMap.set(file.id, { ...file, children: [], level: 0 })
+    const node = {
+      ...file,
+      children: [],
+      level: 0
+    }
+    
+    // 使用 filePath 作为 key（目录的 filePath 就是它的完整路径）
+    const key = file.isDir ? file.filePath : (file.filePath + '/' + file.fileName)
+    nodeMap.set(key, node)
   })
+  
+  // 2. 建立父子关系
   projectFiles.value.forEach(file => {
-    const node = fileMap.get(file.id)
-    if (file.parentId !== null && fileMap.has(file.parentId)) {
-      const parent = fileMap.get(file.parentId)
-      node.level = parent.level + 1
-      parent.children.push(node)
+    const node = nodeMap.get(file.isDir ? file.filePath : (file.filePath + '/' + file.fileName))
+    
+    if (!file.filePath || file.filePath.trim() === '') {
+      // 根级别的文件或目录
+      rootNodes.push(node)
     } else {
-      tree.push(node)
+      // 查找父节点
+      const parentPath = file.filePath.substring(0, file.filePath.lastIndexOf('/'))
+      // 如果 parentPath 为空，说明是一级目录/文件
+      const parentNode = parentPath ? nodeMap.get(parentPath) : null
+      
+      if (parentNode) {
+        node.level = parentNode.level + 1
+        parentNode.children.push(node)
+      } else {
+        // 如果找不到父节点，也作为根节点
+        rootNodes.push(node)
+      }
     }
   })
-  return tree
+  
+  // 3. 排序：目录在前，文件在后，按名称排序
+  const sortNodes = (nodes) => {
+    nodes.sort((a, b) => {
+      if (a.isDir !== b.isDir) {
+        return a.isDir ? -1 : 1 // 目录在前
+      }
+      return a.fileName.localeCompare(b.fileName)
+    })
+    
+    // 递归排序子节点
+    nodes.forEach(node => {
+      if (node.children && node.children.length > 0) {
+        sortNodes(node.children)
+      }
+    })
+  }
+  
+  sortNodes(rootNodes)
+  return rootNodes
 })
 
 const toggleOssFolder = (fileId) => {
@@ -726,9 +806,9 @@ const doUploadFiles = async () => {
 
   const totalBytes = files.reduce((sum, f) => sum + f.size, 0)
   let uploadedBytes = 0
-  let fileLoadedPrev = 0
-
   const uploaded = []
+
+  // 分批获取签名，每批 200 个
   for (let i = 0; i < files.length; i += 200) {
     const batch = files.slice(i, i + 200)
     const sigRes = await getUploadSignatures(batch.map(f => ({
@@ -737,19 +817,30 @@ const doUploadFiles = async () => {
     })))
     if (sigRes.code !== 200) throw new Error('获取上传签名失败')
 
-    for (let j = 0; j < sigRes.data.length; j++) {
-      const sig = sigRes.data[j]
-      fileLoadedPrev = 0
-      await uploadToPresignedUrl(sig, batch[j], (loaded) => {
-        uploadedBytes += loaded - fileLoadedPrev
-        fileLoadedPrev = loaded
-        uploadProgress.value = Math.round((uploadedBytes / totalBytes) * 100)
-      })
-      uploaded.push({
-        objectKey: sig.objectKey, fileName: sig.fileName,
-        fileSize: batch[j].size, path: sig.path || ''
-      })
+    // 5 路并发上传
+    const results = new Array(batch.length)
+    let idx = 0
+    const CONCURRENCY = 5
+
+    const uploadOne = async () => {
+      while (idx < batch.length) {
+        const j = idx++
+        const sig = sigRes.data[j]
+        let prev = 0
+        await uploadToPresignedUrl(sig, batch[j], (loaded) => {
+          uploadedBytes += loaded - prev
+          prev = loaded
+          uploadProgress.value = Math.round((uploadedBytes / totalBytes) * 100)
+        })
+        results[j] = {
+          objectKey: sig.objectKey, fileName: sig.fileName,
+          fileSize: batch[j].size, path: sig.path || ''
+        }
+      }
     }
+
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, batch.length) }, () => uploadOne()))
+    uploaded.push(...results.filter(Boolean))
   }
   return uploaded
 }
@@ -1318,8 +1409,8 @@ onMounted(() => {
                 <button class="btn btn-secondary" @click="showDeleteConfirm = false">
                   取消
                 </button>
-                <button class="btn btn-danger" @click="confirmDelete">
-                  确认删除
+                <button class="btn btn-danger" @click="confirmDelete" :disabled="isDeleting">
+                  {{ isDeleting ? '删除中...' : '确认删除' }}
                 </button>
               </div>
             </div>

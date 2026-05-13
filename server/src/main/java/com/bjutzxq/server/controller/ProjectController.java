@@ -319,11 +319,7 @@ public class ProjectController {
         List<Project> projects = projectService.getPublicProjects(pageNum, pageSize);
         long total = projectService.countPublicProjects();
         
-        // 丰富项目信息
-        Integer userId = UserIdContext.getCurrentUserId();
-        projects = projectService.enrichProjects(projects, userId);
-        
-        // 构建分页响应
+        // 构建分页响应（enrichProjects 已在 Service 层完成）
         PageResult<Project> response = new PageResult<>(projects, total, pageNum, pageSize);
         
         log.info("公开项目列表获取成功，数量：{}, 总数：{}", projects.size(), total);

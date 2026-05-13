@@ -23,6 +23,12 @@ public class ScheduledTasks {
     
     @Autowired
     private NotificationWebSocketHandler webSocketHandler;
+
+    @Autowired
+    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+
+    @Autowired
+    private com.bjutzxq.server.mapper.ProjectMapper projectMapper;
     
     /**
      * 每天凌晨3点清理过期的注册记录
@@ -54,6 +60,31 @@ public class ScheduledTasks {
         }
     }
     
+    /**
+     * 每5分钟将 Redis 中的项目查看计数批量刷新到 MySQL
+     */
+    @Scheduled(fixedRate = 300000)
+    public void flushViewCounts() {
+        var keys = redisTemplate.keys("pv:project:*");
+        if (keys == null || keys.isEmpty()) return;
+
+        for (String key : keys) {
+            try {
+                String countStr = redisTemplate.opsForValue().get(key);
+                if (countStr != null) {
+                    int count = Integer.parseInt(countStr);
+                    if (count > 0) {
+                        int projectId = Integer.parseInt(key.substring(key.lastIndexOf(':') + 1));
+                        projectMapper.incrementViewCountBy(projectId, count);
+                        redisTemplate.opsForValue().decrement(key, count);
+                    }
+                }
+            } catch (Exception e) {
+                log.warn("刷新查看计数失败: key={}, error={}", key, e.getMessage());
+            }
+        }
+    }
+
     /**
      * 每5分钟清理超时的 WebSocket 连接
      * 检测超过60秒未发送心跳的连接并关闭

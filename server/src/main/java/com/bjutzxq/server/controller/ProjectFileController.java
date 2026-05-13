@@ -12,6 +12,7 @@ import com.bjutzxq.server.util.DtoConverter;
 import com.bjutzxq.server.util.OssUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -132,7 +133,6 @@ public class ProjectFileController {
      */
     @DeleteMapping("/all")
     public Result<Integer> deleteAllFiles(@PathVariable Integer projectId) {
-        Integer userId = UserIdContext.getCurrentUserId();
         log.info("删除项目所有文件，项目 ID: {}", projectId);
         int count = projectFileService.deleteAllProjectFiles(projectId);
         log.info("已删除 {} 条文件记录", count);
@@ -144,7 +144,7 @@ public class ProjectFileController {
      * POST /api/projects/{projectId}/files/confirm
      */
     @PostMapping("/confirm")
-    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
+    @Transactional(rollbackFor = Exception.class)
     public Result<List<FileVO>> confirmUpload(
             @PathVariable Integer projectId,
             @RequestBody List<Map<String, Object>> files) {
@@ -152,94 +152,78 @@ public class ProjectFileController {
         Integer userId = UserIdContext.getCurrentUserId();
         log.info("确认 OSS 直传，项目 ID: {}, 文件数: {}", projectId, files.size());
 
-        // 预先加载所有现有目录到缓存（避免 N+1 查询）
-        java.util.Map<String, Integer> dirCache = new java.util.HashMap<>();
-        List<ProjectFile> existingFiles = projectFileService.getAllFiles(projectId);
-        for (ProjectFile f : existingFiles) {
-            if (f.getIsDir() != null && f.getIsDir() == 1) {
-                // 构建目录的唯一键：parentId/dirName
-                String key = buildDirKey(f.getParentId(), f.getFileName());
-                dirCache.put(key, f.getId());
-            }
-        }
+        List<ProjectFile> allFiles = new ArrayList<>();
 
-        List<ProjectFile> projectFiles = new ArrayList<>();
         for (Map<String, Object> f : files) {
-            String objectKey = (String) f.get("objectKey");
             String fileName = (String) f.get("fileName");
             String filePath = (String) f.get("path");
             Long fileSize = f.get("fileSize") != null
                 ? ((Number) f.get("fileSize")).longValue() : 0L;
+            String objectKey = (String) f.get("objectKey");
 
-            String ossUrl = ossUtil.getFileAccessUrl(objectKey);
-
-            // 如果有文件夹路径，创建目录记录
-            Integer parentId = null;
+            // 如果有文件夹路径，先创建目录记录
             if (filePath != null && !filePath.isEmpty()) {
-                // 去掉文件名，只保留目录部分
                 String dirPath = filePath.replace("\\", "/");
-                int lastSlash = dirPath.lastIndexOf('/');
-                if (lastSlash > 0) {
-                    dirPath = dirPath.substring(0, lastSlash);
-                } else {
-                    dirPath = "";
-                }
-
+                int slash = dirPath.lastIndexOf('/');
+                dirPath = slash > 0 ? dirPath.substring(0, slash) : "";
+                
                 if (!dirPath.isEmpty()) {
+                    // 为每一级目录创建记录
                     String[] parts = dirPath.split("/");
                     StringBuilder currentPath = new StringBuilder();
-                    Integer currentParentId = null;
-
+                    
                     for (String dirName : parts) {
                         if (dirName.isEmpty()) continue;
-                        currentPath.append("/").append(dirName);
-                        String cacheKey = buildDirKey(currentParentId, dirName);
-
-                        Integer dirId = dirCache.get(cacheKey);
-                        if (dirId == null) {
-                            // 创建新目录
+                        
+                        if (currentPath.length() > 0) {
+                            currentPath.append("/");
+                        }
+                        currentPath.append(dirName);
+                        
+                        // 检查是否已存在该目录
+                        String fullPath = currentPath.toString();
+                        boolean exists = allFiles.stream()
+                            .anyMatch(pf -> pf.getIsDir() == 1 && pf.getFilePath().equals(fullPath));
+                        
+                        if (!exists) {
                             ProjectFile dir = new ProjectFile();
                             dir.setProjectId(projectId);
                             dir.setFileName(dirName);
-                            dir.setParentId(currentParentId);
+                            dir.setFilePath(fullPath);
+                            dir.setParentId(null); // 前端根据 filePath 构建树
                             dir.setIsDir(1);
                             dir.setUploaderId(userId);
                             dir.setFileType("");
                             dir.setFileSize(0L);
                             dir.setStorageUrl("");
-                            projectFileService.insertSingle(dir);
-                            dirId = dir.getId();
-                            dirCache.put(cacheKey, dirId);
+                            allFiles.add(dir);
                         }
-                        currentParentId = dirId;
                     }
-                    parentId = currentParentId;
                 }
             }
 
+            // 创建文件记录
             ProjectFile pf = new ProjectFile();
             pf.setProjectId(projectId);
             pf.setFileName(fileName);
-            pf.setStorageUrl(ossUrl);
+            pf.setFilePath(filePath != null ? filePath : "");
+            pf.setStorageUrl(ossUtil.getFileAccessUrl(objectKey));
             pf.setFileSize(fileSize);
             pf.setFileType(ossUtil.getFileExtension(fileName));
-            pf.setParentId(parentId);
+            pf.setParentId(null); // 前端根据 filePath 构建树
             pf.setUploaderId(userId);
             pf.setIsDir(0);
-            projectFiles.add(pf);
+            allFiles.add(pf);
         }
 
-        projectFiles = projectFileService.batchCreate(projectFiles);
-        List<FileVO> result = convertToVOListWithBatchQuery(projectFiles);
-        log.info("OSS 直传确认完成，创建 {} 条文件记录", result.size());
-        return Result.success("确认成功", result);
-    }
-
-    /**
-     * 构建目录的唯一键
-     */
-    private String buildDirKey(Integer parentId, String dirName) {
-        return (parentId == null ? "null" : parentId) + "/" + dirName;
+        // 一次性批量插入所有记录
+        if (!allFiles.isEmpty()) {
+            log.info("批量创建 {} 条记录（目录+文件）", allFiles.size());
+            projectFileService.batchCreate(allFiles);
+        }
+        
+        log.info("OSS 直传确认完成");
+        return Result.success("确认成功", convertToVOListWithBatchQuery(allFiles));
     }
 
     /**

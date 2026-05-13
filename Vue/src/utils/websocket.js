@@ -37,7 +37,6 @@ class NotificationWebSocket {
       
       // 连接成功
       this.ws.onopen = () => {
-        log('WebSocket 连接成功')
         this.isConnected = true
         this.reconnectAttempts = 0
         this.reconnectInterval = 3000
@@ -53,17 +52,13 @@ class NotificationWebSocket {
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data)
-          log('收到 WebSocket 消息:', data)
           
           // 根据消息类型处理
-          if (data.type === 'welcome') {
-            log('收到欢迎消息')
-          } else if (data.type === 'notification') {
+          if (data.type === 'notification') {
             // 新通知
             this.emit('notification', data)
-          } else if (data.type === 'heartbeat') {
-            // 心跳响应
-            log('收到心跳响应')
+          } else if (data.type === 'heartbeat' || data.type === 'heartbeat_ack') {
+            // 心跳响应（静默处理）
           } else {
             // 其他消息
             this.emit('message', data)
@@ -75,7 +70,6 @@ class NotificationWebSocket {
       
       // 连接关闭
       this.ws.onclose = (event) => {
-        log('WebSocket 连接关闭:', event.code, event.reason)
         this.isConnected = false
         this.stopHeartbeat()
         
@@ -102,8 +96,6 @@ class NotificationWebSocket {
    * 断开连接
    */
   disconnect() {
-    log('主动断开 WebSocket 连接')
-    
     // 清除定时器
     this.stopHeartbeat()
     this.clearReconnectTimer()
@@ -124,7 +116,7 @@ class NotificationWebSocket {
   send(data) {
     if (this.ws && this.isConnected) {
       this.ws.send(JSON.stringify(data))
-      log('发送 WebSocket 消息:', data)
+      // 不记录日志，避免控制台刷屏
     } else {
       warn('WebSocket 未连接，无法发送消息')
     }
@@ -160,9 +152,6 @@ class NotificationWebSocket {
     
     if (!exists) {
       this.messageHandlers.push({ event, handler })
-      log(`注册 WebSocket 监听器: ${event}`)
-    } else {
-      log(`监听器已存在，跳过注册: ${event}`)
     }
   }
 
@@ -199,10 +188,7 @@ class NotificationWebSocket {
     const delay = this.reconnectInterval * Math.pow(1.5, this.reconnectAttempts)
     this.reconnectAttempts++
     
-    log(`将在 ${delay}ms 后尝试第 ${this.reconnectAttempts} 次重连`)
-    
     this.reconnectTimer = setTimeout(() => {
-      log('尝试重新连接 WebSocket...')
       this.connect()
     }, delay)
   }
@@ -228,8 +214,6 @@ class NotificationWebSocket {
         this.send({ type: 'heartbeat', timestamp: Date.now() })
       }
     }, this.heartbeatInterval)
-    
-    log('心跳检测已启动')
   }
 
   /**
@@ -239,7 +223,6 @@ class NotificationWebSocket {
     if (this.heartbeatTimer) {
       clearInterval(this.heartbeatTimer)
       this.heartbeatTimer = null
-      log('心跳检测已停止')
     }
   }
 

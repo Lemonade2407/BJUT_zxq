@@ -7,17 +7,6 @@ class TokenManager {
   constructor() {
     this.userInfoKey = 'user_info'
   }
-
-  // Token 不再由前端管理（httpOnly Cookie）
-  // 保留以下方法用于兼容：登录状态通过请求 /api/auth/me 判断
-
-  /**
-   * @deprecated Token 已在 httpOnly Cookie 中，前端无需读取
-   */
-  getToken() {
-    return '' // 后端从 Cookie 读，前端不需要
-  }
-
   /**
    * 清除用户信息
    */

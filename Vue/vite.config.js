@@ -29,9 +29,8 @@ export default defineConfig({
     proxy: {
       '/api': {
         target: 'http://localhost:8080',
-        changeOrigin: true
-        // 不需要 rewrite，因为后端 context-path 已经是 /api
-        // 前端请求 /api/xxx -> 代理到 http://localhost:8080/api/xxx
+        changeOrigin: true,
+        ws: true
       }
     }
   }

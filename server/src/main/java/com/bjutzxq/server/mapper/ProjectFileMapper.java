@@ -18,7 +18,9 @@ public interface ProjectFileMapper {
      * @return 影响行数
      */
     int insert(ProjectFile projectFile);
-    
+
+    int batchInsert(@Param("list") List<ProjectFile> list);
+
     /**
      * 根据 ID 查询文件
      * @param id 文件 ID

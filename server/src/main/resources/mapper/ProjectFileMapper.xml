@@ -54,7 +54,18 @@
             NOW()
         )
     </insert>
-    
+
+    <insert id="batchInsert" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO project_file (project_id, file_name, file_path, file_size,
+            file_type, storage_url, content, is_dir, parent_id, uploader_id, created_at, updated_at)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.projectId}, #{item.fileName}, #{item.filePath}, #{item.fileSize},
+             #{item.fileType}, #{item.storageUrl}, #{item.content}, #{item.isDir},
+             #{item.parentId}, #{item.uploaderId}, NOW(), NOW())
+        </foreach>
+    </insert>
+
     <!-- 更新文件 -->
     <update id="updateById" parameterType="com.bjutzxq.pojo.entity.ProjectFile">
         <set>

@@ -36,22 +36,15 @@ public class ProjectFileService {
     /**
      * 插入单条文件记录
      */
-    @Transactional(rollbackFor = Exception.class)
-    public void insertSingle(ProjectFile file) {
-        projectFileMapper.insert(file);
-    }
 
     /**
-     * 批量创建文件记录（OSS 直传确认后调用）
+     * 批量创建文件记录（一条 SQL 完成）
      */
     @Transactional(rollbackFor = Exception.class)
     @CacheEvict(value = "directoryCache", allEntries = true)
     public List<ProjectFile> batchCreate(List<ProjectFile> projectFiles) {
-        for (ProjectFile file : projectFiles) {
-            if (file.getIsDir() == null) {
-                file.setIsDir(0);
-            }
-            projectFileMapper.insert(file);
+        if (!projectFiles.isEmpty()) {
+            projectFileMapper.batchInsert(projectFiles);
         }
         log.info("批量创建 {} 条文件记录", projectFiles.size());
         return projectFiles;
@@ -81,7 +74,7 @@ public class ProjectFileService {
             .filter(file -> file.getIsDir() == null || file.getIsDir() == 0)  // 只保留文件
             .map(ProjectFile::getStorageUrl)
             .filter(url -> url != null && !url.trim().isEmpty())
-            .collect(java.util.stream.Collectors.toList());
+            .toList();
         
         int ossSuccessCount = 0;
         int ossFailCount = 0;
