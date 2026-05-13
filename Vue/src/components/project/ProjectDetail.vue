@@ -486,6 +486,21 @@ const saveChanges = async () => {
   }
 
   try {
+    // 1. 先上传文件（如果有选中的文件）
+    if (selectedFiles.value.length > 0) {
+      if (isOverwriteMode.value && projectFiles.value.length > 0) {
+        await deleteAllProjectFiles(projectId.value)
+      }
+      const uploaded = await doUploadFiles()
+      const confirmRes = await confirmUpload(projectId.value, uploaded)
+      if (confirmRes.code !== 200) {
+        toast.warning('文件上传失败：' + confirmRes.message)
+      } else {
+        selectedFiles.value = []
+      }
+    }
+
+    // 2. 保存项目信息
     const res = await updateProject(projectId.value, {
       name: editForm.value.name.trim(),
       description: editForm.value.description,
@@ -495,16 +510,18 @@ const saveChanges = async () => {
       thesisType: editForm.value.thesisType,
       tagIds: editForm.value.tagIds
     })
-    
+
     if (res.code === 200) {
       toast.success('项目信息更新成功！')
       isEditing.value = false
-      // 重新加载项目详情
       await loadProjectDetail()
     }
   } catch (error) {
     logError('更新项目失败:', error)
     toast.error(error.message || '更新失败，请稍后重试')
+  } finally {
+    isUploading.value = false
+    uploadProgress.value = 0
   }
 }
 
@@ -585,7 +602,6 @@ const handleFileSelect = (event) => {
   
   // 添加到待上传列表并自动上传
   selectedFiles.value.push(...files)
-  uploadProjectFiles()
 }
 
 // 拖拽处理
@@ -677,7 +693,6 @@ const processFiles = (files) => {
   })
   
   selectedFiles.value.push(...validFiles)
-  uploadProjectFiles()
 }
 
 // 按路径移除文件
@@ -700,90 +715,40 @@ const formatFileSize = (bytes) => {
   return Math.round((bytes / Math.pow(k, i)) * 100) / 100 + ' ' + sizes[i]
 }
 
-// 上传项目文件（OSS 直传，分批获取签名）
-const uploadProjectFiles = async () => {
-  if (selectedFiles.value.length === 0) {
-    toast.warning('请先选择要上传的文件')
-    return
-  }
-
-  if (isOverwriteMode.value && projectFiles.value.length > 0) {
-    const confirmed = await new Promise((resolve) => {
-      toast.confirm(
-        `即将删除现有的 ${projectFiles.value.length} 个文件并上传新文件，是否继续？`,
-        '确认覆盖上传',
-        resolve
-      )
-    })
-    if (!confirmed) return
-
-    // 先删除旧文件记录
-    await deleteAllProjectFiles(projectId.value)
-  }
-
-  // 显示上传进度提示
-  if (selectedFiles.value.length > 100) {
-    toast.info(`正在上传 ${selectedFiles.value.length} 个文件，请耐心等待...`)
-  }
-
+// 文件直传到 OSS（供上传和保存复用）
+const doUploadFiles = async () => {
+  const files = selectedFiles.value
   isUploading.value = true
   uploadProgress.value = 0
 
-  try {
-    const allFiles = selectedFiles.value
-    const totalBytes = allFiles.reduce((sum, f) => sum + f.size, 0)
-    let uploadedBytes = 0
-    let fileLoadedPrev = 0
+  const totalBytes = files.reduce((sum, f) => sum + f.size, 0)
+  let uploadedBytes = 0
+  let fileLoadedPrev = 0
 
-    // 分批获取签名，每批 200 个
-    const BATCH = 200
-    for (let i = 0; i < allFiles.length; i += BATCH) {
-      const batch = allFiles.slice(i, i + BATCH)
-      const fileList = batch.map(f => ({
-            name: f.name,
-            size: f.size,
-            path: f.webkitRelativePath || f.relativePath || ''
-          }))
-      const sigRes = await getUploadSignatures(fileList)
-      if (sigRes.code !== 200) throw new Error('获取上传签名失败')
+  const uploaded = []
+  for (let i = 0; i < files.length; i += 200) {
+    const batch = files.slice(i, i + 200)
+    const sigRes = await getUploadSignatures(batch.map(f => ({
+      name: f.name, size: f.size,
+      path: f.webkitRelativePath || f.relativePath || ''
+    })))
+    if (sigRes.code !== 200) throw new Error('获取上传签名失败')
 
-      const signatures = sigRes.data
-      const uploaded = []
-      for (let j = 0; j < signatures.length; j++) {
-        const sig = signatures[j]
-        const file = batch[j]
-        fileLoadedPrev = 0
-        await uploadToPresignedUrl(sig, file, (loaded, total) => {
-          uploadedBytes += loaded - fileLoadedPrev
-          fileLoadedPrev = loaded
-          uploadProgress.value = totalBytes > 0
-            ? Math.min(99, Math.round((uploadedBytes / totalBytes) * 100))
-            : Math.round(((i + j + 1) / allFiles.length) * 100)
-        })
-        uploaded.push({
-          objectKey: sig.objectKey,
-          fileName: sig.fileName,
-          fileSize: file.size,
-          path: sig.path || ''
-        })
-      }
-      await confirmUpload(projectId.value, uploaded)
+    for (let j = 0; j < sigRes.data.length; j++) {
+      const sig = sigRes.data[j]
+      fileLoadedPrev = 0
+      await uploadToPresignedUrl(sig, batch[j], (loaded) => {
+        uploadedBytes += loaded - fileLoadedPrev
+        fileLoadedPrev = loaded
+        uploadProgress.value = Math.round((uploadedBytes / totalBytes) * 100)
+      })
+      uploaded.push({
+        objectKey: sig.objectKey, fileName: sig.fileName,
+        fileSize: batch[j].size, path: sig.path || ''
+      })
     }
-
-    uploadProgress.value = 100
-    toast.success(`成功上传 ${allFiles.length} 个文件`)
-    selectedFiles.value = []
-    setTimeout(() => {
-      loadProjectDetail()
-      isUploading.value = false
-      uploadProgress.value = 0
-    }, 1500)
-  } catch (error) {
-    logError('文件上传失败:', error)
-    toast.error(error.message || '文件上传失败')
-    isUploading.value = false
-    uploadProgress.value = 0
   }
+  return uploaded
 }
 
 // 加载项目类型列表
@@ -1319,19 +1284,11 @@ onMounted(() => {
                 </button>
               </template>
               <template v-else>
-                <button 
-                  type="button"
-                  class="btn btn-secondary" 
-                  @click="uploadProjectFiles"
-                  :disabled="isUploading || selectedFiles.length === 0"
-                >
-                  {{ isUploading ? '上传中...' : '开始上传' }}
-                </button>
                 <button class="btn btn-secondary" @click="cancelEdit">
                   取消
                 </button>
                 <button class="btn btn-primary" @click="saveChanges">
-                  保存修改
+                  {{ isUploading ? '上传中...' : '保存修改' }}
                 </button>
               </template>
             </div>
@@ -2047,7 +2004,7 @@ onMounted(() => {
   height: 24px;
   background-color: #f0f0f0;
   border-radius: 12px;
-  overflow: hidden;
+  overflow: visible;
   position: relative;
 }
 
@@ -2066,6 +2023,7 @@ onMounted(() => {
   font-size: 12px;
   font-weight: 600;
   color: #333333;
+  z-index: 1;
 }
 
 /* 空文档状态 */

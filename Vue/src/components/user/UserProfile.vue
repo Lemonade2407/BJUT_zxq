@@ -143,7 +143,8 @@ const handleChangePassword = async () => {
     }
   } catch (error) {
     logError('修改密码失败:', error)
-    toast.error(error.response?.data?.message || '修改密码失败，请检查原密码是否正确')
+    // request.js 已经将错误消息提取到 error.message 中
+    toast.error(error.message || '修改密码失败，请检查原密码是否正确')
   }
 }
 
@@ -186,7 +187,8 @@ const handleAvatarUpload = async (event) => {
     }
   } catch (error) {
     logError('上传头像失败:', error)
-    toast.error(error.response?.data?.message || '头像上传失败，请稍后重试')
+    // request.js 已经将错误消息提取到 error.message 中
+    toast.error(error.message || '头像上传失败，请稍后重试')
   }
 }
 

@@ -273,23 +273,14 @@ const handleCancel = () => {
 }
 
 // 处理文件选择
-const handleFileSelect = (event) => {
+const handleFileSelect = async (event) => {
   const files = Array.from(event.target.files)
   if (files.length === 0) return
   
-  // 验证文件大小（单个文件不超过 50MB）
-  const maxSize = 50 * 1024 * 1024
-  const oversizedFiles = files.filter(file => file.size > maxSize)
-  
-  if (oversizedFiles.length > 0) {
-    toast.warning(`以下文件超过 50MB，无法上传：${oversizedFiles.map(f => f.name).join(', ')}`)
-  }
-  
-  // 过滤出符合要求的文件
-  const validFiles = files.filter(file => file.size <= maxSize)
+  // OSS 直传支持大文件，无需前端限制大小
   
   // 如果是文件夹上传，保留相对路径信息
-  validFiles.forEach((file, index) => {
+  files.forEach((file, index) => {
     // webkitRelativePath 包含文件夹路径，如 "folder/subfolder/file.txt"
     if (file.webkitRelativePath) {
       file.relativePath = file.webkitRelativePath
@@ -304,8 +295,11 @@ const handleFileSelect = (event) => {
   })
   
   // 添加到待上传列表
-  selectedFiles.value.push(...validFiles)
-  log('已选择文件:', validFiles.length, '个')
+  selectedFiles.value.push(...files)
+  log('已选择文件:', files.length, '个')
+  
+  // 自动触发上传
+  await autoUploadFiles()
 }
 
 // 拖拽处理
@@ -399,13 +393,8 @@ const processFiles = (files) => {
   
   log('拖拽的文件数量:', files.length)
   
-  // 验证文件大小
-  const maxSize = 50 * 1024 * 1024
-  const validFiles = files.filter(file => file.size <= maxSize)
-  
-  if (validFiles.length < files.length) {
-    toast.warning('部分文件超过 50MB，已自动过滤')
-  }
+  // OSS 直传支持大文件，无需前端限制大小
+  const validFiles = files
   
   // 打印前3个文件的路径信息
   validFiles.forEach((file, index) => {
@@ -423,11 +412,6 @@ const processFiles = (files) => {
 }
 
 // 移除文件
-const removeFile = (index) => {
-  selectedFiles.value.splice(index, 1)
-  log('移除文件，剩余:', selectedFiles.value.length, '个')
-}
-
 // 按路径移除文件
 const removeFileByPath = (path) => {
   const index = selectedFiles.value.findIndex(file => {
@@ -439,6 +423,76 @@ const removeFileByPath = (path) => {
     log('移除文件，剩余:', selectedFiles.value.length, '个')
   }
 }
+
+// 自动上传文件
+const autoUploadFiles = async () => {
+  if (selectedFiles.value.length === 0) return
+  
+  try {
+    isUploading.value = true
+    uploadProgress.value = 0
+    
+    const allFiles = selectedFiles.value
+    const totalBytes = allFiles.reduce((sum, f) => sum + f.size, 0)
+    let uploadedBytes = 0
+    let fileLoadedPrev = 0
+    
+    // 分批获取签名，每批 200 个
+    const BATCH = 200
+    for (let i = 0; i < allFiles.length; i += BATCH) {
+      const batch = allFiles.slice(i, i + BATCH)
+      const fileList = batch.map(f => ({
+        name: f.name,
+        size: f.size,
+        path: f.webkitRelativePath || f.relativePath || ''
+      }))
+      const sigRes = await getUploadSignatures(fileList)
+      if (sigRes.code !== 200) throw new Error('获取上传签名失败')
+      
+      const signatures = sigRes.data
+      const uploaded = []
+      for (let j = 0; j < signatures.length; j++) {
+        const sig = signatures[j]
+        const file = batch[j]
+        fileLoadedPrev = 0
+        await uploadToPresignedUrl(sig, file, (loaded, total) => {
+          uploadedBytes += loaded - fileLoadedPrev
+          fileLoadedPrev = loaded
+          uploadProgress.value = totalBytes > 0
+            ? Math.min(99, Math.round((uploadedBytes / totalBytes) * 100))
+            : Math.round(((i + j + 1) / allFiles.length) * 100)
+        })
+        uploaded.push({
+          objectKey: sig.objectKey,
+          fileName: sig.fileName,
+          fileSize: file.size,
+          path: sig.path || ''
+        })
+      }
+      
+      // 如果项目已存在，立即确认上传
+      if (projectId.value) {
+        await confirmUpload(projectId.value, uploaded)
+      }
+    }
+    
+    uploadProgress.value = 100
+    toast.success(`成功上传 ${allFiles.length} 个文件`)
+    
+    setTimeout(() => {
+      isUploading.value = false
+      uploadProgress.value = 0
+    }, 1500)
+  } catch (error) {
+    logError('文件上传失败:', error)
+    toast.error(error.message || '文件上传失败')
+    isUploading.value = false
+    uploadProgress.value = 0
+  }
+}
+
+// 项目 ID（用于自动上传）
+const projectId = ref(null)
 
 // 格式化文件大小
 const formatFileSize = (bytes) => {

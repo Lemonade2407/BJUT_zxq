@@ -144,6 +144,7 @@ public class ProjectFileController {
      * POST /api/projects/{projectId}/files/confirm
      */
     @PostMapping("/confirm")
+    @org.springframework.transaction.annotation.Transactional(rollbackFor = Exception.class)
     public Result<List<FileVO>> confirmUpload(
             @PathVariable Integer projectId,
             @RequestBody List<Map<String, Object>> files) {
@@ -151,8 +152,16 @@ public class ProjectFileController {
         Integer userId = UserIdContext.getCurrentUserId();
         log.info("确认 OSS 直传，项目 ID: {}, 文件数: {}", projectId, files.size());
 
-        // 目录缓存：path -> directoryId
+        // 预先加载所有现有目录到缓存（避免 N+1 查询）
         java.util.Map<String, Integer> dirCache = new java.util.HashMap<>();
+        List<ProjectFile> existingFiles = projectFileService.getAllFiles(projectId);
+        for (ProjectFile f : existingFiles) {
+            if (f.getIsDir() != null && f.getIsDir() == 1) {
+                // 构建目录的唯一键：parentId/dirName
+                String key = buildDirKey(f.getParentId(), f.getFileName());
+                dirCache.put(key, f.getId());
+            }
+        }
 
         List<ProjectFile> projectFiles = new ArrayList<>();
         for (Map<String, Object> f : files) {
@@ -184,13 +193,22 @@ public class ProjectFileController {
                     for (String dirName : parts) {
                         if (dirName.isEmpty()) continue;
                         currentPath.append("/").append(dirName);
-                        String cacheKey = currentPath.toString();
+                        String cacheKey = buildDirKey(currentParentId, dirName);
 
                         Integer dirId = dirCache.get(cacheKey);
                         if (dirId == null) {
-                            // 查找或创建目录
-                            dirId = findOrCreateDirectory(projectId, dirName,
-                                currentParentId, userId);
+                            // 创建新目录
+                            ProjectFile dir = new ProjectFile();
+                            dir.setProjectId(projectId);
+                            dir.setFileName(dirName);
+                            dir.setParentId(currentParentId);
+                            dir.setIsDir(1);
+                            dir.setUploaderId(userId);
+                            dir.setFileType("");
+                            dir.setFileSize(0L);
+                            dir.setStorageUrl("");
+                            projectFileService.insertSingle(dir);
+                            dirId = dir.getId();
                             dirCache.put(cacheKey, dirId);
                         }
                         currentParentId = dirId;
@@ -218,32 +236,10 @@ public class ProjectFileController {
     }
 
     /**
-     * 查找或创建目录记录
+     * 构建目录的唯一键
      */
-    private Integer findOrCreateDirectory(Integer projectId, String dirName,
-                                          Integer parentId, Integer userId) {
-        // 查找已存在的目录
-        List<ProjectFile> existing = projectFileService.getAllFiles(projectId);
-        for (ProjectFile f : existing) {
-            if (f.getIsDir() != null && f.getIsDir() == 1
-                && dirName.equals(f.getFileName())
-                && java.util.Objects.equals(f.getParentId(), parentId)) {
-                return f.getId();
-            }
-        }
-
-        // 创建新目录
-        ProjectFile dir = new ProjectFile();
-        dir.setProjectId(projectId);
-        dir.setFileName(dirName);
-        dir.setParentId(parentId);
-        dir.setIsDir(1);
-        dir.setUploaderId(userId);
-        dir.setFileType("");
-        dir.setFileSize(0L);
-        dir.setStorageUrl("");
-        projectFileService.insertSingle(dir);
-        return dir.getId();
+    private String buildDirKey(Integer parentId, String dirName) {
+        return (parentId == null ? "null" : parentId) + "/" + dirName;
     }
 
     /**
