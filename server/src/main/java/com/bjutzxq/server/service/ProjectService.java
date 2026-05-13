@@ -52,6 +52,9 @@ public class ProjectService {
     private StringRedisTemplate redisTemplate;
 
     private static final ObjectMapper objectMapper = new ObjectMapper();
+    
+    // 统计缓存键前缀
+    private static final String ADMIN_STATS_CACHE_KEY = "stats:admin";
 
     @Autowired
     private ProjectFileMapper projectFileMapper;
@@ -91,6 +94,14 @@ public class ProjectService {
         if (tagIds != null) {
             projectTagService.setProjectTags(project.getId(), tagIds);
             log.info("项目标签设置成功，项目 ID: {}, 标签数量: {}", project.getId(), tagIds.size());
+        }
+        
+        // 清除管理员统计缓存
+        try {
+            redisTemplate.delete(ADMIN_STATS_CACHE_KEY);
+            log.debug("已清除管理员统计缓存");
+        } catch (Exception e) {
+            log.warn("清除管理员统计缓存失败: {}", e.getMessage());
         }
         
         return project;
@@ -175,6 +186,14 @@ public class ProjectService {
             projectTagService.setProjectTags(existingProject.getId(), tagIds);
             log.info("项目标签更新成功，项目 ID: {}, 标签数量: {}", existingProject.getId(), tagIds.size());
         }
+        
+        // 清除管理员统计缓存
+        try {
+            redisTemplate.delete(ADMIN_STATS_CACHE_KEY);
+            log.debug("已清除管理员统计缓存");
+        } catch (Exception e) {
+            log.warn("清除管理员统计缓存失败: {}", e.getMessage());
+        }
             
         log.info("项目信息修改成功，ID: {}", project.getId());
         return existingProject;
@@ -249,6 +268,16 @@ public class ProjectService {
         }
 
         log.info("项目删除成功，ID: {}", id);
+        
+        // 清除管理员统计缓存和项目广场缓存
+        try {
+            redisTemplate.delete(ADMIN_STATS_CACHE_KEY);
+            redisTemplate.delete("cache:trending:projects");
+            log.debug("已清除相关缓存");
+        } catch (Exception e) {
+            log.warn("清除缓存失败: {}", e.getMessage());
+        }
+        
         return true;
     }
 

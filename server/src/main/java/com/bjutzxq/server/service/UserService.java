@@ -43,6 +43,9 @@ public class UserService {
     @Autowired
     private OssUtil ossUtil;
     
+    @Autowired
+    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+    
 
     /**
      * 用户注册
@@ -98,6 +101,15 @@ public class UserService {
         userMapper.insert(user);
         
         log.info("用户注册成功，ID：{}", user.getId());
+        
+        // 清除管理员统计缓存
+        try {
+            redisTemplate.delete("stats:admin");
+            log.debug("已清除管理员统计缓存");
+        } catch (Exception e) {
+            log.warn("清除管理员统计缓存失败: {}", e.getMessage());
+        }
+        
         return user;
     }
     

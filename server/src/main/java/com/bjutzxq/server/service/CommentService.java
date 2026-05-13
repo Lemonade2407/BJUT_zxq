@@ -34,6 +34,9 @@ public class CommentService {
     @Autowired
     private NotificationService notificationService;
     
+    @Autowired
+    private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
+    
     /**
      * 发表评论
      * @param userId 用户 ID
@@ -86,6 +89,14 @@ public class CommentService {
         }
         
         log.info("评论发表成功，评论 ID: {}", comment.getId());
+        
+        // 清除管理员统计缓存
+        try {
+            redisTemplate.delete("stats:admin");
+            log.debug("已清除管理员统计缓存");
+        } catch (Exception e) {
+            log.warn("清除管理员统计缓存失败: {}", e.getMessage());
+        }
         
         return comment;
     }

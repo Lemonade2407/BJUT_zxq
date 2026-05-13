@@ -199,18 +199,12 @@ public class AuthController {
      * GET /api/auth/me
      */
     @GetMapping("/me")
-    public Result<UserVO> getCurrentUser(
-            @RequestHeader(value = "Authorization") String authorization) {
+    public Result<UserVO> getCurrentUser() {
         log.debug("获取当前用户信息");
         
-        String token = authorization;
-        if (token.startsWith("Bearer ")) {
-            token = token.substring(7);
-        }
-        
-        // 解析 token 获取用户 ID
-        Integer userId = JwtUtil.getUserIdFromToken(token);
-        log.debug("Token 解析成功，用户 ID: {}", userId);
+        // 从拦截器上下文中获取用户 ID
+        Integer userId = UserIdContext.getCurrentUserId();
+        log.debug("从上下文获取用户 ID: {}", userId);
         
         // 获取用户信息并转换为 VO
         User user = userService.getCurrentUser(userId);
@@ -225,7 +219,6 @@ public class AuthController {
      */
     @PutMapping("/user/profile")
     public Result<UserVO> updateProfile(
-            @RequestHeader(value = "Authorization") String authorization,
             @RequestBody java.util.Map<String, Object> body) {
         log.debug("更新用户信息");
 
@@ -242,13 +235,9 @@ public class AuthController {
             }
         }
 
-        String token = authorization;
-        if (token.startsWith("Bearer ")) {
-            token = token.substring(7);
-        }
-
-        Integer userId = JwtUtil.getUserIdFromToken(token);
-        log.debug("Token 解析成功，用户 ID: {}", userId);
+        // 从拦截器上下文中获取用户 ID
+        Integer userId = UserIdContext.getCurrentUserId();
+        log.debug("从上下文获取用户 ID: {}", userId);
 
         User updatedUser = userService.updateProfile(userId, avatar, phone, sex, bio, username);
         UserVO response = DtoConverter.toUserVO(updatedUser);
@@ -262,7 +251,6 @@ public class AuthController {
      */
     @PutMapping("/user/password")
     public Result<Void> changePassword(
-            @RequestHeader(value = "Authorization") String authorization,
             @RequestBody java.util.Map<String, String> body) {
         log.debug("修改密码请求");
 
@@ -287,13 +275,9 @@ public class AuthController {
             throw new IllegalArgumentException("密码必须包含字母和数字");
         }
 
-        String token = authorization;
-        if (token.startsWith("Bearer ")) {
-            token = token.substring(7);
-        }
-
-        Integer userId = JwtUtil.getUserIdFromToken(token);
-        log.debug("Token 解析成功，用户 ID: {}", userId);
+        // 从拦截器上下文中获取用户 ID
+        Integer userId = UserIdContext.getCurrentUserId();
+        log.debug("从上下文获取用户 ID: {}", userId);
 
         userService.changePassword(userId, oldPassword.trim(), newPassword.trim());
         log.info("密码修改成功，用户 ID: {}", userId);
