@@ -209,9 +209,13 @@ class JwtUtilTest {
     @Test
     @DisplayName("黑名单操作 - 无效Token加入黑名单不抛异常")
     void blacklist_InvalidToken() {
+        // Arrange - 使用唯一的无效token避免与其他测试冲突
+        String invalidToken = "invalid-token-test-" + System.currentTimeMillis();
+        
         // Act & Assert - 不应抛出异常
-        assertDoesNotThrow(() -> JwtUtil.addToBlacklist("invalid-token"));
-        assertFalse(JwtUtil.isTokenBlacklisted("invalid-token"));
+        assertDoesNotThrow(() -> JwtUtil.addToBlacklist(invalidToken));
+        // 无效token由于无法解析过期时间，不会被添加到黑名单
+        assertFalse(JwtUtil.isTokenBlacklisted(invalidToken));
     }
 
     // ==================== refreshToken ====================

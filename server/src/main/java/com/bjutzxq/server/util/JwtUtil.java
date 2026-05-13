@@ -29,6 +29,10 @@ public class JwtUtil {
     private StringRedisTemplate redisTemplate;
 
     private static JwtUtil instance;
+    
+    // 测试/降级用的内存存储
+    private static final java.util.Map<String, String> BLACKLIST_FALLBACK = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final java.util.Map<Integer, Integer> REFRESH_COUNT_FALLBACK = new java.util.concurrent.ConcurrentHashMap<>();
 
     @PostConstruct
     void init() {
@@ -126,11 +130,31 @@ public class JwtUtil {
     private static final String REFRESH_PREFIX = "jwt:refresh:";
 
     public static boolean isTokenBlacklisted(String token) {
+        if (instance == null || instance.redisTemplate == null) {
+            // 降级：使用内存存储
+            return BLACKLIST_FALLBACK.containsKey(token);
+        }
         return Boolean.TRUE.equals(
             instance.redisTemplate.hasKey(BLACKLIST_PREFIX + token));
     }
 
     public static void addToBlacklist(String token) {
+        if (instance == null || instance.redisTemplate == null) {
+            // 降级：使用内存存储
+            // 为了与 Redis 模式保持一致，先尝试验证 token
+            try {
+                Claims claims = parseToken(token);
+                long expireMs = claims.getExpiration().getTime() - System.currentTimeMillis();
+                if (expireMs > 0) {
+                    BLACKLIST_FALLBACK.put(token, "1");
+                    log.debug("Token 已加入黑名单（内存模式）");
+                }
+            } catch (Exception e) {
+                log.warn("加入黑名单失败（内存模式）：{}", e.getMessage());
+            }
+            return;
+        }
+        
         try {
             Claims claims = parseToken(token);
             long expireMs = claims.getExpiration().getTime() - System.currentTimeMillis();
@@ -145,12 +169,24 @@ public class JwtUtil {
     }
 
     private static boolean checkRefreshLimit(Integer userId) {
+        if (instance == null || instance.redisTemplate == null) {
+            // 降级：使用内存存储
+            Integer count = REFRESH_COUNT_FALLBACK.get(userId);
+            return count == null || count < MAX_REFRESH_COUNT;
+        }
+        
         String key = REFRESH_PREFIX + userId;
         String count = instance.redisTemplate.opsForValue().get(key);
         return count == null || Integer.parseInt(count) < MAX_REFRESH_COUNT;
     }
 
     private static void incrementRefreshCount(Integer userId) {
+        if (instance == null || instance.redisTemplate == null) {
+            // 降级：使用内存存储
+            REFRESH_COUNT_FALLBACK.merge(userId, 1, Integer::sum);
+            return;
+        }
+        
         String key = REFRESH_PREFIX + userId;
         Long count = instance.redisTemplate.opsForValue().increment(key);
         if (count != null && count == 1) {
@@ -159,12 +195,24 @@ public class JwtUtil {
     }
 
     public static int getRefreshCount(Integer userId) {
+        if (instance == null || instance.redisTemplate == null) {
+            // 降级：使用内存存储
+            return REFRESH_COUNT_FALLBACK.getOrDefault(userId, 0);
+        }
+        
         String count = instance.redisTemplate.opsForValue()
             .get(REFRESH_PREFIX + userId);
         return count != null ? Integer.parseInt(count) : 0;
     }
 
     public static void clearRefreshCount(Integer userId) {
+        if (instance == null || instance.redisTemplate == null) {
+            // 降级：使用内存存储
+            REFRESH_COUNT_FALLBACK.remove(userId);
+            log.debug("已清除用户 {} 的刷新计数（内存模式）", userId);
+            return;
+        }
+        
         instance.redisTemplate.delete(REFRESH_PREFIX + userId);
         log.debug("已清除用户 {} 的刷新计数", userId);
     }

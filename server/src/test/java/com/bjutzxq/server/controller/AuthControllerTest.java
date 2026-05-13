@@ -7,6 +7,7 @@ import com.bjutzxq.pojo.vo.LoginVO;
 import com.bjutzxq.server.service.UserService;
 import com.bjutzxq.server.util.CaptchaUtil;
 import com.bjutzxq.server.util.RegistrationRateLimiter;
+import jakarta.servlet.http.HttpServletResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -30,6 +31,9 @@ class AuthControllerTest {
 
     @Mock
     private UserService userService;
+
+    @Mock
+    private HttpServletResponse mockResponse;
 
     @InjectMocks
     private AuthController authController;
@@ -207,7 +211,7 @@ rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
         when(userService.login("testuser", "Test123456")).thenReturn(loginVO);
 
         // Act
-        Result<LoginVO> result = authController.login(loginParams);
+        Result<LoginVO> result = authController.login(loginParams, mockResponse);
 
         // Assert
         assertNotNull(result);
@@ -228,7 +232,7 @@ rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
 
         // Act & Assert
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> authController.login(loginParams));
+                () -> authController.login(loginParams, mockResponse));
         assertEquals("用户名不能为空", exception.getMessage());
         verify(userService, never()).login(anyString(), anyString());
     }
@@ -243,7 +247,7 @@ rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
 
         // Act & Assert
         IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-                () -> authController.login(loginParams));
+                () -> authController.login(loginParams, mockResponse));
         assertEquals("密码不能为空", exception.getMessage());
         verify(userService, never()).login(anyString(), anyString());
     }
@@ -261,7 +265,7 @@ rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
 
         // Act & Assert
         RuntimeException exception = assertThrows(RuntimeException.class,
-                () -> authController.login(loginParams));
+                () -> authController.login(loginParams, mockResponse));
         assertEquals("用户不存在", exception.getMessage());
     }
 
@@ -278,7 +282,7 @@ rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
 
         // Act & Assert
         RuntimeException exception = assertThrows(RuntimeException.class,
-                () -> authController.login(loginParams));
+                () -> authController.login(loginParams, mockResponse));
         assertEquals("密码错误", exception.getMessage());
     }
 
@@ -286,7 +290,7 @@ rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
     @DisplayName("退出登录 - 成功")
     void testLogout_Success() {
         // Act
-        Result<Void> result = authController.logout();
+        Result<Void> result = authController.logout(mockResponse);
 
         // Assert
         assertNotNull(result);

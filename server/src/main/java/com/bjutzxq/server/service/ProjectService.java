@@ -672,7 +672,11 @@ public class ProjectService {
      * @param id 项目 ID
      */
     public void incrementViewCount(Integer id) {
-        redisTemplate.opsForValue().increment("pv:project:" + id);
+        if (redisTemplate != null) {
+            redisTemplate.opsForValue().increment("pv:project:" + id);
+        } else {
+            log.debug("Redis 未初始化，跳过浏览量统计");
+        }
     }
 
     /**

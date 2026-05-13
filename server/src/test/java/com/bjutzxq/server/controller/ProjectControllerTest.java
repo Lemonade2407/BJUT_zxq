@@ -125,7 +125,6 @@ class ProjectControllerTest {
         // Arrange
         when(projectService.getPublicProjects(1, 10)).thenReturn(List.of(testProject));
         when(projectService.countPublicProjects()).thenReturn(1L);
-        when(projectService.enrichProjects(anyList(), isNull())).thenReturn(List.of(testProject));
 
         // Act
         Result<PageResult<Project>> result = projectController.getPublicProjects(1, 10);
