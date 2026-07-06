@@ -38,10 +38,10 @@ public class WebMvcConfig implements WebMvcConfigurer {
         config.setAllowedOriginPatterns(Arrays.asList(
             "http://localhost:*",
             "http://127.0.0.1:*",
-            "https://*.bjut-zxq.cn",
-            "https://bjut-zxq.cn",
-            "https://60.205.210.11",
-            "http://60.205.210.11"
+            "https://*.bjut-zxq.cn:*",
+            "https://bjut-zxq.cn:*",
+            "https://60.205.210.11:*",
+            "http://60.205.210.11:*"
         ));
         
         // 允许的方法
