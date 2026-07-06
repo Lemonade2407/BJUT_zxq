@@ -33,15 +33,17 @@ public class WebMvcConfig implements WebMvcConfigurer {
     @Bean
     public CorsFilter corsFilter() {
         CorsConfiguration config = new CorsConfiguration();
-        
+
         // 允许的域名（使用通配符模式支持多端口/多域名访问）
         config.setAllowedOriginPatterns(Arrays.asList(
             "http://localhost:*",
             "http://127.0.0.1:*",
             "https://*.bjut-zxq.cn:*",
             "https://bjut-zxq.cn:*",
+            "https://bjut-zxq.cn",
             "https://60.205.210.11:*",
-            "http://60.205.210.11:*"
+            "http://60.205.210.11:*",
+            "http://60.205.210.11:8080"
         ));
         
         // 允许的方法
