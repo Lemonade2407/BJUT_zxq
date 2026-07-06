@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { getCurrentUser, updateProfile, changePassword, uploadAvatar } from '@/api/auth'
 import { toast } from '@/utils/toast'
 import { error as logError } from '@/utils/logger'
@@ -8,6 +8,7 @@ import tokenManager from '@/utils/tokenManager'
 import UserSidebar from '@/components/user/UserSidebar.vue'
 
 const router = useRouter()
+const route = useRoute()
 
 // 用户信息
 const userInfo = ref({
@@ -127,8 +128,17 @@ const handleChangePassword = async () => {
     toast.error('请输入新密码')
     return
   }
-  if (passwordForm.value.newPassword.length < 6) {
-    toast.error('新密码长度不能少于6位')
+  if (passwordForm.value.newPassword.length < 8) {
+    toast.error('新密码长度不能少于8位')
+    return
+  }
+  if (passwordForm.value.newPassword.length > 32) {
+    toast.error('新密码长度不能超过32位')
+    return
+  }
+  // 至少包含大小写字母和数字
+  if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/.test(passwordForm.value.newPassword)) {
+    toast.error('密码必须包含大小写字母和数字')
     return
   }
   if (passwordForm.value.newPassword !== passwordForm.value.confirmPassword) {
@@ -226,6 +236,10 @@ const getSexText = (sex) => {
 // 组件挂载时加载用户信息
 onMounted(() => {
   loadUserInfo()
+  // 弱密码强制改密
+  if (route.query.mustChangePassword === 'true') {
+    openPasswordDialog()
+  }
 })
 </script>
 
@@ -372,7 +386,11 @@ onMounted(() => {
       <div class="modal-content">
         <div class="modal-header">
           <h2>修改密码</h2>
-          <button @click="closePasswordDialog" class="close-btn">&times;</button>
+          <button v-if="$route.query.mustChangePassword !== 'true'" @click="closePasswordDialog" class="close-btn">&times;</button>
+        </div>
+        <!-- 弱密码强制改密提示 -->
+        <div v-if="$route.query.mustChangePassword === 'true'" class="password-warning-banner">
+          ⚠️ 您的密码强度不足，为了账户安全，请修改密码后再继续使用系统
         </div>
         <div class="modal-body">
           <div class="form-group">
@@ -389,7 +407,7 @@ onMounted(() => {
             <input
               v-model="passwordForm.newPassword"
               type="password"
-              placeholder="请输入新密码（至少6位）"
+              placeholder="至少8位，需含大、小写字母和数字"
               class="form-input"
             />
           </div>
@@ -963,5 +981,15 @@ onMounted(() => {
     width: 100%;
     justify-content: center;
   }
+}
+
+.password-warning-banner {
+  background: #fef3c7;
+  border-left: 4px solid #f59e0b;
+  color: #92400e;
+  padding: 12px 16px;
+  font-size: 14px;
+  margin: 0 24px;
+  border-radius: 6px;
 }
 </style>

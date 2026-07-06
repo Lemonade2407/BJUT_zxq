@@ -60,32 +60,6 @@ public class ProjectFileController {
     // ==================== 项目文档管理 ====================
     
     /**
-     * 上传项目文档（支持覆盖上传）
-     * POST /api/projects/{projectId}/files/document/upload
-     */
-    @PostMapping("/document/upload")
-    public Result<String> uploadDocument(
-            @PathVariable Integer projectId,
-            @RequestParam("file") MultipartFile file) {
-        
-        log.info("收到项目文档上传请求，项目 ID: {}, 文件名: {}", projectId, file.getOriginalFilename());
-        
-        // 1. 获取当前用户 ID
-        Integer userId = UserIdContext.getCurrentUserId();
-        
-        // 2. 验证权限
-        if (!projectService.isProjectOwner(projectId, userId)) {
-            throw new RuntimeException("无权操作此项目");
-        }
-        
-        // 3. 上传文档
-        String documentUrl = projectService.uploadProjectDocument(projectId, file);
-        
-        log.info("项目文档上传成功，项目 ID: {}, URL: {}", projectId, documentUrl);
-        return Result.success("文档上传成功", documentUrl);
-    }
-    
-    /**
      * 删除项目文档
      * DELETE /api/projects/{projectId}/files/document
      */
@@ -125,6 +99,39 @@ public class ProjectFileController {
         }
         
         return Result.success(documentUrl);
+    }
+    
+    /**
+     * 保存项目文档 URL（前端直传 OSS 后调用）
+     * POST /api/projects/{projectId}/files/document/save
+     */
+    @PostMapping("/document/save")
+    public Result<Void> saveDocumentUrl(
+            @PathVariable Integer projectId,
+            @RequestBody Map<String, String> body) {
+        
+        log.info("保存项目文档 URL，项目 ID: {}, URL: {}", projectId, body.get("documentUrl"));
+        
+        // 1. 获取当前用户 ID
+        Integer userId = UserIdContext.getCurrentUserId();
+        
+        // 2. 验证权限
+        if (!projectService.isProjectOwner(projectId, userId)) {
+            throw new RuntimeException("无权操作此项目");
+        }
+        
+        // 3. 保存文档 URL
+        String documentUrl = body.get("documentUrl");
+        String documentName = body.get("documentName");
+        
+        if (documentUrl == null || documentUrl.isEmpty()) {
+            throw new RuntimeException("文档 URL 不能为空");
+        }
+        
+        projectService.saveProjectDocumentUrl(projectId, documentUrl, documentName);
+        
+        log.info("项目文档 URL 保存成功，项目 ID: {}", projectId);
+        return Result.success("文档保存成功", null);
     }
     
     /**

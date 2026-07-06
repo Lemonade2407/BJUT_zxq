@@ -1,3 +1,4 @@
+
 package com.bjutzxq.server.service;
 
 import com.bjutzxq.pojo.entity.*;
@@ -13,19 +14,25 @@ import org.springframework.beans.factory.annotation.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
+import jakarta.annotation.PreDestroy;
+import org.springframework.scheduling.annotation.Scheduled;
 
 /**
  * 项目服务类
@@ -51,7 +58,8 @@ public class ProjectService {
     @Autowired
     private StringRedisTemplate redisTemplate;
 
-    private static final ObjectMapper objectMapper = new ObjectMapper();
+    @Autowired
+    private ObjectMapper objectMapper;  // 使用 Spring Boot 自动配置的 ObjectMapper（已注册 JavaTimeModule）
     
     // 统计缓存键前缀
     private static final String ADMIN_STATS_CACHE_KEY = "stats:admin";
@@ -64,6 +72,67 @@ public class ProjectService {
     
     @Autowired
     private ProjectFileService projectFileService;
+
+    @Autowired
+    private com.bjutzxq.server.handler.NotificationWebSocketHandler webSocketHandler;
+    
+    // 共享线程池：用于并行生成预签名 URL（固定 8 线程）
+    private final ExecutorService urlGenerationExecutor = Executors.newFixedThreadPool(8);
+    
+    // 共享线程池：用于并行打包项目（最大 8 线程）
+    private final ExecutorService projectPackagingExecutor = Executors.newFixedThreadPool(8);
+
+    // 共享线程池：用于并行下载文件（固定 16 线程，提高 OSS 下载并行度）
+    private final ExecutorService fileDownloadExecutor = Executors.newFixedThreadPool(16);
+
+    // 批量下载任务状态缓存（taskId → 任务信息）
+    private final ConcurrentHashMap<String, DownloadTaskInfo> downloadTasks = new ConcurrentHashMap<>();
+
+    // 批量下载任务 Future 引用（用于取消）
+    private final ConcurrentHashMap<String, CompletableFuture<Void>> downloadFutures = new ConcurrentHashMap<>();
+
+    /**
+     * 批量下载任务状态信息
+     */
+    public static class DownloadTaskInfo {
+        private String status;       // PROCESSING / COMPLETED / FAILED
+        private int total;
+        private int current;
+        private int progress;
+        private String projectName;
+        private String downloadUrl;
+        private int successCount;
+        private int failCount;
+        private String errorMessage;
+        private long startTime;
+
+        public DownloadTaskInfo() {
+            this.status = "PROCESSING";
+            this.startTime = Instant.now().toEpochMilli();
+        }
+
+        // Getters needed for JSON serialization via ObjectMapper
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
+        public int getTotal() { return total; }
+        public void setTotal(int total) { this.total = total; }
+        public int getCurrent() { return current; }
+        public void setCurrent(int current) { this.current = current; }
+        public int getProgress() { return progress; }
+        public void setProgress(int progress) { this.progress = progress; }
+        public String getProjectName() { return projectName; }
+        public void setProjectName(String projectName) { this.projectName = projectName; }
+        public String getDownloadUrl() { return downloadUrl; }
+        public void setDownloadUrl(String downloadUrl) { this.downloadUrl = downloadUrl; }
+        public int getSuccessCount() { return successCount; }
+        public void setSuccessCount(int successCount) { this.successCount = successCount; }
+        public int getFailCount() { return failCount; }
+        public void setFailCount(int failCount) { this.failCount = failCount; }
+        public String getErrorMessage() { return errorMessage; }
+        public void setErrorMessage(String errorMessage) { this.errorMessage = errorMessage; }
+        public long getStartTime() { return startTime; }
+        public void setStartTime(long startTime) { this.startTime = startTime; }
+    }
 
     /**
      * 新增项目
@@ -765,46 +834,44 @@ public class ProjectService {
      * @return 成功打包的文件数量
      */
     private int downloadAndPackFiles(List<com.bjutzxq.pojo.entity.ProjectFile> filesToPack, Path zipPath) throws IOException {
-        ExecutorService executor = Executors.newFixedThreadPool(Math.min(10, filesToPack.size()));
-        
-        try {
-            // 1. 并行下载所有文件
-            List<CompletableFuture<FileContent>> futures = filesToPack.stream()
-                .map(file -> CompletableFuture.supplyAsync(() -> {
-                    try {
-                        byte[] content = ossUtil.download(file.getStorageUrl());
-                        return new FileContent(file, content);
-                    } catch (IOException e) {
-                        log.error("下载文件失败: {}, 错误: {}", file.getFileName(), e.getMessage());
-                        return new FileContent(file, null);
-                    }
-                }, executor))
-                .toList();
-            
-            // 2. 等待所有下载完成并写入 ZIP
-            int successCount = 0;
-            try (FileOutputStream fos = new FileOutputStream(zipPath.toFile());
-                 ZipOutputStream zos = new ZipOutputStream(fos)) {
-                
-                for (CompletableFuture<FileContent> future : futures) {
-                    FileContent fileContent = future.join();
-                    
-                    if (fileContent.content != null) {
-                        String entryPath = buildZipEntryPath(fileContent.file);
+        // 1. 并行下载所有文件
+        List<CompletableFuture<FileContent>> futures = filesToPack.stream()
+            .map(file -> CompletableFuture.supplyAsync(() -> {
+                try {
+                    byte[] content = ossUtil.download(file.getStorageUrl());
+                    return new FileContent(file, content);
+                } catch (IOException e) {
+                    log.error("下载文件失败: {}, 错误: {}", file.getFileName(), e.getMessage());
+                    return new FileContent(file, null);
+                }
+            }, fileDownloadExecutor))
+            .toList();
+
+        // 2. 等待所有下载完成并写入 ZIP（跳过重复路径）
+        int successCount = 0;
+        java.util.Set<String> usedNames = new HashSet<>();
+        try (FileOutputStream fos = new FileOutputStream(zipPath.toFile());
+             ZipOutputStream zos = new ZipOutputStream(fos)) {
+
+            for (CompletableFuture<FileContent> future : futures) {
+                FileContent fileContent = future.join();
+
+                if (fileContent.content != null) {
+                    String entryPath = buildZipEntryPath(fileContent.file);
+                    if (usedNames.add(entryPath)) {
                         ZipEntry entry = new ZipEntry(entryPath);
                         zos.putNextEntry(entry);
                         zos.write(fileContent.content);
                         zos.closeEntry();
                         successCount++;
+                    } else {
+                        log.debug("单项目下载跳过重复文件: {}", entryPath);
                     }
                 }
             }
-            
-            return successCount;
-            
-        } finally {
-            executor.shutdown();
         }
+
+        return successCount;
     }
     
     /**
@@ -843,73 +910,6 @@ public class ProjectService {
         }
         
         return project.getOwnerId().equals(userId);
-    }
-    
-    /**
-     * 上传项目文档（支持覆盖上传）
-     * @param projectId 项目 ID
-     * @param file 上传的文件
-     * @return 文档 URL
-     */
-    @Transactional(rollbackFor = Exception.class)
-    public String uploadProjectDocument(Integer projectId, org.springframework.web.multipart.MultipartFile file) {
-        log.info("开始上传项目文档，项目 ID: {}, 文件名: {}", projectId, file.getOriginalFilename());
-        
-        // 1. 验证文件
-        if (file.isEmpty()) {
-            throw new IllegalArgumentException("文件不能为空");
-        }
-        
-        String originalFilename = file.getOriginalFilename();
-        if (originalFilename == null || originalFilename.trim().isEmpty()) {
-            throw new IllegalArgumentException("文件名不能为空");
-        }
-        
-        // 2. 验证文件类型（只允许 PDF、Word 等文档格式）
-        String fileExtension = getFileExtension(originalFilename).toLowerCase();
-        List<String> allowedExtensions = List.of("pdf", "doc", "docx", "txt", "md");
-        if (!allowedExtensions.contains(fileExtension)) {
-            throw new IllegalArgumentException("不支持的文件类型: " + fileExtension + "，仅支持 PDF、Word、TXT、Markdown格式");
-        }
-        
-        // 3. 获取原项目信息
-        Project project = projectMapper.selectById(projectId);
-        if (project == null) {
-            throw new RuntimeException("项目不存在");
-        }
-        
-        // 4. 如果已有文档，先删除旧文档
-        if (project.getDocumentUrl() != null && !project.getDocumentUrl().isEmpty()) {
-            log.info("检测到旧文档，准备删除: {}", project.getDocumentUrl());
-            try {
-                ossUtil.delete(project.getDocumentUrl());
-                log.info("旧文档删除成功");
-            } catch (Exception e) {
-                log.warn("删除旧文档失败: {}", e.getMessage());
-                // 不抛出异常，继续上传新文档
-            }
-        }
-        
-        // 5. 上传新文档到 OSS
-        String documentUrl;
-        try {
-            documentUrl = ossUtil.upload(file, "documents");
-            log.info("文档上传成功: {}", documentUrl);
-        } catch (IOException e) {
-            log.error("文档上传失败: {}", e.getMessage(), e);
-            throw new RuntimeException("文档上传失败: " + e.getMessage());
-        }
-        
-        // 6. 更新项目的 document_url 字段
-        project.setDocumentUrl(documentUrl);
-        int rows = projectMapper.updateById(project);
-        if (rows == 0) {
-            log.error("更新项目文档 URL 失败，项目 ID: {}", projectId);
-            throw new RuntimeException("更新项目文档 URL 失败");
-        }
-        
-        log.info("项目文档上传完成，项目 ID: {}, URL: {}", projectId, documentUrl);
-        return documentUrl;
     }
     
     /**
@@ -968,6 +968,44 @@ public class ProjectService {
     }
     
     /**
+     * 保存项目文档 URL（前端直传 OSS 后调用）
+     * @param projectId 项目 ID
+     * @param documentUrl 文档 URL
+     * @param documentName 文档名称（可选）
+     */
+    @Transactional(rollbackFor = Exception.class)
+    public void saveProjectDocumentUrl(Integer projectId, String documentUrl, String documentName) {
+        log.info("保存项目文档 URL，项目 ID: {}, URL: {}", projectId, documentUrl);
+        
+        // 1. 查询项目
+        Project project = projectMapper.selectById(projectId);
+        if (project == null) {
+            throw new RuntimeException("项目不存在");
+        }
+        
+        // 2. 如果有旧文档，先删除 OSS 上的文件
+        if (project.getDocumentUrl() != null && !project.getDocumentUrl().isEmpty()) {
+            try {
+                ossUtil.delete(project.getDocumentUrl());
+                log.info("已删除旧文档: {}", project.getDocumentUrl());
+            } catch (Exception e) {
+                log.warn("删除旧文档失败: {}", e.getMessage());
+                // 不抛出异常，继续执行
+            }
+        }
+        
+        // 3. 更新数据库
+        project.setDocumentUrl(documentUrl);
+        int result = projectMapper.updateById(project);
+        
+        if (result <= 0) {
+            throw new RuntimeException("保存文档 URL 失败");
+        }
+        
+        log.info("项目文档 URL 保存成功，项目 ID: {}", projectId);
+    }
+    
+    /**
      * 获取文件扩展名
      * @param filename 文件名
      * @return 扩展名（不含点号）
@@ -1002,7 +1040,19 @@ public class ProjectService {
      * @param courseName 课程名称
      * @return ZIP 文件路径
      */
-    public Path batchPackageProjects(List<Integer> projectIds, String className, String courseName) {
+    /**
+     * 批量打包项目（带进度推送）- 优化版：并行处理
+     * @param projectIds 项目 ID 列表
+     * @param className 班级名称
+     * @param courseName 课程名称
+     * @param userId 用户 ID
+     * @param taskId 任务 ID
+     * @param webSocketHandler WebSocket 处理器
+     * @return ZIP 文件路径
+     */
+    public Path batchPackageProjects(List<Integer> projectIds, String className, String courseName, 
+                                     Integer userId, String taskId, 
+                                     com.bjutzxq.server.handler.NotificationWebSocketHandler webSocketHandler) {
         log.info("开始批量打包项目，数量: {}, 班级: {}, 课程: {}", projectIds.size(), className, courseName);
         
         try {
@@ -1018,145 +1068,237 @@ public class ProjectService {
             String zipFileName = className + "_" + courseName + "_" + System.currentTimeMillis() + ".zip";
             Path zipPath = Paths.get(tempDir, zipFileName);
             
-            // 3. 创建 ZIP 文件
+            // 3. 创建 ZIP 文件（优化：使用最低压缩级别，提升速度）
             try (FileOutputStream fos = new FileOutputStream(zipPath.toFile());
                  ZipOutputStream zos = new ZipOutputStream(fos)) {
                 
-                int successCount = 0;
-                int failCount = 0;
+                // 设置压缩级别为 1（最快模式，文件稍大但速度快 2-3 倍）
+                zos.setLevel(1);
                 
-                // 4. 遍历每个项目
+                int total = projectIds.size();
+                java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger(0);
+                java.util.concurrent.atomic.AtomicInteger failCount = new java.util.concurrent.atomic.AtomicInteger(0);
+                java.util.concurrent.atomic.AtomicInteger processedCount = new java.util.concurrent.atomic.AtomicInteger(0);
+                // 防止同名文件重复写入 ZIP（去重）
+                java.util.Set<String> writtenEntries = ConcurrentHashMap.newKeySet();
+                
+                // 4. 并行处理所有项目
+                List<CompletableFuture<Void>> futures = new ArrayList<>();
+                
                 for (Integer projectId : projectIds) {
-                    try {
-                        // 4.1 获取项目信息
-                        Project project = projectMapper.selectById(projectId);
-                        if (project == null) {
-                            log.warn("项目不存在，跳过，ID: {}", projectId);
-                            failCount++;
-                            continue;
-                        }
-                        
-                        // 4.2 获取项目所有者信息（学号和姓名）
-                        com.bjutzxq.pojo.entity.User owner = userMapper.selectById(project.getOwnerId());
-                        if (owner == null) {
-                            log.warn("项目所有者不存在，跳过，项目 ID: {}", projectId);
-                            failCount++;
-                            continue;
-                        }
-                        
-                        // 4.3 构建文件夹名称：学号 真实姓名 项目名称
-                        String folderName = owner.getEmployeeId() + " " + owner.getRealName() + " " + project.getName();
-                        log.info("处理项目: {}", folderName);
-                        
-                        // 4.4 获取项目的所有文件
-                        List<com.bjutzxq.pojo.entity.ProjectFile> projectFiles = projectFileMapper.selectByProjectId(projectId);
-                        
-                        if (projectFiles == null || projectFiles.isEmpty()) {
-                            log.warn("项目没有文件，创建空文件夹: {}", folderName);
-                            // 创建一个空目录条目
-                            ZipEntry dirEntry = new ZipEntry(folderName + "/");
-                            zos.putNextEntry(dirEntry);
-                            zos.closeEntry();
-                            successCount++;
-                            continue;
-                        }
-                        
-                        // 4.5 收集需要打包的文件
-                        List<com.bjutzxq.pojo.entity.ProjectFile> filesToPack = projectFiles.stream()
-                            .filter(f -> f.getIsDir() == null || f.getIsDir() == 0)  // 只保留文件
-                            .filter(f -> f.getStorageUrl() != null && !f.getStorageUrl().trim().isEmpty())  // 有 URL
-                            .toList();
-                        
-                        if (filesToPack.isEmpty()) {
-                            log.warn("项目没有可下载的文件，跳过: {}", folderName);
-                            failCount++;
-                            continue;
-                        }
-                        
-                        // 4.6 并行下载所有文件
-                        ExecutorService executor = Executors.newFixedThreadPool(
-                            Math.min(10, filesToPack.size())
-                        );
-                        
-                        List<CompletableFuture<byte[]>> futures = new ArrayList<>();
-                        List<com.bjutzxq.pojo.entity.ProjectFile> validFiles = new ArrayList<>();
-                        
-                        for (com.bjutzxq.pojo.entity.ProjectFile file : filesToPack) {
-                            CompletableFuture<byte[]> future = CompletableFuture.supplyAsync(() -> {
-                                try {
-                                    return ossUtil.download(file.getStorageUrl());
-                                } catch (IOException e) {
-                                    log.error("下载文件失败: {}, 错误: {}", file.getFileName(), e.getMessage());
-                                    return null;
-                                }
-                            }, executor);
-                            
-                            futures.add(future);
-                            validFiles.add(file);
-                        }
-                        
-                        // 4.7 等待所有下载完成并写入 ZIP
-                        for (int i = 0; i < futures.size(); i++) {
-                            try {
-                                byte[] fileContent = futures.get(i).join();
-                                com.bjutzxq.pojo.entity.ProjectFile file = validFiles.get(i);
-                                
-                                if (fileContent == null) {
-                                    continue;
-                                }
-                                
-                                // 构建文件在 ZIP 中的路径（包含文件夹前缀）
-                                String entryPath = folderName + "/";
-                                if (file.getFilePath() != null && !file.getFilePath().trim().isEmpty()) {
-                                    entryPath += file.getFilePath() + "/";
-                                }
-                                entryPath += file.getFileName();
-                                
-                                // 添加到 ZIP
-                                ZipEntry entry = new ZipEntry(entryPath);
-                                zos.putNextEntry(entry);
-                                zos.write(fileContent);
-                                zos.closeEntry();
-                            } catch (Exception e) {
-                                log.error("写入 ZIP 失败: {}, 错误: {}", validFiles.get(i).getFileName(), e.getMessage());
-                            }
-                        }
-                        
-                        // 关闭线程池
-                        executor.shutdown();
-                        
-                        // 4.8 添加项目文档（如果有）
-                        if (project.getDocumentUrl() != null && !project.getDocumentUrl().trim().isEmpty()) {
-                            try {
-                                byte[] docContent = ossUtil.download(project.getDocumentUrl());
-                                String docExtension = getFileExtensionFromUrl(project.getDocumentUrl());
-                                String docName = folderName + "/项目文档." + docExtension;
-                                
-                                ZipEntry docEntry = new ZipEntry(docName);
-                                zos.putNextEntry(docEntry);
-                                zos.write(docContent);
-                                zos.closeEntry();
-                                
-                                log.info("项目文档已添加: {}", docName);
-                            } catch (Exception e) {
-                                log.warn("下载项目文档失败: {}", e.getMessage());
-                            }
-                        }
-                        
-                        successCount++;
-                        log.info("项目打包成功: {}", folderName);
-                        
-                    } catch (Exception e) {
-                        log.error("处理项目失败，项目 ID: {}, 错误: {}", projectId, e.getMessage(), e);
-                        failCount++;
+                    // 检查是否已被取消
+                    if (isTaskCancelled(taskId)) {
+                        log.info("任务已取消，停止处理剩余项目");
+                        break;
                     }
+                    CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                        // 任务已取消则跳过
+                        if (isTaskCancelled(taskId)) return;
+                        try {
+                            // 4.1 获取项目信息
+                            Project project = projectMapper.selectById(projectId);
+                            if (project == null) {
+                                log.warn("项目不存在，跳过，ID: {}", projectId);
+                                failCount.incrementAndGet();
+                                processedCount.incrementAndGet();
+                                // 推送进度
+                                updateTaskProgress(taskId, processedCount.get(), total, "项目不存在");
+                                if (webSocketHandler != null) {
+                                    webSocketHandler.sendDownloadProgress(userId, taskId, processedCount.get(), total, "项目不存在");
+                                }
+                                return;
+                            }
+                            
+                            // 4.2 获取项目所有者信息（学号和姓名）
+                            com.bjutzxq.pojo.entity.User owner = userMapper.selectById(project.getOwnerId());
+                            if (owner == null) {
+                                log.warn("项目所有者不存在，跳过，项目 ID: {}", projectId);
+                                failCount.incrementAndGet();
+                                processedCount.incrementAndGet();
+                                // 推送进度
+                                updateTaskProgress(taskId, processedCount.get(), total, "用户不存在");
+                                if (webSocketHandler != null) {
+                                    webSocketHandler.sendDownloadProgress(userId, taskId, processedCount.get(), total, "用户不存在");
+                                }
+                                return;
+                            }
+                            
+                            // 4.3 构建文件夹名称：学号 真实姓名 项目名称
+                            String folderName = owner.getEmployeeId() + " " + owner.getRealName() + " " + project.getName();
+                            log.info("处理项目: {}", folderName);
+                            
+                            // 4.4 获取项目的所有文件
+                            List<com.bjutzxq.pojo.entity.ProjectFile> projectFiles = projectFileMapper.selectByProjectId(projectId);
+                            
+                            // 追踪已写入 ZIP 的文件数（用于空目录兜底）
+                            java.util.concurrent.atomic.AtomicInteger fileCount = new java.util.concurrent.atomic.AtomicInteger(0);
+
+                            if (projectFiles != null && !projectFiles.isEmpty()) {
+                                // 4.5 收集需要打包的文件
+                                List<com.bjutzxq.pojo.entity.ProjectFile> filesToPack = projectFiles.stream()
+                                    .filter(f -> f.getIsDir() == null || f.getIsDir() == 0)  // 只保留文件
+                                    .filter(f -> f.getStorageUrl() != null && !f.getStorageUrl().trim().isEmpty())  // 有 URL
+                                    .toList();
+
+                                if (!filesToPack.isEmpty()) {
+                                    // 4.6 并行下载所有文件，下载完立即写入 ZIP（避免堆积在内存）
+                                    List<CompletableFuture<Void>> downloadFutures = new ArrayList<>();
+
+                                    for (com.bjutzxq.pojo.entity.ProjectFile file : filesToPack) {
+                                        CompletableFuture<Void> downloadFuture = CompletableFuture.runAsync(() -> {
+                                            try (
+                                                java.io.InputStream inputStream = ossUtil.downloadStream(file.getStorageUrl());
+                                                ByteArrayOutputStream outputStream = new ByteArrayOutputStream()
+                                            ) {
+                                                if (inputStream != null) {
+                                                    byte[] buffer = new byte[8192];
+                                                    int bytesRead;
+                                                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                                                        outputStream.write(buffer, 0, bytesRead);
+                                                    }
+
+                                                    byte[] fileContent = outputStream.toByteArray();
+                                                    if (fileContent.length > 0) {
+                                                        String entryPath = folderName + "/";
+                                                        if (file.getFilePath() != null && !file.getFilePath().trim().isEmpty()) {
+                                                            entryPath += file.getFilePath() + "/";
+                                                        }
+                                                        entryPath += file.getFileName();
+
+                                                        // 立即写入 ZIP，去重：跳过已写入的同名文件
+                                                        if (writtenEntries.add(entryPath)) {
+                                                            synchronized (zos) {
+                                                                ZipEntry entry = new ZipEntry(entryPath);
+                                                                zos.putNextEntry(entry);
+                                                                zos.write(fileContent);
+                                                                zos.closeEntry();
+                                                            }
+                                                            fileCount.incrementAndGet();
+                                                        } else {
+                                                            log.debug("跳过重复文件: {}", entryPath);
+                                                        }
+                                                    }
+                                                }
+                                            } catch (IOException e) {
+                                                log.error("下载文件失败: {}, 错误: {}", file.getFileName(), e.getMessage());
+                                            }
+                                        }, fileDownloadExecutor);
+
+                                        downloadFutures.add(downloadFuture);
+                                    }
+
+                                    // 等待所有文件下载并写入完成
+                                    CompletableFuture.allOf(downloadFutures.toArray(new CompletableFuture[0])).join();
+                                }
+                            }
+
+                            // 4.7 添加项目文档（如果有）—— 下载后立即写入 ZIP
+                            if (project.getDocumentUrl() != null && !project.getDocumentUrl().trim().isEmpty()) {
+                                try (
+                                    java.io.InputStream inputStream = ossUtil.downloadStream(project.getDocumentUrl());
+                                    ByteArrayOutputStream outputStream = new ByteArrayOutputStream()
+                                ) {
+                                    if (inputStream != null) {
+                                        byte[] buffer = new byte[8192];
+                                        int bytesRead;
+                                        while ((bytesRead = inputStream.read(buffer)) != -1) {
+                                            outputStream.write(buffer, 0, bytesRead);
+                                        }
+
+                                        byte[] docContent = outputStream.toByteArray();
+                                        if (docContent.length > 0) {
+                                            String docExtension = getFileExtensionFromUrl(project.getDocumentUrl());
+                                            String docName = folderName + "/项目文档." + docExtension;
+
+                                            if (writtenEntries.add(docName)) {
+                                                synchronized (zos) {
+                                                    ZipEntry entry = new ZipEntry(docName);
+                                                    zos.putNextEntry(entry);
+                                                    zos.write(docContent);
+                                                    zos.closeEntry();
+                                                }
+                                                fileCount.incrementAndGet();
+                                                log.info("项目文档已添加: {}", docName);
+                                            }
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    log.warn("下载项目文档失败: {}", e.getMessage());
+                                }
+                            }
+
+                            // 4.8 没有任何文件时创建空目录
+                            if (fileCount.get() == 0) {
+                                synchronized (zos) {
+                                    ZipEntry dirEntry = new ZipEntry(folderName + "/");
+                                    zos.putNextEntry(dirEntry);
+                                    zos.closeEntry();
+                                }
+                            }
+                            
+                            successCount.incrementAndGet();
+                            processedCount.incrementAndGet();
+                            log.info("项目打包成功: {}", folderName);
+                            
+                            // 推送进度
+                            updateTaskProgress(taskId, processedCount.get(), total, folderName);
+                            if (webSocketHandler != null) {
+                                webSocketHandler.sendDownloadProgress(userId, taskId, processedCount.get(), total, folderName);
+                            }
+                            
+                        } catch (Exception e) {
+                            log.error("处理项目失败，项目 ID: {}, 错误: {}", projectId, e.getMessage(), e);
+                            failCount.incrementAndGet();
+                            processedCount.incrementAndGet();
+                            
+                            // 推送进度
+                            updateTaskProgress(taskId, processedCount.get(), total, "处理失败");
+                            if (webSocketHandler != null) {
+                                webSocketHandler.sendDownloadProgress(userId, taskId, processedCount.get(), total, "处理失败");
+                            }
+                        }
+                    }, projectPackagingExecutor);
+                    
+                    futures.add(future);
                 }
                 
-                log.info("批量打包完成，成功: {}, 失败: {}, ZIP 文件: {}", successCount, failCount, zipPath);
+                // 等待所有项目处理完成
+                CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+                
+                log.info("批量打包完成，成功: {}, 失败: {}, ZIP 文件: {}", successCount.get(), failCount.get(), zipPath);
+
+                // 更新异步任务缓存（如果存在）
+                downloadTasks.computeIfPresent(taskId, (k, info) -> {
+                    info.setSuccessCount(successCount.get());
+                    info.setFailCount(failCount.get());
+                    return info;
+                });
+
+                // 异步模式下不推送完成消息，由 startAsyncBatchDownload 在 OSS 上传后推送带 downloadUrl 的消息
+                boolean isAsync = downloadTasks.containsKey(taskId);
+                if (webSocketHandler != null && !isAsync) {
+                    String fileName = className + "_" + courseName + ".zip";
+                    webSocketHandler.sendDownloadComplete(userId, taskId, successCount.get(), failCount.get(), fileName);
+                }
+
                 return zipPath;
             }
         } catch (IOException e) {
             log.error("批量打包失败：{}", e.getMessage(), e);
+
+            // 更新异步任务缓存
+            downloadTasks.computeIfPresent(taskId, (k, info) -> {
+                info.setStatus("FAILED");
+                info.setErrorMessage(e.getMessage());
+                return info;
+            });
+
+            // 异步模式下不推送失败消息，由 startAsyncBatchDownload 处理
+            boolean isAsync = downloadTasks.containsKey(taskId);
+            if (webSocketHandler != null && !isAsync) {
+                webSocketHandler.sendDownloadFailed(userId, taskId, e.getMessage());
+            }
+
             return null;
         }
     }
@@ -1166,6 +1308,146 @@ public class ProjectService {
      * @param url 文件 URL
      * @return 扩展名
      */
+    /**
+     * 更新任务进度到缓存（供 WebSocket 推送时同步更新，支持轮询查询）
+     */
+    private void updateTaskProgress(String taskId, int current, int total, String projectName) {
+        if (taskId == null) return;
+        downloadTasks.computeIfPresent(taskId, (k, info) -> {
+            info.setCurrent(current);
+            info.setTotal(total);
+            info.setProgress(total > 0 ? current * 100 / total : 0);
+            info.setProjectName(projectName);
+            return info;
+        });
+    }
+
+    /**
+     * 查询批量下载任务状态（供前端轮询），超过 1 小时自动清理
+     */
+    public DownloadTaskInfo getDownloadTaskStatus(String taskId) {
+        DownloadTaskInfo info = downloadTasks.get(taskId);
+        if (info == null) return null;
+        // 超过 1 小时的已完成/失败任务自动清理
+        long age = Instant.now().toEpochMilli() - info.getStartTime();
+        if (age > 3600_000 && !"PROCESSING".equals(info.getStatus())) {
+            downloadTasks.remove(taskId);
+            return null;
+        }
+        return info;
+    }
+
+    /**
+     * 异步启动批量下载（返回 taskId 立即响应，后台打包完成后推送 WebSocket + 更新缓存）
+     */
+    public String startAsyncBatchDownload(List<Integer> projectIds, String className,
+                                          String courseName, Integer userId) {
+        String taskId = "batch_download_" + System.currentTimeMillis();
+        DownloadTaskInfo taskInfo = new DownloadTaskInfo();
+        taskInfo.setTotal(projectIds.size());
+        downloadTasks.put(taskId, taskInfo);
+        log.info("异步批量下载任务已创建，taskId: {}, 项目数: {}", taskId, projectIds.size());
+
+        CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+            try {
+                Path zipPath = batchPackageProjects(projectIds, className, courseName,
+                        userId, taskId, webSocketHandler);
+
+                // 检查是否已被取消
+                if (isTaskCancelled(taskId)) {
+                    log.info("任务已被取消，跳过 OSS 上传: {}", taskId);
+                    cleanupCancelledTask(taskId, zipPath);
+                    return;
+                }
+
+                if (zipPath != null) {
+                    String ossUrl = ossUtil.uploadFile(zipPath, "batch-downloads");
+                    String objectKey = ossUtil.extractObjectName(ossUrl);
+                    String downloadUrl = ossUtil.generatePresignedUrl(objectKey, 3600);
+
+                    DownloadTaskInfo latest = downloadTasks.computeIfPresent(taskId, (k, info) -> {
+                        info.setStatus("COMPLETED");
+                        info.setDownloadUrl(downloadUrl);
+                        info.setProgress(100);
+                        return info;
+                    });
+
+                    String fileName = className + "_" + courseName + ".zip";
+                    int success = latest != null ? latest.getSuccessCount() : 0;
+                    int fail = latest != null ? latest.getFailCount() : 0;
+                    if (webSocketHandler != null) {
+                        webSocketHandler.sendDownloadComplete(userId, taskId, success, fail,
+                                fileName, downloadUrl);
+                    }
+
+                    try {
+                        java.nio.file.Files.deleteIfExists(zipPath);
+                    } catch (IOException e) {
+                        log.warn("删除临时 ZIP 文件失败: {}", zipPath);
+                    }
+                }
+            } catch (Exception e) {
+                // 检查是否是取消导致的
+                if (isTaskCancelled(taskId)) {
+                    log.info("任务已取消: {}", taskId);
+                    return;
+                }
+                log.error("异步批量下载失败: {}", e.getMessage(), e);
+                downloadTasks.computeIfPresent(taskId, (k, info) -> {
+                    info.setStatus("FAILED");
+                    info.setErrorMessage(e.getMessage());
+                    return info;
+                });
+                if (webSocketHandler != null) {
+                    webSocketHandler.sendDownloadFailed(userId, taskId,
+                            "批量下载失败: " + e.getMessage());
+                }
+            } finally {
+                downloadFutures.remove(taskId);
+            }
+        }, projectPackagingExecutor);
+
+        downloadFutures.put(taskId, future);
+        return taskId;
+    }
+
+    private boolean isTaskCancelled(String taskId) {
+        DownloadTaskInfo info = downloadTasks.get(taskId);
+        return info == null || "CANCELLED".equals(info.getStatus());
+    }
+
+    private void cleanupCancelledTask(String taskId, Path zipPath) {
+        downloadTasks.computeIfPresent(taskId, (k, info) -> {
+            info.setStatus("CANCELLED");
+            return info;
+        });
+        if (zipPath != null) {
+            try {
+                java.nio.file.Files.deleteIfExists(zipPath);
+            } catch (IOException e) {
+                log.warn("删除取消任务的临时 ZIP 失败: {}", zipPath);
+            }
+        }
+    }
+
+    /**
+     * 取消批量下载任务
+     * @return true 表示取消成功，false 表示任务不存在或已完成
+     */
+    public boolean cancelDownloadTask(String taskId) {
+        DownloadTaskInfo info = downloadTasks.get(taskId);
+        if (info == null) return false;
+        if (!"PROCESSING".equals(info.getStatus())) return false;
+
+        info.setStatus("CANCELLED");
+        CompletableFuture<Void> future = downloadFutures.get(taskId);
+        if (future != null) {
+            future.cancel(true); // 中断正在执行的线程
+        }
+        log.info("下载任务已取消: {}", taskId);
+        return true;
+    }
+
     private String getFileExtensionFromUrl(String url) {
         if (url == null || url.isEmpty()) {
             return "docx";
@@ -1181,5 +1463,210 @@ public class ProjectService {
             return ext;
         }
         return "docx";
+    }
+    
+    /**
+     * 生成批量下载的预签名 URL 列表（前端直传 OSS）
+     * @param projectIds 项目 ID 列表
+     * @param className 班级名称
+     * @param courseName 课程名称
+     * @return 文件信息列表，每个元素包含 {url, path}
+     */
+    public List<Map<String, String>> generateBatchDownloadUrls(
+            List<Integer> projectIds, String className, String courseName) {
+        log.info("开始生成批量下载 URL，项目数量: {}, 班级: {}, 课程: {}", 
+                projectIds.size(), className, courseName);
+        
+        // 优化：使用并行流加速预签名 URL 生成
+        List<Map<String, String>> fileUrls = Collections.synchronizedList(new ArrayList<>());
+        java.util.concurrent.atomic.AtomicInteger successCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        java.util.concurrent.atomic.AtomicInteger skipCount = new java.util.concurrent.atomic.AtomicInteger(0);
+        
+        try {
+            List<CompletableFuture<Void>> futures = new ArrayList<>();
+            
+            for (Integer projectId : projectIds) {
+                CompletableFuture<Void> future = CompletableFuture.runAsync(() -> {
+                    try {
+                        // 获取项目信息
+                        Project project = projectMapper.selectById(projectId);
+                        if (project == null) {
+                            log.warn("项目不存在，跳过，ID: {}", projectId);
+                            skipCount.incrementAndGet();
+                            return;
+                        }
+                        
+                        // 获取项目所有者信息
+                        com.bjutzxq.pojo.entity.User owner = userMapper.selectById(project.getOwnerId());
+                        if (owner == null) {
+                            log.warn("项目所有者不存在，跳过，项目 ID: {}", projectId);
+                            skipCount.incrementAndGet();
+                            return;
+                        }
+                        
+                        // 构建文件夹名称：学号 真实姓名 项目名称
+                        String folderName = owner.getEmployeeId() + " " + owner.getRealName() + " " + project.getName();
+                        
+                        boolean hasFiles = false;
+                        
+                        // 获取项目的所有文件
+                        List<com.bjutzxq.pojo.entity.ProjectFile> projectFiles = projectFileMapper.selectByProjectId(projectId);
+                        
+                        if (projectFiles != null && !projectFiles.isEmpty()) {
+                            // 处理每个文件
+                            for (com.bjutzxq.pojo.entity.ProjectFile file : projectFiles) {
+                                if (file.getIsDir() != null && file.getIsDir() == 1) {
+                                    continue; // 跳过目录
+                                }
+                                if (file.getStorageUrl() == null || file.getStorageUrl().trim().isEmpty()) {
+                                    continue; // 跳过没有 URL 的文件
+                                }
+                                
+                                try {
+                                    // 提取 object key
+                                    String objectKey = ossUtil.extractObjectName(file.getStorageUrl());
+                                    if (objectKey != null && !objectKey.isEmpty()) {
+                                        // 生成预签名 URL（1 小时有效）
+                                        String presignedUrl = ossUtil.generatePresignedUrl(objectKey, 3600);
+                                        
+                                        // 构建文件在 ZIP 中的路径
+                                        String filePath = folderName + "/";
+                                        if (file.getFilePath() != null && !file.getFilePath().trim().isEmpty()) {
+                                            filePath += file.getFilePath() + "/";
+                                        }
+                                        filePath += file.getFileName();
+                                        
+                                        Map<String, String> fileInfo = new HashMap<>();
+                                        fileInfo.put("url", presignedUrl);
+                                        fileInfo.put("path", filePath);
+                                        fileUrls.add(fileInfo);
+                                        hasFiles = true;
+                                    }
+                                } catch (Exception e) {
+                                    log.error("生成文件预签名 URL 失败: {}, 错误: {}", 
+                                            file.getFileName(), e.getMessage());
+                                }
+                            }
+                        }
+                        
+                        // 添加项目文档（如果有）
+                        if (project.getDocumentUrl() != null && !project.getDocumentUrl().trim().isEmpty()) {
+                            try {
+                                String objectKey = ossUtil.extractObjectName(project.getDocumentUrl());
+                                if (objectKey != null && !objectKey.isEmpty()) {
+                                    String presignedUrl = ossUtil.generatePresignedUrl(objectKey, 3600);
+                                    String docExtension = getFileExtensionFromUrl(project.getDocumentUrl());
+                                    String docPath = folderName + "/项目文档." + docExtension;
+                                    
+                                    Map<String, String> docInfo = new HashMap<>();
+                                    docInfo.put("url", presignedUrl);
+                                    docInfo.put("path", docPath);
+                                    fileUrls.add(docInfo);
+                                    hasFiles = true;
+                                    
+                                    log.info("项目文档 URL 已生成: {}", docPath);
+                                }
+                            } catch (Exception e) {
+                                log.warn("生成项目文档 URL 失败: {}", e.getMessage());
+                            }
+                        }
+                        
+                        // 如果项目没有任何文件，添加一个空文件夹标记（空文件）
+                        if (!hasFiles) {
+                            log.info("项目没有任何文件，创建空文件夹标记: {}", folderName);
+                            
+                            // 添加一个 0 字节的空文件来创建文件夹
+                            Map<String, String> emptyFile = new HashMap<>();
+                            emptyFile.put("url", "");  // 空 URL
+                            emptyFile.put("path", folderName + "/.empty");  // 隐藏空文件
+                            emptyFile.put("isEmpty", "true");  // 标记为空文件
+                            fileUrls.add(emptyFile);
+                            
+                            successCount.incrementAndGet();
+                        } else {
+                            successCount.incrementAndGet();
+                        }
+                        
+                    } catch (Exception e) {
+                        log.error("处理项目失败，项目 ID: {}, 错误: {}", projectId, e.getMessage(), e);
+                        skipCount.incrementAndGet();
+                    }
+                }, urlGenerationExecutor);
+                
+                futures.add(future);
+            }
+            
+            // 等待所有任务完成
+            CompletableFuture.allOf(futures.toArray(new CompletableFuture[0])).join();
+            
+        } catch (Exception e) {
+            log.error("生成批量下载 URL 失败: {}", e.getMessage(), e);
+            throw new RuntimeException("生成批量下载 URL 失败: " + e.getMessage(), e);
+        }
+        
+        log.info("批量下载 URL 生成完成，项目统计 - 成功: {}, 跳过: {}, 文件总数: {}", 
+                successCount.get(), skipCount.get(), fileUrls.size());
+        return fileUrls;
+    }
+    
+    /**
+     * 定时清理过期或卡住的下载任务（每 10 分钟）
+     */
+    @Scheduled(fixedRate = 600_000)
+    public void cleanupExpiredDownloadTasks() {
+        long now = Instant.now().toEpochMilli();
+        downloadTasks.entrySet().removeIf(entry -> {
+            long age = now - entry.getValue().getStartTime();
+            return age > 3600_000; // 超过 1 小时
+        });
+    }
+
+    /**
+     * Spring 容器销毁时优雅关闭线程池
+     */
+    @PreDestroy
+    public void destroy() {
+        log.info("开始关闭共享线程池...");
+        
+        // 关闭预签名 URL 生成线程池
+        urlGenerationExecutor.shutdown();
+        try {
+            if (!urlGenerationExecutor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                log.warn("预签名 URL 生成线程池未能在 10 秒内关闭，强制关闭");
+                urlGenerationExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            log.error("等待预签名 URL 生成线程池关闭时被中断", e);
+            urlGenerationExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        
+        // 关闭项目打包线程池
+        projectPackagingExecutor.shutdown();
+        try {
+            if (!projectPackagingExecutor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                log.warn("项目打包线程池未能在 10 秒内关闭，强制关闭");
+                projectPackagingExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            log.error("等待项目打包线程池关闭时被中断", e);
+            projectPackagingExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+
+        // 关闭文件下载线程池
+        fileDownloadExecutor.shutdown();
+        try {
+            if (!fileDownloadExecutor.awaitTermination(10, java.util.concurrent.TimeUnit.SECONDS)) {
+                log.warn("文件下载线程池未能在 10 秒内关闭，强制关闭");
+                fileDownloadExecutor.shutdownNow();
+            }
+        } catch (InterruptedException e) {
+            log.error("等待文件下载线程池关闭时被中断", e);
+            fileDownloadExecutor.shutdownNow();
+            Thread.currentThread().interrupt();
+        }
+        
+        log.info("共享线程池已关闭");
     }
 }

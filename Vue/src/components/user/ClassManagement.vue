@@ -1,7 +1,7 @@
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { filterProjects, getFilteredProjectIds, batchDownloadProjects } from '@/api/project'
+import { filterProjects, getFilteredProjectIds, batchDownloadAsync, getDownloadTaskStatus, cancelDownloadTask } from '@/api/project'
 import { getActiveCourses } from '@/api/course'
 import { toast } from '@/utils/toast'
 import { log, error as logError } from '@/utils/logger'
@@ -33,6 +33,24 @@ const hasSearched = ref(false)
 
 // 加载状态
 const loading = ref(false)
+
+// 下载状态
+const isDownloading = ref(false)
+const downloadInfo = ref({
+  total: 0,
+  current: 0,
+  progress: 0, // 百分比
+  projectName: '',
+  estimatedTime: ''
+})
+
+// WebSocket 进度监听器
+let wsProgressHandler = null
+
+// 异步任务恢复
+const PENDING_DOWNLOAD_KEY = 'pendingBatchDownload'
+let pollTimer = null
+let pendingTaskId = null
 
 // 每页显示数量
 const PAGE_SIZE = 12
@@ -109,56 +127,177 @@ const loadFilteredProjects = async () => {
   }
 }
 
+// 清除待恢复的下载任务
+const clearPendingDownload = () => {
+  localStorage.removeItem(PENDING_DOWNLOAD_KEY)
+  pendingTaskId = null
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
+}
+
+// 开始轮询任务状态
+const startPolling = (taskId) => {
+  if (pollTimer) clearInterval(pollTimer)
+  pollTimer = setInterval(async () => {
+    try {
+      const res = await getDownloadTaskStatus(taskId)
+      if (res.code !== 200 || !res.data) return
+
+      const task = res.data
+      if (task.status === 'COMPLETED') {
+        clearPendingDownload()
+        if (task.downloadUrl) {
+          window.location.href = task.downloadUrl
+        }
+        setTimeout(() => {
+          isDownloading.value = false
+          toast.success(`批量下载完成！成功: ${task.successCount}, 失败: ${task.failCount}`)
+        }, 2000)
+      } else if (task.status === 'FAILED' || task.status === 'CANCELLED') {
+        clearPendingDownload()
+        isDownloading.value = false
+        if (task.status === 'FAILED') {
+          toast.error(task.errorMessage || '批量下载失败')
+        }
+      } else {
+        // PROCESSING — 更新进度显示
+        downloadInfo.value.current = task.current || 0
+        downloadInfo.value.total = task.total || downloadInfo.value.total
+        downloadInfo.value.progress = task.progress || 0
+        downloadInfo.value.projectName = task.projectName || '正在打包...'
+      }
+    } catch {
+      // 网络错误时静默重试
+    }
+  }, 2000)
+}
+
+// 恢复未完成的下载任务（页面刷新后调用）
+const recoverPendingDownload = () => {
+  try {
+    const saved = localStorage.getItem(PENDING_DOWNLOAD_KEY)
+    if (!saved) return
+    const { taskId, total } = JSON.parse(saved)
+    if (!taskId) return
+
+    log('发现未完成的下载任务，正在恢复:', taskId)
+    pendingTaskId = taskId
+    isDownloading.value = true
+    downloadInfo.value = {
+      total: total || 0,
+      current: 0,
+      progress: 0,
+      projectName: '正在恢复下载任务...',
+      estimatedTime: ''
+    }
+
+    // 注册 WebSocket 监听（可能收到实时消息）
+    registerWsProgressHandler()
+
+    // 启动轮询兜底
+    startPolling(taskId)
+  } catch {
+    localStorage.removeItem(PENDING_DOWNLOAD_KEY)
+  }
+}
+
+// 取消下载任务
+const handleCancelDownload = async () => {
+  const taskId = pendingTaskId
+  if (!taskId) {
+    isDownloading.value = false
+    return
+  }
+  try {
+    log('取消下载任务:', taskId)
+    await cancelDownloadTask(taskId)
+    toast.info('下载任务已取消')
+  } catch {
+    // 即使后端返回错误也关闭遮罩（任务可能已完成）
+  }
+  clearPendingDownload()
+  isDownloading.value = false
+}
+
 // 批量下载学生项目
 const handleBatchDownload = async () => {
   if (!hasSearched.value || total.value === 0) {
     toast.warning('请先查询并筛选出要下载的项目')
     return
   }
-  
-  // 检查是否有班级和课程信息
+
   if (!filters.value.className && !filters.value.courseName) {
     toast.warning('请至少选择班级或课程之一')
     return
   }
-  
+
   try {
-    log('开始获取所有项目ID...')
-    toast.info('正在获取项目列表...')
-    
+    log('开始批量下载...')
+    toast.info('正在创建下载任务...')
+
     // 获取所有符合条件的项目ID
     const res = await getFilteredProjectIds({
       className: filters.value.className,
       courseName: filters.value.courseName,
       projectType: 'COURSE'
     })
-    
+
     if (res.code !== 200 || !res.data) {
       logError('获取项目ID失败:', res)
       toast.error('获取项目列表失败，请稍后重试')
       return
     }
-    
+
     const projectIds = res.data
-    
+
     if (projectIds.length === 0) {
       toast.warning('当前没有可下载的项目')
       return
     }
-    
-    log(`获取到 ${projectIds.length} 个项目ID，开始批量下载...`)
-    toast.info(`正在打包 ${projectIds.length} 个项目...`)
-    
-    // 调用批量下载 API
-    batchDownloadProjects({
+
+    log(`获取到 ${projectIds.length} 个项目ID，创建异步下载任务...`)
+
+    // 显示加载遮罩
+    isDownloading.value = true
+    downloadInfo.value = {
+      total: projectIds.length,
+      current: 0,
+      progress: 0,
+      projectName: '正在创建下载任务...',
+      estimatedTime: ''
+    }
+
+    // 调用异步下载接口，后端立即返回 taskId
+    const asyncRes = await batchDownloadAsync({
       projectIds: projectIds,
       className: filters.value.className || '未知班级',
       courseName: filters.value.courseName || '未知课程'
     })
-    
-    toast.success(`成功下载 ${projectIds.length} 个项目！`)
+
+    if (asyncRes.code !== 200 || !asyncRes.data || !asyncRes.data.taskId) {
+      throw new Error('创建下载任务失败')
+    }
+
+    const taskId = asyncRes.data.taskId
+    pendingTaskId = taskId
+    log('异步下载任务已创建，taskId:', taskId)
+
+    // 持久化任务信息，刷新后恢复
+    localStorage.setItem(PENDING_DOWNLOAD_KEY, JSON.stringify({
+      taskId: taskId,
+      total: projectIds.length,
+      timestamp: Date.now()
+    }))
+
+    // 启动轮询 + WebSocket 双通道
+    startPolling(taskId)
+
   } catch (error) {
     logError('批量下载失败:', error)
+    clearPendingDownload()
+    isDownloading.value = false
     toast.error(error.message || '批量下载失败，请稍后重试')
   }
 }
@@ -183,9 +322,55 @@ const loadCourseList = async () => {
   }
 }
 
+// WebSocket 进度消息处理器
+const createWsHandler = () => {
+  return (data) => {
+    log('收到 WebSocket 消息:', data)
+
+    if (data.type === 'download_progress') {
+      downloadInfo.value.current = data.current
+      downloadInfo.value.total = data.total
+      downloadInfo.value.progress = data.progress
+      downloadInfo.value.projectName = data.projectName
+      log(`下载进度: ${data.current}/${data.total} (${data.progress}%) - ${data.projectName}`)
+    } else if (data.type === 'download_complete') {
+      log(`下载完成，成功: ${data.successCount}, 失败: ${data.failCount}`)
+      clearPendingDownload()
+
+      if (data.downloadUrl) {
+        log('使用后端提供的下载链接:', data.downloadUrl)
+        window.location.href = data.downloadUrl
+        setTimeout(() => {
+          isDownloading.value = false
+          toast.success(`批量下载完成！成功: ${data.successCount}, 失败: ${data.failCount}`)
+        }, 2000)
+      } else {
+        setTimeout(() => {
+          isDownloading.value = false
+          toast.success(`批量下载完成！成功: ${data.successCount}, 失败: ${data.failCount}`)
+        }, 1000)
+      }
+    } else if (data.type === 'download_failed') {
+      logError('下载失败:', data.errorMessage)
+      clearPendingDownload()
+      isDownloading.value = false
+      toast.error(`下载失败: ${data.errorMessage}`)
+    }
+  }
+}
+
+// 注册 WebSocket 进度监听（幂等）
+const registerWsProgressHandler = () => {
+  if (wsProgressHandler) return // 已注册
+  import('@/utils/websocket').then(({ default: notificationWS }) => {
+    wsProgressHandler = createWsHandler()
+    notificationWS.on('message', wsProgressHandler)
+    log('已注册 WebSocket 进度监听器')
+  })
+}
+
 // 组件挂载时加载数据
 onMounted(() => {
-  // 检查是否为教师
   const userInfoFromToken = tokenManager.getUserInfo()
   if (!userInfoFromToken || userInfoFromToken.role !== 'TEACHER') {
     toast.warning('只有教师可以访问此页面')
@@ -194,6 +379,25 @@ onMounted(() => {
   }
 
   loadCourseList()
+  registerWsProgressHandler()
+
+  // 尝试恢复未完成的下载任务
+  recoverPendingDownload()
+})
+
+// 组件卸载时清理
+onUnmounted(() => {
+  if (wsProgressHandler) {
+    import('@/utils/websocket').then(({ default: notificationWS }) => {
+      notificationWS.off('message', wsProgressHandler)
+      log('已移除 WebSocket 进度监听器')
+    })
+    wsProgressHandler = null
+  }
+  if (pollTimer) {
+    clearInterval(pollTimer)
+    pollTimer = null
+  }
 })
 </script>
 
@@ -251,8 +455,9 @@ onMounted(() => {
                   v-if="hasSearched && total > 0"
                   @click="handleBatchDownload" 
                   class="batch-download-btn"
+                  :disabled="isDownloading"
                 >
-                  📁 批量下载
+                  {{ isDownloading ? '⏳ 打包中...' : '📁 批量下载' }}
                 </button>
               </div>
             </div>
@@ -263,8 +468,42 @@ onMounted(() => {
             </div>
           </div>
 
+          <!-- 下载进度遮罩 -->
+          <div v-if="isDownloading" class="download-overlay">
+            <div class="download-progress-card">
+              <div class="spinner-large"></div>
+              <h3>📦 正在打包项目</h3>
+              
+              <!-- 进度条 -->
+              <div class="progress-bar-container">
+                <div class="progress-bar" :style="{ width: downloadInfo.progress + '%' }"></div>
+              </div>
+              
+              <p class="progress-text">
+                {{ downloadInfo.current }} / {{ downloadInfo.total }} 个项目
+              </p>
+              
+              <p class="project-name-text" v-if="downloadInfo.projectName">
+                📄 {{ downloadInfo.projectName }}
+              </p>
+              
+              <p class="time-estimate">
+                ⏱️ 已完成 {{ downloadInfo.progress }}%
+              </p>
+              
+              <div class="cancel-download-section">
+                <button class="btn-cancel-download" @click="handleCancelDownload">
+                  取消下载
+                </button>
+                <p class="tip-text">
+                  💡 提示：打包完成后浏览器会自动开始下载
+                </p>
+              </div>
+            </div>
+          </div>
+
           <!-- 初始状态 -->
-          <div v-if="!hasSearched" class="initial-state">
+          <div v-else-if="!hasSearched" class="initial-state">
             <div class="empty-icon">🔍</div>
             <h3>开始查询学生项目</h3>
             <p>输入班级名称或选择课程，然后点击"查询"按钮</p>
@@ -826,5 +1065,143 @@ onMounted(() => {
   .page-header h1 {
     font-size: 24px;
   }
+}
+
+/* 下载进度遮罩 */
+.download-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  backdrop-filter: blur(4px);
+}
+
+.download-progress-card {
+  background: white;
+  padding: 40px 50px;
+  border-radius: 16px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  text-align: center;
+  max-width: 450px;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.spinner-large {
+  width: 60px;
+  height: 60px;
+  border: 5px solid #e5e7eb;
+  border-top-color: #064e3b;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 20px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.download-progress-card h3 {
+  font-size: 22px;
+  color: #064e3b;
+  margin-bottom: 16px;
+  font-weight: 700;
+}
+
+.progress-text {
+  font-size: 16px;
+  color: #374151;
+  margin-bottom: 12px;
+  line-height: 1.5;
+}
+
+/* 进度条容器 */
+.progress-bar-container {
+  width: 100%;
+  height: 8px;
+  background-color: #e5e7eb;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+/* 进度条 */
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #064e3b 0%, #059669 100%);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.project-name-text {
+  font-size: 14px;
+  color: #6b7280;
+  margin-bottom: 12px;
+  padding: 8px 12px;
+  background: #f9fafb;
+  border-radius: 6px;
+  word-break: break-all;
+}
+
+.time-estimate {
+  font-size: 15px;
+  color: #059669;
+  font-weight: 600;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+  background: #ecfdf5;
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.tip-text {
+  font-size: 13px;
+  color: #6b7280;
+  margin-top: 8px;
+  line-height: 1.6;
+}
+
+.cancel-download-section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-cancel-download {
+  padding: 8px 24px;
+  background: #fff;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-cancel-download:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
 }
 </style>

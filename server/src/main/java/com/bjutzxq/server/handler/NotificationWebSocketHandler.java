@@ -225,7 +225,13 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
     @Override
     public void handleTransportError(WebSocketSession session, Throwable exception) throws Exception {
         Integer userId = getUserIdFromSession(session);
-        log.error("WebSocket 传输错误，用户 ID: {}", userId, exception);
+        log.warn("WebSocket 传输错误，用户 ID: {}，原因: {}", userId, exception.getMessage());
+        
+        // 清理失效的会话
+        if (userId != null) {
+            userSessions.remove(userId);
+            lastHeartbeatTimes.remove(userId);
+        }
         
         if (session.isOpen()) {
             session.close(CloseStatus.SERVER_ERROR);
@@ -245,7 +251,10 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
                 session.sendMessage(new TextMessage(jsonMessage));
                 log.debug("通知推送成功，用户 ID: {}", userId);
             } catch (IOException e) {
-                log.error("通知推送失败，用户 ID: {}", userId, e);
+                log.warn("通知推送失败，用户 ID: {}，连接可能已断开: {}", userId, e.getMessage());
+                // 移除失效的会话
+                userSessions.remove(userId);
+                lastHeartbeatTimes.remove(userId);
             }
         } else {
             log.warn("用户 {} 不在线或会话已关闭，无法推送通知", userId);
@@ -266,7 +275,13 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
                     try {
                         session.sendMessage(textMessage);
                     } catch (IOException e) {
-                        log.error("广播消息失败", e);
+                        log.warn("广播消息失败，用户可能已断开: {}", e.getMessage());
+                        // 尝试清理失效会话
+                        Integer userId = getUserIdFromSession(session);
+                        if (userId != null) {
+                            userSessions.remove(userId);
+                            lastHeartbeatTimes.remove(userId);
+                        }
                     }
                 }
             });
@@ -339,6 +354,128 @@ public class NotificationWebSocketHandler extends TextWebSocketHandler {
      */
     private Integer getUserIdFromSession(WebSocketSession session) {
         return (Integer) session.getAttributes().get("userId");
+    }
+    
+    /**
+     * 发送批量下载进度消息
+     * @param userId 用户 ID
+     * @param taskId 任务 ID
+     * @param current 当前处理的项目数
+     * @param total 总项目数
+     * @param projectName 当前处理的项目名称（可选）
+     */
+    public void sendDownloadProgress(Integer userId, String taskId, int current, int total, String projectName) {
+        WebSocketSession session = userSessions.get(userId);
+        if (session != null && session.isOpen()) {
+            try {
+                int progress = total > 0 ? (current * 100 / total) : 0;
+                
+                Map<String, Object> progressMsg = Map.of(
+                    "type", "download_progress",
+                    "taskId", taskId,
+                    "current", current,
+                    "total", total,
+                    "progress", progress,
+                    "projectName", projectName != null ? projectName : "",
+                    "timestamp", System.currentTimeMillis()
+                );
+                
+                String jsonMessage = objectMapper.writeValueAsString(progressMsg);
+                session.sendMessage(new TextMessage(jsonMessage));
+                log.debug("推送下载进度，用户 ID: {}, 任务 ID: {}, {}/{} ({}%)", 
+                    userId, taskId, current, total, progress);
+            } catch (IOException e) {
+                log.warn("推送下载进度失败，用户 ID: {}，连接可能已断开: {}", userId, e.getMessage());
+                // 移除失效的会话
+                userSessions.remove(userId);
+                lastHeartbeatTimes.remove(userId);
+            }
+        } else {
+            log.warn("用户 {} 不在线或会话已关闭，无法推送下载进度", userId);
+        }
+    }
+    
+    /**
+     * 发送批量下载完成消息
+     * @param userId 用户 ID
+     * @param taskId 任务 ID
+     * @param successCount 成功数量
+     * @param failCount 失败数量
+     * @param fileName 文件名
+     */
+    public void sendDownloadComplete(Integer userId, String taskId, int successCount, int failCount, String fileName) {
+        sendDownloadComplete(userId, taskId, successCount, failCount, fileName, null);
+    }
+
+    /**
+     * 发送批量下载完成消息（含 OSS 下载链接）
+     * @param userId 用户 ID
+     * @param taskId 任务 ID
+     * @param successCount 成功数量
+     * @param failCount 失败数量
+     * @param fileName 文件名
+     * @param downloadUrl OSS 预签名下载链接
+     */
+    public void sendDownloadComplete(Integer userId, String taskId, int successCount, int failCount, String fileName, String downloadUrl) {
+        WebSocketSession session = userSessions.get(userId);
+        if (session != null && session.isOpen()) {
+            try {
+                Map<String, Object> completeMsg = new java.util.LinkedHashMap<>();
+                completeMsg.put("type", "download_complete");
+                completeMsg.put("taskId", taskId);
+                completeMsg.put("successCount", successCount);
+                completeMsg.put("failCount", failCount);
+                completeMsg.put("fileName", fileName != null ? fileName : "");
+                if (downloadUrl != null && !downloadUrl.isEmpty()) {
+                    completeMsg.put("downloadUrl", downloadUrl);
+                }
+                completeMsg.put("timestamp", System.currentTimeMillis());
+
+                String jsonMessage = objectMapper.writeValueAsString(completeMsg);
+                session.sendMessage(new TextMessage(jsonMessage));
+                log.info("推送下载完成，用户 ID: {}, 任务 ID: {}, 成功: {}, 失败: {}",
+                    userId, taskId, successCount, failCount);
+            } catch (IOException e) {
+                log.warn("推送下载完成消息失败，用户 ID: {}，连接可能已断开: {}", userId, e.getMessage());
+                // 移除失效的会话
+                userSessions.remove(userId);
+                lastHeartbeatTimes.remove(userId);
+            }
+        } else {
+            log.warn("用户 {} 不在线或会话已关闭，无法推送下载完成消息", userId);
+        }
+    }
+    
+    /**
+     * 发送批量下载失败消息
+     * @param userId 用户 ID
+     * @param taskId 任务 ID
+     * @param errorMessage 错误信息
+     */
+    public void sendDownloadFailed(Integer userId, String taskId, String errorMessage) {
+        WebSocketSession session = userSessions.get(userId);
+        if (session != null && session.isOpen()) {
+            try {
+                Map<String, Object> failedMsg = Map.of(
+                    "type", "download_failed",
+                    "taskId", taskId,
+                    "errorMessage", errorMessage != null ? errorMessage : "未知错误",
+                    "timestamp", System.currentTimeMillis()
+                );
+                
+                String jsonMessage = objectMapper.writeValueAsString(failedMsg);
+                session.sendMessage(new TextMessage(jsonMessage));
+                log.warn("推送下载失败，用户 ID: {}, 任务 ID: {}, 原因: {}", 
+                    userId, taskId, errorMessage);
+            } catch (IOException e) {
+                log.warn("推送下载失败消息失败，用户 ID: {}，连接可能已断开: {}", userId, e.getMessage());
+                // 移除失效的会话
+                userSessions.remove(userId);
+                lastHeartbeatTimes.remove(userId);
+            }
+        } else {
+            log.warn("用户 {} 不在线或会话已关闭，无法推送下载失败消息", userId);
+        }
     }
     
     /**

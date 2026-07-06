@@ -79,7 +79,10 @@ public class DtoConverter {
         vo.setRole(user.getRole() != null ? user.getRole().name() : "USER");
         vo.setToken(token);
         vo.setExpiresIn(com.bjutzxq.common.Constants.JWT.TOKEN_EXPIRE_TIME / 1000L);
-        
+        // 密码强度为 null 或 WEAK 时要求强制修改
+        String strength = user.getPasswordStrength();
+        vo.setMustChangePassword(strength == null || "WEAK".equals(strength));
+
         return vo;
     }
     

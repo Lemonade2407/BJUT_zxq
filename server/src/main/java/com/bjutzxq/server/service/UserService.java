@@ -12,7 +12,10 @@ import com.bjutzxq.server.mapper.UserMapper;
 import com.bjutzxq.server.util.DtoConverter;
 import com.bjutzxq.server.util.JwtUtil;
 import com.bjutzxq.server.util.OssUtil;
+import com.bjutzxq.server.util.PasswordStrengthUtil;
 import com.bjutzxq.server.util.PasswordUtil;
+
+import java.util.concurrent.TimeUnit;
 import com.github.pagehelper.PageHelper;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.Cacheable;
@@ -77,7 +80,12 @@ public class UserService {
             throw new BusinessException(409, "邮箱已被使用");
         }
         
-        // 4. 密码加密（BCrypt）
+        // 4. 评估并存储密码强度（在加密前，因为加密后无法评估）
+        PasswordStrengthUtil.PasswordStrengthInfo strength =
+                PasswordStrengthUtil.evaluatePassword(user.getPassword());
+        user.setPasswordStrength(strength.level().name());
+
+        // 5. 密码加密（BCrypt）
         String encodedPassword = PasswordUtil.encode(user.getPassword());
         user.setPassword(encodedPassword);
         
@@ -121,7 +129,16 @@ public class UserService {
      */
     public LoginVO login(String username, String password) {
         log.info("用户登录，用户名/邮箱/学号：{}", username);
-        
+
+        // 防暴力破解：检查是否被锁定
+        String lockKey = "login_lock:" + username.trim();
+        String lockCount = redisTemplate.opsForValue().get(lockKey);
+        if (lockCount != null && Integer.parseInt(lockCount) >= 5) {
+            long ttl = redisTemplate.getExpire(lockKey);
+            throw new BusinessException(429,
+                    "登录失败次数过多，请 " + (ttl > 0 ? ttl / 60 + 1 : 15) + " 分钟后再试");
+        }
+
         // 查询用户（可能是用户名、邮箱或学号）
         User user = userMapper.selectByUsername(username);
         if (user == null) {
@@ -130,34 +147,48 @@ public class UserService {
         if (user == null) {
             user = userMapper.selectByEmployeeId(username);
         }
-        
+
         if (user == null) {
             log.warn("用户不存在：{}", username);
+            recordLoginFailure(username);
             throw new BusinessException(404, "用户不存在");
         }
-        
+
         // 检查用户状态
         if (!Constants.User.STATUS_NORMAL.equals(user.getStatus())) {
             log.warn("账号已被禁用：{}", username);
             throw new BusinessException(403, "账号已被禁用");
         }
-        
+
         // 验证密码（BCrypt）
         if (!PasswordUtil.matches(password, user.getPassword())) {
             log.warn("密码错误：{}", username);
+            recordLoginFailure(username);
             throw new BusinessException(401, "密码错误");
         }
-        
+
+        // 登录成功，清除失败计数
+        redisTemplate.delete(lockKey);
+
         // 生成 Token
         String token = JwtUtil.generateToken(user.getId(), user.getUsername(), user.getAvatar());
-        
+
         // 清除用户的刷新计数（重新登录后重置）
         JwtUtil.clearRefreshCount(user.getId());
-        
+
         log.info("用户登录成功：{}, ID: {}", username, user.getId());
-        
-        // 使用工具类构建 LoginResponse DTO
+
+        // 使用工具类构建 LoginResponse DTO（包含 mustChangePassword 标记）
         return DtoConverter.buildLoginResponse(user, token);
+    }
+
+    /**
+     * 记录登录失败（防暴力破解）
+     */
+    private void recordLoginFailure(String username) {
+        String lockKey = "login_lock:" + username.trim();
+        redisTemplate.opsForValue().increment(lockKey, 1);
+        redisTemplate.expire(lockKey, 15, TimeUnit.MINUTES);
     }
     
     /**
@@ -259,13 +290,18 @@ public class UserService {
             throw new BusinessException(401, "原密码错误");
         }
         
+        // 评估新密码强度并存储
+        PasswordStrengthUtil.PasswordStrengthInfo strength =
+                PasswordStrengthUtil.evaluatePassword(newPassword);
+        user.setPasswordStrength(strength.level().name());
+
         // 加密新密码（BCrypt）
         String encodedNewPassword = PasswordUtil.encode(newPassword);
         user.setPassword(encodedNewPassword);
-        
+
         userMapper.update(user);
-        
-        log.info("密码修改成功，ID：{}", userId);
+
+        log.info("密码修改成功，ID：{}, 强度: {}", userId, strength.level().name());
     }
     
     /**

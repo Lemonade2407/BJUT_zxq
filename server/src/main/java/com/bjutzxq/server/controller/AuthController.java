@@ -11,6 +11,7 @@ import com.bjutzxq.server.service.UserService;
 import com.bjutzxq.server.util.CaptchaUtil;
 import com.bjutzxq.server.util.DtoConverter;
 import com.bjutzxq.server.util.JwtUtil;
+import com.bjutzxq.server.util.PasswordStrengthUtil;
 import com.bjutzxq.server.util.RegistrationRateLimiter;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
@@ -43,17 +44,18 @@ public class AuthController {
     private void setTokenCookie(HttpServletResponse response, String token) {
         Cookie cookie = new Cookie(TOKEN_COOKIE, token);
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        // 开发环境（localhost）使用 HTTP，生产环境使用 HTTPS
+        cookie.setSecure(false); // localhost 测试时设为 false，生产环境改为 true
         cookie.setPath("/");
         cookie.setMaxAge(COOKIE_MAX_AGE);
-        cookie.setAttribute("SameSite", "Strict");
+        cookie.setAttribute("SameSite", "Lax"); // 改为 Lax 以允许跨站请求携带 Cookie
         response.addCookie(cookie);
     }
 
     private void clearTokenCookie(HttpServletResponse response) {
         Cookie cookie = new Cookie(TOKEN_COOKIE, "");
         cookie.setHttpOnly(true);
-        cookie.setSecure(true);
+        cookie.setSecure(false); // 与 setTokenCookie 保持一致
         cookie.setPath("/");
         cookie.setMaxAge(0);
         response.addCookie(cookie);
@@ -80,7 +82,15 @@ public class AuthController {
             throw new IllegalArgumentException("验证码错误或已过期");
         }
         
-        // 2. 验证密码确认
+        // 2. 验证密码强度（必须达到 MEDIUM 以上）
+        PasswordStrengthUtil.PasswordStrengthInfo strengthInfo =
+                PasswordStrengthUtil.evaluatePassword(request.getPassword());
+        if (strengthInfo.level().getLevel() < PasswordStrengthUtil.StrengthLevel.MEDIUM.getLevel()) {
+            throw new IllegalArgumentException(
+                    "密码强度不足（" + strengthInfo.getLevelDescription() + "），" + strengthInfo.suggestion());
+        }
+
+        // 3. 验证密码确认
         if (!request.getPassword().equals(request.getConfirmPassword())) {
             throw new IllegalArgumentException("两次输入的密码不一致");
         }
@@ -265,14 +275,12 @@ public class AuthController {
             throw new IllegalArgumentException("新密码不能为空");
         }
 
-        // 2. 验证新密码长度
-        if (newPassword.length() < 6 || newPassword.length() > 20) {
-            throw new IllegalArgumentException("密码长度应为 6-20 位");
-        }
-
-        // 3. 验证新密码强度（必须包含字母和数字）
-        if (!newPassword.matches("^(?=.*[a-zA-Z])(?=.*\\d).+$")) {
-            throw new IllegalArgumentException("密码必须包含字母和数字");
+        // 2. 验证新密码强度（必须达到 MEDIUM 以上）
+        PasswordStrengthUtil.PasswordStrengthInfo strengthInfo =
+                PasswordStrengthUtil.evaluatePassword(newPassword);
+        if (strengthInfo.level().getLevel() < PasswordStrengthUtil.StrengthLevel.MEDIUM.getLevel()) {
+            throw new IllegalArgumentException(
+                    "密码强度不足（" + strengthInfo.getLevelDescription() + "），" + strengthInfo.suggestion());
         }
 
         // 从拦截器上下文中获取用户 ID

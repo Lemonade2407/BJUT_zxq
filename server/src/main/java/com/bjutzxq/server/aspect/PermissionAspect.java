@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.Cookie;
 import java.lang.reflect.Method;
 
 /**
@@ -46,20 +47,36 @@ public class PermissionAspect {
             return joinPoint.proceed();
         }
         
-        // 从请求头获取 Token
+        // 优先从 Cookie 读取 Token，兼容 Authorization header
         HttpServletRequest request = ((ServletRequestAttributes) RequestContextHolder
                 .currentRequestAttributes()).getRequest();
-        String authorization = request.getHeader("Authorization");
         
-        if (authorization == null || authorization.trim().isEmpty()) {
-            log.warn("权限验证失败：缺少认证信息");
-            throw new RuntimeException("未授权访问");
+        String token = null;
+        
+        // 1. 尝试从 Cookie 读取
+        Cookie[] cookies = request.getCookies();
+        if (cookies != null) {
+            for (Cookie c : cookies) {
+                if ("auth_token".equals(c.getName())) {
+                    token = c.getValue();
+                    break;
+                }
+            }
         }
         
-        // 解析 Token 获取用户 ID
-        String token = authorization;
-        if (token.startsWith("Bearer ")) {
-            token = token.substring(7);
+        // 2. 如果 Cookie 中没有，尝试从 Authorization header 读取
+        if (token == null || token.isEmpty()) {
+            String authorization = request.getHeader("Authorization");
+            if (authorization != null && authorization.startsWith("Bearer ")) {
+                token = authorization.substring(7);
+            } else if (authorization != null) {
+                token = authorization;
+            }
+        }
+        
+        if (token == null || token.trim().isEmpty()) {
+            log.warn("权限验证失败：缺少认证信息");
+            throw new RuntimeException("未授权访问");
         }
         
         Integer userId;

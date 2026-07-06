@@ -7,9 +7,9 @@ WORKDIR /app
 # 复制依赖文件（利用 Docker 缓存层）
 COPY package*.json ./
 
-# 使用 ci 模式安装依赖（严格遵守 package-lock.json）
+# 使用 install 模式安装依赖（允许更新 package-lock.json）
 RUN --mount=type=cache,target=/root/.npm \
-    npm ci --cache /root/.npm
+    npm install --cache /root/.npm
 
 # 复制所有源代码
 COPY . .

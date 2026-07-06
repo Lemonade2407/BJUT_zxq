@@ -1,12 +1,13 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getProjectDetail, starProject, unstarProject, watchProject, unwatchProject, downloadProject, updateProject, deleteProject, getAllProjectFiles, deleteAllProjectFiles, getUploadSignatures, uploadToPresignedUrl, confirmUpload, uploadProjectDocument, deleteProjectDocument, getProjectDocument, getProjectTypes } from '@/api/project'
+import { getProjectDetail, starProject, unstarProject, watchProject, unwatchProject, downloadProject, updateProject, deleteProject, getAllProjectFiles, deleteAllProjectFiles, getUploadSignatures, uploadToPresignedUrl, confirmUpload, deleteProjectDocument, getProjectDocument, getProjectTypes, batchDownloadAsync, cancelDownloadTask } from '@/api/project'
 import { getTagsByCategory } from '@/api/tag'
 import { getActiveCourses } from '@/api/course'
 import { toast } from '@/utils/toast'
-import { error as logError, warn } from '@/utils/logger'
+import { log, error as logError, warn } from '@/utils/logger'
 import tokenManager from '@/utils/tokenManager'
+import request from '@/utils/request'
 import FileTreeItem from '../layout/FileTreeItem.vue'
 import { formatNumber, formatDateShort } from '@/utils/helpers'
 import { useFileTree } from '@/composables/useFileTree'
@@ -154,6 +155,8 @@ const loadProjectDocument = async () => {
         renderWordDocument()
       } else if (isMarkdownDocument()) {
         renderMarkdownDocument()
+      } else if (isTxtDocument()) {
+        renderTxtDocument()
       }
     }
   } catch (error) {
@@ -169,10 +172,14 @@ const handleDocumentFileSelect = (event) => {
   
   // 验证文件类型
   const fileExtension = file.name.split('.').pop().toLowerCase()
-  const allowedExtensions = ['pdf', 'doc', 'docx', 'txt', 'md']
+  const allowedExtensions = ['pdf', 'docx', 'txt', 'md'] // 移除 .doc
   
   if (!allowedExtensions.includes(fileExtension)) {
-    toast.error('不支持的文件类型，仅支持 PDF、Word、TXT、Markdown格式')
+    if (fileExtension === 'doc') {
+      toast.error('不支持旧版 .doc 格式，请使用 Word 另存为 .docx 格式后上传')
+    } else {
+      toast.error('不支持的文件类型，仅支持 PDF、Word(.docx)、TXT、Markdown格式')
+    }
     event.target.value = '' // 清空选择
     return
   }
@@ -180,7 +187,7 @@ const handleDocumentFileSelect = (event) => {
   selectedDocumentFile.value = file
 }
 
-// 上传项目文档
+// 上传项目文档（前端直传 OSS）
 const uploadDocument = async () => {
   if (!selectedDocumentFile.value) {
     toast.warning('请先选择文档文件')
@@ -191,22 +198,45 @@ const uploadDocument = async () => {
   documentUploadProgress.value = 0
   
   try {
-    const res = await uploadProjectDocument(
-      projectId.value,
+    // 1. 获取 OSS 上传签名
+    const sigRes = await getUploadSignatures([
+      { name: selectedDocumentFile.value.name, path: 'documents' }
+    ])
+    
+    if (sigRes.code !== 200 || !sigRes.data || sigRes.data.length === 0) {
+      throw new Error('获取上传签名失败')
+    }
+    
+    const signature = sigRes.data[0]
+    
+    // 2. 前端直传 OSS
+    await uploadToPresignedUrl(
+      signature,
       selectedDocumentFile.value,
-      (progress) => {
-        documentUploadProgress.value = progress
+      (loaded, total) => {
+        documentUploadProgress.value = Math.round((loaded / total) * 100)
       }
     )
     
-    if (res.code === 200 && res.data) {
-      documentUrl.value = res.data
-      // 保存原始文件名
+    // 3. 通知后端保存文档记录
+    const objectKey = signature.objectKey
+    const fullUrl = `${signature.host}/${objectKey}`
+    
+    // 调用后端 API 保存文档 URL
+    const res = await request({
+      url: `/projects/${projectId.value}/files/document/save`,
+      method: 'post',
+      data: {
+        documentUrl: fullUrl,
+        documentName: selectedDocumentFile.value.name
+      }
+    })
+    
+    if (res.code === 200) {
+      documentUrl.value = fullUrl
       documentName.value = selectedDocumentFile.value.name
       selectedDocumentFile.value = null
       toast.success('文档上传成功！')
-      
-      // 不立即渲染，等用户切换到文档标签页时再渲染（懒加载）
       
       // 清空文件选择
       const fileInput = document.getElementById('document-file-input')
@@ -272,6 +302,12 @@ const isWordDocument = () => {
 const isMarkdownDocument = () => {
   if (!documentUrl.value) return false
   return documentUrl.value.toLowerCase().endsWith('.md')
+}
+
+// 判断是否为 TXT 文档
+const isTxtDocument = () => {
+  if (!documentUrl.value) return false
+  return documentUrl.value.toLowerCase().endsWith('.txt')
 }
 
 // 渲染 Word 文档为 HTML
@@ -353,6 +389,32 @@ const renderMarkdownDocument = async () => {
   }
 }
 
+// 渲染 TXT 文档
+const renderTxtDocument = async () => {
+  if (!isTxtDocument()) return
+  
+  isRenderingDocument.value = true
+  try {
+    // 下载 TXT 文件
+    const response = await fetch(documentUrl.value)
+    const text = await response.text()
+    
+    // 将换行符转换为 <br>，并保留空格
+    documentContent.value = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/\n/g, '<br>')
+      .replace(/  /g, '&nbsp;&nbsp;')
+  } catch (error) {
+    logError('渲染 TXT 文档失败:', error)
+    toast.error('TXT 文档渲染失败，请下载后查看')
+    documentContent.value = ''
+  } finally {
+    isRenderingDocument.value = false
+  }
+}
+
 // 切换标签页
 const switchTab = (tab) => {
   activeTab.value = tab
@@ -415,20 +477,67 @@ const toggleFavorite = async () => {
   }
 }
 
-// 下载项目
+// 下载状态（异步下载）
+const isDownloading = ref(false)
+const downloadTargetName = ref('')
+let downloadWsHandler = null
+
+// 取消下载
+const handleCancelDownload = async () => {
+  isDownloading.value = false
+  log('用户取消了下载')
+}
+
+// 下载项目（异步流：创建任务 → WebSocket 推送下载链接）
 const downloadProjectHandler = async () => {
+  if (!project.value) return
+  if (isDownloading.value) return  // 防重复点击
   try {
-    toast.info('正在准备下载...')
-    
-    // 调用真实 API 下载项目（后端会自动增加下载次数）
-    await downloadProject(projectId.value)
-    
-    toast.success('下载成功！')
+    downloadTargetName.value = project.value.name
+    isDownloading.value = true
+
+    // 注册 WebSocket 监听（如果还没注册）
+    if (!downloadWsHandler) {
+      const { default: notificationWS } = await import('@/utils/websocket')
+      downloadWsHandler = (data) => {
+        if (data.type === 'download_complete' && data.downloadUrl) {
+          isDownloading.value = false
+          window.location.href = data.downloadUrl
+          toast.success('下载成功！')
+        } else if (data.type === 'download_failed') {
+          isDownloading.value = false
+          toast.error(data.errorMessage || '下载失败')
+        }
+      }
+      notificationWS.on('message', downloadWsHandler)
+    }
+
+    // 调用异步接口
+    const res = await batchDownloadAsync({
+      projectIds: [projectId.value],
+      className: project.value.courseName || '单项目',
+      courseName: project.value.courseName || ''
+    })
+
+    if (res.code !== 200 || !res.data || !res.data.taskId) {
+      throw new Error('创建下载任务失败')
+    }
+    log('单项目异步下载创建成功，taskId:', res.data.taskId)
   } catch (error) {
-    logError('下载项目失败:', error)
-    toast.error(error.message || '下载失败，请稍后重试')
+    logError('下载失败:', error)
+    isDownloading.value = false
+    toast.error(error.message || '下载失败')
   }
 }
+
+// 清理 WebSocket 监听
+onUnmounted(() => {
+  if (downloadWsHandler) {
+    import('@/utils/websocket').then(({ default: notificationWS }) => {
+      notificationWS.off('message', downloadWsHandler)
+    })
+  }
+})
 
 // 获取作者名称（从标签或分类中推断）
 // 初始化编辑表单
@@ -764,8 +873,24 @@ const handleDrop = (event) => {
 const processFiles = (files) => {
   if (files.length === 0) return
   
-  // OSS 直传支持大文件，无需前端限制大小
-  const validFiles = files
+  // 文件大小限制：5GB
+  const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024 // 5GB in bytes
+  const validFiles = []
+  const invalidFiles = []
+  
+  files.forEach(file => {
+    if (file.size > MAX_FILE_SIZE) {
+      invalidFiles.push(file)
+    } else {
+      validFiles.push(file)
+    }
+  })
+  
+  // 提示超限文件
+  if (invalidFiles.length > 0) {
+    toast.warning(`有 ${invalidFiles.length} 个文件超过 5GB 限制，已自动跳过`)
+    logError('超限文件:', invalidFiles.map(f => `${f.name} (${formatFileSize(f.size)})`))
+  }
   
   // 打印前3个文件的路径信息
   validFiles.forEach((file, index) => {
@@ -920,6 +1045,17 @@ onMounted(() => {
         </div>
       </div>
 
+      <!-- 下载进度遮罩 -->
+      <div v-if="isDownloading" class="download-overlay">
+        <div class="download-card">
+          <div class="spinner-large"></div>
+          <h3>正在打包项目</h3>
+          <p>📦 {{ downloadTargetName }}</p>
+          <p class="download-hint">打包完成后浏览器会自动下载</p>
+          <button class="btn-cancel" @click="handleCancelDownload">取消</button>
+        </div>
+      </div>
+
       <!-- 项目信息 -->
       <div v-if="project" class="project-info-bar">
         <div class="info-item">
@@ -1019,6 +1155,21 @@ onMounted(() => {
               <div v-else-if="documentContent" class="rendered-content markdown-body" v-html="documentContent"></div>
               <div v-else class="render-failed">
                 <p>⚠️ Markdown 文档渲染失败</p>
+                <a :href="documentUrl" target="_blank" class="download-link">
+                  ⬇️ 下载文档
+                </a>
+              </div>
+            </div>
+            
+            <!-- TXT 文档预览 -->
+            <div v-else-if="isTxtDocument()" class="txt-preview">
+              <div v-if="isRenderingDocument" class="rendering-loading">
+                <span class="loading-spinner">⏳</span>
+                <p>正在加载 TXT 文档...</p>
+              </div>
+              <div v-else-if="documentContent" class="rendered-content txt-content" v-html="documentContent"></div>
+              <div v-else class="render-failed">
+                <p>⚠️ TXT 文档加载失败</p>
                 <a :href="documentUrl" target="_blank" class="download-link">
                   ⬇️ 下载文档
                 </a>
@@ -1295,6 +1446,7 @@ onMounted(() => {
                 />
                 <div class="upload-icon">📁</div>
                 <p class="upload-text">点击选择文件或文件夹，或直接拖拽到此处</p>
+                <p class="upload-hint">💡 提示：单个文件最大支持 5GB</p>
               </div>
 
               <!-- 覆盖模式选项（始终显示） -->
@@ -2854,5 +3006,77 @@ onMounted(() => {
   .tabs {
     overflow-x: auto;
   }
+}
+
+/* 下载进度遮罩 */
+.download-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.download-card {
+  background: white;
+  border-radius: 16px;
+  padding: 40px 48px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  min-width: 320px;
+}
+
+.download-card h3 {
+  margin: 16px 0 8px;
+  font-size: 18px;
+  color: #1f2937;
+}
+
+.download-card p {
+  margin: 4px 0;
+  color: #6b7280;
+  font-size: 14px;
+}
+
+.download-hint {
+  font-size: 13px !important;
+  color: #9ca3af !important;
+  margin-top: 12px !important;
+}
+
+.spinner-large {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn-cancel {
+  margin-top: 16px;
+  padding: 8px 24px;
+  background: #fff;
+  color: #ef4444;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all .2s;
+}
+
+.btn-cancel:hover {
+  background: #fef2f2;
+  border-color: #fca5a5;
 }
 </style>

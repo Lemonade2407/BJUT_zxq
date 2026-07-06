@@ -11,8 +11,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayOutputStream;
+import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Date;
@@ -101,6 +103,10 @@ public class OssUtil {
      */
     public String upload(MultipartFile file, String directory) throws IOException {
         try {
+            // 调试：打印当前系统时间
+            java.time.Instant now = java.time.Instant.now();
+            log.info("OSS 上传开始 - 系统时间 (UTC): {}", now.toString());
+            
             // 获取原始文件名和后缀
             String originalFilename = file.getOriginalFilename();
             if (originalFilename == null || originalFilename.trim().isEmpty()) {
@@ -157,7 +163,30 @@ public class OssUtil {
             throw new IOException("OSS 上传失败: " + e.getMessage(), e);
         }
     }
-    
+
+    /**
+     * 上传本地文件到 OSS（用于批量下载 ZIP 等场景）
+     * @param filePath 本地文件路径
+     * @param directory OSS 目录
+     * @return 文件访问 URL
+     */
+    public String uploadFile(Path filePath, String directory) throws IOException {
+        String originalName = filePath.getFileName().toString();
+        String datePath = LocalDate.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        String objectName = directory + "/" + datePath + "/" + originalName;
+
+        try (FileInputStream fis = new FileInputStream(filePath.toFile())) {
+            ossClient.putObject(bucketName, objectName, fis);
+        } catch (Exception e) {
+            log.error("上传本地文件到 OSS 失败: {}", e.getMessage(), e);
+            throw new IOException("上传本地文件到 OSS 失败: " + e.getMessage(), e);
+        }
+
+        String accessUrl = getFileAccessUrl(objectName);
+        log.info("本地文件已上传到 OSS: {} → {}", filePath, accessUrl);
+        return accessUrl;
+    }
+
     /**
      * 获取文件扩展名
      */
@@ -236,7 +265,7 @@ public class OssUtil {
      * @param fileUrl 文件 URL
      * @return ObjectName
      */
-    private String extractObjectName(String fileUrl) {
+    public String extractObjectName(String fileUrl) {
         // 尝试从 CDN 域名提取
         if (cdnEnabled && cdnDomain != null && !cdnDomain.isEmpty() && fileUrl.startsWith(cdnDomain)) {
             return fileUrl.substring(cdnDomain.length() + 1);
@@ -291,6 +320,37 @@ public class OssUtil {
         } catch (Exception e) {
             log.error("从 OSS 下载文件失败: {}, 错误: {}", fileUrl, e.getMessage());
             throw new IOException("OSS 下载失败: " + e.getMessage(), e);
+        }
+    }
+    
+    /**
+     * 从 OSS 流式下载文件 - 减少内存占用
+     * @param fileUrl 文件的完整 URL
+     * @return InputStream（调用者负责关闭）
+     * @throws IOException 下载失败时抛出
+     */
+    public java.io.InputStream downloadStream(String fileUrl) throws IOException {
+        if (fileUrl == null || fileUrl.trim().isEmpty()) {
+            throw new IOException("文件 URL 不能为空");
+        }
+        
+        try {
+            // 从 URL 中提取 ObjectName
+            String objectName = extractObjectName(fileUrl);
+            if (objectName == null || objectName.isEmpty()) {
+                throw new IOException("无法解析 ObjectName: " + fileUrl);
+            }
+            
+            log.debug("开始从 OSS 流式下载文件: {}", objectName);
+            
+            // 使用单例 OSSClient 获取 OSS 对象
+            OSSObject ossObject = ossClient.getObject(bucketName, objectName);
+            
+            // 直接返回输入流（调用者负责关闭）
+            return ossObject.getObjectContent();
+        } catch (Exception e) {
+            log.error("从 OSS 流式下载文件失败: {}, 错误: {}", fileUrl, e.getMessage());
+            throw new IOException("OSS 流式下载失败: " + e.getMessage(), e);
         }
     }
     
@@ -356,9 +416,22 @@ public class OssUtil {
      * 签名算法：base64(hmac-sha1(accessKeySecret, base64(policy)))
      */
     public Map<String, String> generatePostSignature(String objectKey) {
-        long expireEnd = System.currentTimeMillis() + 600 * 1000;
-        String expireStr = new java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
-            .format(new Date(expireEnd));
+        // 使用 Instant 获取当前 UTC 时间
+        java.time.Instant now = java.time.Instant.now();
+        
+        // 调试：打印当前时间
+        log.info("OSS 签名 - Instant.now(): {}", now.toString());
+        
+        // 添加 10 分钟过期时间
+        java.time.Instant expireInstant = now.plusSeconds(600);
+        
+        // 格式化为 ISO 8601 UTC 时间字符串
+        String expireStr = expireInstant.toString();
+        
+        // 确保格式符合阿里云要求：yyyy-MM-dd'T'HH:mm:ss.SSS'Z'
+        if (!expireStr.endsWith("Z")) {
+            expireStr = expireStr + "Z";
+        }
 
         String policy = "{\"expiration\":\"" + expireStr + "\"," +
             "\"conditions\":[" +
@@ -400,6 +473,29 @@ public class OssUtil {
         String uuid = UUID.randomUUID().toString().replace("-", "");
         String ext = getFileExtension(originalFilename);
         return fileHost + "/" + datePath + "/" + uuid + (ext.isEmpty() ? "" : "." + ext);
+    }
+    
+    /**
+     * 生成预签名 GET URL（用于前端直接下载 OSS 文件）
+     * @param objectKey OSS 对象路径
+     * @param expireSeconds 过期时间（秒），默认 3600 秒（1小时）
+     * @return 预签名 URL，前端可直接访问下载
+     */
+    public String generatePresignedUrl(String objectKey, int expireSeconds) {
+        if (expireSeconds <= 0) {
+            expireSeconds = 3600; // 默认 1 小时
+        }
+        
+        try {
+            Date expiration = new Date(System.currentTimeMillis() + expireSeconds * 1000L);
+            java.net.URL url = ossClient.generatePresignedUrl(bucketName, objectKey, expiration);
+            String presignedUrl = url.toString();
+            log.debug("生成预签名 URL: {}", presignedUrl);
+            return presignedUrl;
+        } catch (Exception e) {
+            log.error("生成预签名 URL 失败: {}", e.getMessage(), e);
+            throw new RuntimeException("生成预签名 URL 失败: " + e.getMessage(), e);
+        }
     }
 }
 

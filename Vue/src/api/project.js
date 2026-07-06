@@ -192,7 +192,41 @@ export async function downloadProject(projectId) {
   window.URL.revokeObjectURL(downloadUrl)
 }
 
-// 批量下载学生项目（教师专用）
+// 批量下载学生项目（教师专用）- 获取预签名 URL 列表
+export function getBatchDownloadUrls(data) {
+  return request({
+    url: '/projects/batch-download-urls',
+    method: 'post',
+    data
+  })
+}
+
+// 异步批量下载（服务器端打包 ZIP → 上传 OSS → WebSocket 推送下载链接）
+export function batchDownloadAsync(data) {
+  return request({
+    url: '/projects/batch-download-async',
+    method: 'post',
+    data
+  })
+}
+
+// 查询批量下载任务状态（页面刷新后恢复进度）
+export function getDownloadTaskStatus(taskId) {
+  return request({
+    url: `/projects/download/task/${taskId}`,
+    method: 'get'
+  })
+}
+
+// 取消批量下载任务
+export function cancelDownloadTask(taskId) {
+  return request({
+    url: `/projects/download/task/${taskId}/cancel`,
+    method: 'post'
+  })
+}
+
+// 批量下载学生项目（教师专用）- 旧接口，保留兼容
 export async function batchDownloadProjects(data) {
   const baseUrl = import.meta.env.VITE_API_BASE_URL || '/api'
   const response = await fetch(`${baseUrl}/projects/batch-download`, {
@@ -228,26 +262,6 @@ export function getAllProjectFiles(projectId) {
 }
 
 // ==================== 项目文档相关 API ====================
-
-// 上传项目文档
-export function uploadProjectDocument(projectId, file, onProgress = null) {
-  const formData = new FormData()
-  formData.append('file', file)
-  
-  return request({
-    url: `/projects/${projectId}/files/document/upload`,
-    method: 'post',
-    data: formData,
-    headers: {
-      'Content-Type': 'multipart/form-data'
-    },
-    timeout: 120000, // 文档上传超时时间设置为2分钟（120秒）
-    onUploadProgress: onProgress ? (progressEvent) => {
-      const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total)
-      onProgress(percentCompleted)
-    } : undefined
-  })
-}
 
 // 删除项目文档
 export function deleteProjectDocument(projectId) {

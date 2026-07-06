@@ -83,4 +83,9 @@ public class User {
      * 用户角色
      */
     private Role role;
+
+    /**
+     * 密码强度: WEAK / MEDIUM / STRONG / VERY_STRONG（null 表示旧数据需强制改密）
+     */
+    private String passwordStrength;
 }

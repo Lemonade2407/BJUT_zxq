@@ -125,13 +125,13 @@ const validatePassword = () => {
     errors.password = '密码不能为空'
     return false
   }
-  if (registerForm.password.length < 6 || registerForm.password.length > 20) {
-    errors.password = '密码长度应为 6-20 位'
+  if (registerForm.password.length < 8 || registerForm.password.length > 32) {
+    errors.password = '密码长度应为 8-32 位'
     return false
   }
-  // 密码必须包含字母和数字
-  if (!/^(?=.*[a-zA-Z])(?=.*\d).+$/.test(registerForm.password)) {
-    errors.password = '密码必须包含字母和数字'
+  // 密码必须包含大小写字母和数字
+  if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).+$/.test(registerForm.password)) {
+    errors.password = '密码必须包含大小写字母和数字'
     return false
   }
   errors.password = ''
@@ -298,7 +298,12 @@ const handleRegister = async () => {
     }
   } catch (error) {
     console.error('注册失败:', error)
-    errorMessage.value = error.message || '注册失败，请稍后重试'
+    const msg = error.message || '注册失败，请稍后重试'
+    errorMessage.value = msg
+    // 密码强度相关错误同步显示在密码框下方
+    if (msg.includes('密码强度') || msg.includes('密码必须') || msg.includes('密码长度')) {
+      errors.password = msg
+    }
     // 刷新验证码
     fetchCaptcha()
     registerForm.captchaCode = ''
@@ -470,7 +475,7 @@ const getStrengthColor = (level) => {
               :type="showPassword ? 'text' : 'password'"
               class="form-input"
               :class="{ error: errors.password }"
-              placeholder="请输入密码（6-20位，含字母和数字）"
+              placeholder="至少8位，含大小写字母和数字"
               @blur="validatePassword"
               @input="clearError('password'); checkStrength()"
             />

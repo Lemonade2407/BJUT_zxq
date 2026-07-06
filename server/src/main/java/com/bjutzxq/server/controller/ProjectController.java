@@ -34,6 +34,9 @@ public class ProjectController {
     @Autowired
     private ProjectService projectService;
     
+    @Autowired
+    private com.bjutzxq.server.handler.NotificationWebSocketHandler webSocketHandler;
+    
 
     /**
      * 创建项目
@@ -433,15 +436,130 @@ public class ProjectController {
         
         return ResponseEntity.ok()
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
-                .header(HttpHeaders.CONTENT_DISPOSITION, 
-                        "attachment; filename=\"" + fileName + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + URLEncoder.encode(fileName, StandardCharsets.UTF_8))
                 .body(resource);
     }
     
     /**
-     * 批量下载学生项目（教师专用）
-     * POST /api/projects/batch-download
+     * 批量下载学生项目（教师专用）- 返回预签名 URL 列表
+     * POST /api/projects/batch-download-urls
      */
+    @PostMapping("/batch-download-urls")
+    @CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"}, 
+                 allowedHeaders = "*", 
+                 allowCredentials = "true",
+                 methods = {RequestMethod.POST, RequestMethod.OPTIONS})
+    public Result<List<Map<String, String>>> getBatchDownloadUrls(
+            @Valid @RequestBody BatchDownloadDTO batchRequest) {
+        log.info("收到批量下载 URL 请求，项目数量: {}, 班级: {}, 课程: {}", 
+                batchRequest.getProjectIds().size(), 
+                batchRequest.getClassName(), 
+                batchRequest.getCourseName());
+        
+        // 1. 获取当前用户 ID 并验证是否为教师
+        Integer userId = UserIdContext.getCurrentUserId();
+        
+        com.bjutzxq.pojo.entity.User user = projectService.getUserById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        
+        if (user.getRole() != com.bjutzxq.common.Role.TEACHER) {
+            throw new RuntimeException("只有教师才能批量下载项目");
+        }
+        
+        // 2. 生成所有文件的预签名 URL
+        List<Map<String, String>> fileUrls = projectService.generateBatchDownloadUrls(
+            batchRequest.getProjectIds(),
+            batchRequest.getClassName(),
+            batchRequest.getCourseName()
+        );
+        
+        log.info("批量下载 URL 生成成功，文件数量: {}", fileUrls.size());
+        return Result.success("生成成功", fileUrls);
+    }
+
+    /**
+     * 异步批量下载学生项目（教师专用）
+     * POST /api/projects/batch-download-async
+     * 立即返回 taskId，后台打包上传 OSS 后通过 WebSocket 推送下载链接
+     */
+    @PostMapping("/batch-download-async")
+    @CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"},
+                 allowedHeaders = "*",
+                 allowCredentials = "true",
+                 methods = {RequestMethod.POST, RequestMethod.OPTIONS})
+    public Result<Map<String, String>> batchDownloadAsync(
+            @Valid @RequestBody BatchDownloadDTO batchRequest) {
+        log.info("收到异步批量下载请求，项目数量: {}, 班级: {}, 课程: {}",
+                batchRequest.getProjectIds().size(),
+                batchRequest.getClassName(),
+                batchRequest.getCourseName());
+
+        Integer userId = UserIdContext.getCurrentUserId();
+        com.bjutzxq.pojo.entity.User user = projectService.getUserById(userId);
+        if (user == null) {
+            throw new RuntimeException("用户不存在");
+        }
+        // 非教师用户仅允许下载自己的单个项目
+        if (user.getRole() != com.bjutzxq.common.Role.TEACHER) {
+            if (batchRequest.getProjectIds().size() != 1) {
+                throw new RuntimeException("只有教师才能批量下载项目");
+            }
+            com.bjutzxq.pojo.entity.Project project =
+                    projectService.selectById(batchRequest.getProjectIds().get(0));
+            if (project == null || !project.getOwnerId().equals(userId)) {
+                throw new RuntimeException("只能下载自己的项目");
+            }
+        }
+
+        String className = batchRequest.getClassName() != null
+                ? batchRequest.getClassName() : "未知班级";
+        String courseName = batchRequest.getCourseName() != null
+                ? batchRequest.getCourseName() : "未知课程";
+
+        String taskId = projectService.startAsyncBatchDownload(
+                batchRequest.getProjectIds(), className, courseName, userId);
+
+        log.info("异步批量下载任务已启动，taskId: {}", taskId);
+        return Result.success("任务已创建", Map.of("taskId", taskId));
+    }
+
+    /**
+     * 查询批量下载任务状态（供前端刷新后恢复进度）
+     * GET /api/projects/download/task/{taskId}
+     */
+    @GetMapping("/download/task/{taskId}")
+    public Result<?> getDownloadTaskStatus(@PathVariable String taskId) {
+        com.bjutzxq.server.service.ProjectService.DownloadTaskInfo taskInfo =
+                projectService.getDownloadTaskStatus(taskId);
+
+        if (taskInfo == null) {
+            return Result.error(404, "任务不存在或已过期");
+        }
+        return Result.success("查询成功", taskInfo);
+    }
+
+    /**
+     * 取消批量下载任务
+     * POST /api/projects/download/task/{taskId}/cancel
+     */
+    @PostMapping("/download/task/{taskId}/cancel")
+    public Result<?> cancelDownloadTask(@PathVariable String taskId) {
+        boolean cancelled = projectService.cancelDownloadTask(taskId);
+        if (!cancelled) {
+            return Result.error(400, "任务不存在或已完成，无法取消");
+        }
+        return Result.success("任务已取消");
+    }
+
+    /**
+     * 批量下载学生项目（教师专用）- 旧接口，保留兼容
+     * POST /api/projects/batch-download
+     * @deprecated 建议使用 /batch-download-urls 接口，前端使用 JSZip 打包
+     */
+    @Deprecated
     @PostMapping("/batch-download")
     @CrossOrigin(origins = {"http://localhost:5173", "http://127.0.0.1:5173"}, 
                  allowedHeaders = "*", 
@@ -466,13 +584,19 @@ public class ProjectController {
             throw new RuntimeException("只有教师才能批量下载项目");
         }
         
-        // 2. 批量打包项目（验证已由 @Valid 处理）
+        // 2. 生成任务 ID（用于前端识别）
+        String taskId = "batch_download_" + System.currentTimeMillis();
+        
+        // 3. 批量打包项目（验证已由 @Valid 处理）
         String className = batchRequest.getClassName() != null ? batchRequest.getClassName() : "未知班级";
         String courseName = batchRequest.getCourseName() != null ? batchRequest.getCourseName() : "未知课程";
         Path zipPath = projectService.batchPackageProjects(
             batchRequest.getProjectIds(), 
             className, 
-            courseName
+            courseName,
+            userId,
+            taskId,
+            webSocketHandler
         );
         
         if (zipPath == null || !Files.exists(zipPath)) {

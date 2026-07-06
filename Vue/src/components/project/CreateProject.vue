@@ -1,7 +1,7 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { createProject, getUploadSignatures, uploadToPresignedUrl, confirmUpload, uploadProjectDocument, getProjectTypes } from '@/api/project'
+import { createProject, getUploadSignatures, uploadToPresignedUrl, confirmUpload, getProjectTypes } from '@/api/project'
 import { getTagsByCategory } from '@/api/tag'
 import { getActiveCourses } from '@/api/course'
 import { useFileTree } from '@/composables/useFileTree'
@@ -232,12 +232,34 @@ const validateForm = () => {
       const projectId = res.data.id
       log('项目已创建，ID:', projectId)
 
-      // 2. 上传项目文档（走专用接口，存入项目 document_url 字段）
+      // 2. 上传项目文档（前端直传 OSS）
       if (documentFile.value) {
         try {
-          const docRes = await uploadProjectDocument(projectId, documentFile.value)
-          if (docRes.code !== 200) {
-            toast.warning('项目文档上传失败：' + (docRes.message || '未知错误'))
+          // 获取 OSS 签名
+          const sigRes = await getUploadSignatures([
+            { name: documentFile.value.name, path: 'documents' }
+          ])
+          
+          if (sigRes.code === 200 && sigRes.data && sigRes.data.length > 0) {
+            const signature = sigRes.data[0]
+            
+            // 直传 OSS
+            await uploadToPresignedUrl(signature, documentFile.value)
+            
+            // 通知后端保存文档 URL
+            const objectKey = signature.objectKey
+            const fullUrl = `${signature.host}/${objectKey}`
+            
+            await request({
+              url: `/projects/${projectId}/files/document/save`,
+              method: 'post',
+              data: {
+                documentUrl: fullUrl,
+                documentName: documentFile.value.name
+              }
+            })
+          } else {
+            toast.warning('项目文档上传失败：获取签名失败')
           }
         } catch (e) {
           toast.warning('项目文档上传失败：' + (e.message || '未知错误'))
@@ -391,8 +413,24 @@ const processFiles = (files) => {
   
   log('拖拽的文件数量:', files.length)
   
-  // OSS 直传支持大文件，无需前端限制大小
-  const validFiles = files
+  // 文件大小限制：5GB
+  const MAX_FILE_SIZE = 5 * 1024 * 1024 * 1024 // 5GB in bytes
+  const validFiles = []
+  const invalidFiles = []
+  
+  files.forEach(file => {
+    if (file.size > MAX_FILE_SIZE) {
+      invalidFiles.push(file)
+    } else {
+      validFiles.push(file)
+    }
+  })
+  
+  // 提示超限文件
+  if (invalidFiles.length > 0) {
+    toast.warning(`有 ${invalidFiles.length} 个文件超过 5GB 限制，已自动跳过`)
+    logError('超限文件:', invalidFiles.map(f => `${f.name} (${formatFileSize(f.size)})`))
+  }
   
   // 打印前3个文件的路径信息
   validFiles.forEach((file, index) => {
@@ -718,7 +756,7 @@ onMounted(() => {
               />
               <div class="upload-icon">📁</div>
               <p class="upload-text">点击选择文件或文件夹，或直接拖拽到此处</p>
-              <p class="upload-hint">支持批量上传文件和整个文件夹，单个文件不超过 100MB（大文件自动分片上传）</p>
+              <p class="upload-hint">💡 提示：单个文件最大支持 5GB</p>
             </div>
 
             <!-- 文件列表 -->

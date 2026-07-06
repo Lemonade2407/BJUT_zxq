@@ -109,6 +109,12 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(Exception.class)
     @ResponseStatus(HttpStatus.INTERNAL_SERVER_ERROR)
     public Result<Void> handleException(Exception e) {
+        // Broken pipe 是客户端断开连接，属于正常现象，降低日志级别
+        if (e.getMessage() != null && e.getMessage().contains("Broken pipe")) {
+            log.warn("客户端断开连接：{}", e.getMessage());
+            return Result.error(500, "下载已取消");
+        }
+        
         // 生产环境不返回详细错误信息，避免泄露系统细节
         log.error("服务器内部错误：{}", e.getMessage(), e);
         return Result.error(500, "服务器内部错误，请联系管理员");

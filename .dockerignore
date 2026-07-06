@@ -49,7 +49,7 @@ FRONTEND_OPTIMIZATION.md
 
 # Deployment scripts (不需要打包到镜像中)
 deploy.sh
-deploy.ps1
+服务器版deploy.ps1
 *.sh
 *.ps1
 

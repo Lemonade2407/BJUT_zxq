@@ -18,11 +18,11 @@ public class RegisterDTO {
     private String username;
     
     /**
-     * 密码
+     * 密码（至少 8 位，含大小写字母和数字）
      */
     @NotBlank(message = "密码不能为空")
-    @Size(min = 6, max = 20, message = "密码长度应为 6-20 位")
-    @Pattern(regexp = "^(?=.*[a-zA-Z])(?=.*\\d).+$", message = "密码必须包含字母和数字")
+    @Size(min = 8, max = 32, message = "密码长度应为 8-32 位")
+    @Pattern(regexp = "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d).+$", message = "密码必须包含大小写字母和数字")
     private String password;
     
     /**

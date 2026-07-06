@@ -25,6 +25,12 @@ FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
+# 设置容器时区为 Asia/Shanghai（与阿里云 OSS 北京区域保持一致）
+ENV TZ=Asia/Shanghai
+RUN apk add --no-cache tzdata && \
+    cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime && \
+    echo "Asia/Shanghai" > /etc/timezone
+
 # 从构建阶段复制jar包
 COPY --from=builder /app/server/target/*.jar app.jar
 
@@ -39,7 +45,9 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:8080/api/actuator/health || exit 1
 
 # 启动应用（优化 JVM 参数）
+# 注意：设置时区为 Asia/Shanghai，与阿里云 OSS 北京区域保持一致
 ENTRYPOINT ["java", \
+  "-Duser.timezone=Asia/Shanghai", \
   "-XX:+UseContainerSupport", \
   "-XX:MaxRAMPercentage=75.0", \
   "-XX:+UseG1GC", \

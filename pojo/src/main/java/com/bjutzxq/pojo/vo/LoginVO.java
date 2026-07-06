@@ -42,4 +42,9 @@ public class LoginVO {
      * Token 过期时间（秒）
      */
     private Long expiresIn;
+
+    /**
+     * 是否需要强制修改密码（密码为弱密码或旧数据）
+     */
+    private Boolean mustChangePassword;
 }

@@ -16,9 +16,9 @@ const currentPageNum = ref(1)
 
 // 筛选条件
 const filters = ref({
-  projectType: '',  // 项目类型
-  courseName: '',   // 课程名称
-  tagId: null       // 标签ID
+  projectType: '',   // 项目类型
+  courseName: '',    // 课程名称
+  tagIds: []         // 标签ID列表（支持多选）
 })
 
 // 排序方式
@@ -143,9 +143,10 @@ const loadCourseList = async () => {
 // 加载标签列表
 const loadTags = async () => {
   try {
-    const res = await getTags()
+    const res = await getTags({ pageSize: 100 }) // 获取更多标签
     if (res.code === 200 && res.data) {
-      tagList.value = res.data
+      // 处理分页数据结构
+      tagList.value = res.data.records || res.data.list || res.data || []
     }
   } catch (error) {
     logError('加载标签列表失败:', error)
@@ -196,10 +197,12 @@ const handleFavoriteProject = (project) => {
 
 // 切换页码
 const changePage = (page) => {
-  if (page >= 1 && page <= totalPages) {
+  if (page >= 1 && page <= totalPages.value) {
     currentPageNum.value = page
     // 滚动到顶部
     window.scrollTo({ top: 0, behavior: 'smooth' })
+    // 重新获取数据
+    fetchProjects()
   }
 }
 

@@ -26,6 +26,8 @@ const errors = reactive({
 const isLoading = ref(false)
 const showPassword = ref(false)
 const errorMessage = ref('')
+const isLocked = ref(false)
+const lockMessage = ref('')
 
 // 验证用户名
 const validateUsername = () => {
@@ -83,7 +85,14 @@ const handleLogin = async () => {
       }
       
       tokenManager.saveUserInfo(userInfo)
-      
+
+      // 弱密码强制跳转改密
+      if (loginData.mustChangePassword) {
+        toast.warning('您的密码强度不足，为了账户安全，请修改密码')
+        await router.replace('/profile?mustChangePassword=true')
+        return
+      }
+
       // 登录成功,根据角色跳转到不同页面
       const userRole = loginData.role
       let redirect = route.query.redirect
@@ -96,13 +105,21 @@ const handleLogin = async () => {
           redirect = '/home'
         }
       }
-      
+
       await router.replace(redirect)
     }
   } catch (err) {
     logError('登录失败:', err)
-    toast.error(err.message || '登录失败，请检查用户名和密码')
-    errorMessage.value = err.message || '登录失败，请检查用户名和密码'
+    const msg = err.message || '登录失败，请检查用户名和密码'
+    // 暴力破解锁定：显示红色警告，禁用按钮
+    if (msg.includes('登录失败次数过多')) {
+      isLocked.value = true
+      lockMessage.value = msg
+      toast.error('账户已被临时锁定')
+    } else {
+      toast.error(msg)
+    }
+    errorMessage.value = msg
   } finally {
     isLoading.value = false
   }
@@ -121,6 +138,8 @@ const clearError = (field) => {
     errors.password = ''
   }
   errorMessage.value = ''
+  isLocked.value = false
+  lockMessage.value = ''
 }
 
 // 组件挂载时加载记住的用户名
@@ -221,8 +240,19 @@ const goToRegister = () => {
           <a href="#" class="forgot-link">忘记密码？</a>
         </div>
 
+        <!-- 暴力破解锁定提示 -->
+        <div v-if="isLocked" class="lockout-banner">
+          <svg class="lockout-icon" viewBox="0 0 16 16" width="18" height="18">
+            <path d="M8 1a3.5 3.5 0 00-3.5 3.5V7H3a1 1 0 00-1 1v5a1 1 0 001 1h10a1 1 0 001-1V8a1 1 0 00-1-1h-1.5V4.5A3.5 3.5 0 008 1zm2.5 6h-5V4.5a2.5 2.5 0 015 0V7z"/>
+          </svg>
+          <div class="lockout-text">
+            <strong>账户已被临时锁定</strong>
+            <span>{{ lockMessage }}</span>
+          </div>
+        </div>
+
         <!-- 错误提示 -->
-        <div v-if="errorMessage" class="global-error">
+        <div v-else-if="errorMessage" class="global-error">
           <svg class="error-icon" viewBox="0 0 16 16" width="16" height="16">
             <path d="M8 16A8 8 0 108 0a8 8 0 000 8zm1-4.5V6H7v5.5h2zm0-7V3H7v1.5h2z"/>
           </svg>
@@ -230,7 +260,7 @@ const goToRegister = () => {
         </div>
 
         <!-- 登录按钮 -->
-        <button type="submit" class="login-button" :disabled="isLoading">
+        <button type="submit" class="login-button" :disabled="isLoading || isLocked">
           <span v-if="!isLoading">登 录</span>
           <span v-else class="loading-spinner">
             <svg class="spinner" viewBox="0 0 16 16" width="16" height="16">
@@ -451,6 +481,34 @@ const goToRegister = () => {
 .error-icon {
   fill: #d93025;
   flex-shrink: 0;
+}
+
+/* 暴力破解锁定横幅 */
+.lockout-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 16px;
+  background: #fef2f2;
+  border: 2px solid #ef4444;
+  border-radius: 8px;
+  color: #991b1b;
+  font-size: 13px;
+}
+
+.lockout-icon {
+  fill: #ef4444;
+  flex-shrink: 0;
+}
+
+.lockout-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.lockout-text strong {
+  font-size: 14px;
 }
 
 /* 登录按钮 */

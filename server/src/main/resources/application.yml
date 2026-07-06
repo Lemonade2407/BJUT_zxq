@@ -11,9 +11,9 @@ spring:
   
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://60.205.210.11:3306/bjut_zxq?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: BJUT-zxq2026
+    url: jdbc:mysql://${DB_HOST:localhost}:${DB_PORT:3306}/${DB_NAME:bjut_zxq}?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
       
     # HikariCP 连接池配置
     hikari:
@@ -53,11 +53,13 @@ spring:
     time-zone: Asia/Shanghai
     serialization:
       write-dates-as-timestamps: false
+    # 自动注册 Java 8 时间模块
+    default-property-inclusion: non_null
   
   servlet:
     multipart:
-      max-file-size: 100MB
-      max-request-size: 500MB
+      max-file-size: 5GB  # 单文件最大 5GB
+      max-request-size: 10GB  # 总请求最大 10GB
 
 mybatis:
   mapper-locations: classpath:mapper/*.xml
@@ -118,5 +120,5 @@ jwt:
 # 文件上传配置
 file:
   upload:
-    max-size: 104857600  # 100MB（文件已改为 OSS 直传）
+    max-size: 5368709120  # 5GB (5 * 1024 * 1024 * 1024)
     allowed-types: "*"  # 支持所有文件类型
