@@ -13,6 +13,8 @@ import com.bjutzxq.server.util.DtoConverter;
 import com.bjutzxq.server.util.JwtUtil;
 import com.bjutzxq.server.util.PasswordStrengthUtil;
 import com.bjutzxq.server.util.RegistrationRateLimiter;
+import com.bjutzxq.server.util.RefreshTokenStore;
+import com.bjutzxq.server.util.TokenVersionManager;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
@@ -31,15 +33,21 @@ import java.util.Map;
 @RestController
 @RequestMapping("/auth")
 public class AuthController {
-    
+
     @Autowired
     private UserService userService;
 
     @Autowired
     private StatisticsService statisticsService;
 
+    @Autowired
+    private RefreshTokenStore refreshTokenStore;
+
+    @Autowired
+    private TokenVersionManager tokenVersionManager;
+
     private static final String TOKEN_COOKIE = "auth_token";
-    private static final int COOKIE_MAX_AGE = (int)(Constants.JWT.TOKEN_EXPIRE_TIME / 1000);
+    private static final int COOKIE_MAX_AGE = (int)(Constants.JWT.ACCESS_TOKEN_EXPIRE / 1000);
 
     private void setTokenCookie(HttpServletResponse response, String token) {
         Cookie cookie = new Cookie(TOKEN_COOKIE, token);
@@ -154,7 +162,7 @@ public class AuthController {
         log.info("收到登录请求，用户名：{}", username);
 
         LoginVO loginInfo = userService.login(username.trim(), password);
-        setTokenCookie(response, loginInfo.getToken());
+        setTokenCookie(response, loginInfo.getAccessToken());
         log.info("用户登录成功：{}", username);
         return Result.success("登录成功", loginInfo);
     }
@@ -164,43 +172,70 @@ public class AuthController {
      * POST /api/auth/logout
      */
     @PostMapping("/logout")
-    public Result<Void> logout(HttpServletResponse response) {
+    public Result<Void> logout(
+            @RequestBody(required = false) Map<String, String> body,
+            HttpServletResponse response) {
         log.info("用户退出登录");
+
+        // 可选：吊销 Refresh Token
+        if (body != null && body.containsKey("refreshToken")) {
+            try {
+                refreshTokenStore.consumeToken(body.get("refreshToken"));
+            } catch (Exception e) {
+                log.warn("吊销 Refresh Token 失败: {}", e.getMessage());
+            }
+        }
+
         clearTokenCookie(response);
         return Result.success("退出成功", null);
+    }
+
+    /**
+     * 退出所有设备（使所有 token 失效）
+     * POST /api/auth/logout-all
+     */
+    @PostMapping("/logout-all")
+    public Result<Void> logoutAll(HttpServletResponse response) {
+        Integer userId = UserIdContext.getCurrentUserId();
+        if (userId == null) {
+            throw new RuntimeException("用户未登录");
+        }
+
+        // 递增版本号使所有 access token 失效
+        tokenVersionManager.incrementVersion(userId);
+        // 删除所有 refresh token
+        refreshTokenStore.deleteAllForUser(userId);
+
+        clearTokenCookie(response);
+        log.info("用户已退出所有设备，ID: {}", userId);
+        return Result.success("已退出所有设备", null);
     }
     
     /**
      * 刷新 Token
      * POST /api/auth/refresh
+     * 使用 Refresh Token 换取新的 Access Token + Refresh Token
      */
     @PostMapping("/refresh")
     public Result<Map<String, Object>> refreshToken(
-            @CookieValue(value = "auth_token", required = false) String cookieToken,
-            @RequestHeader(value = "Authorization", required = false) String authorization,
+            @RequestBody Map<String, String> body,
             HttpServletResponse response) {
         log.info("请求刷新 Token");
 
-        String token = null;
-        if (cookieToken != null && !cookieToken.isEmpty()) {
-            token = cookieToken;
-        } else if (authorization != null && authorization.startsWith("Bearer ")) {
-            token = authorization.substring(7);
+        String refreshToken = body != null ? body.get("refreshToken") : null;
+        if (refreshToken == null || refreshToken.trim().isEmpty()) {
+            throw new IllegalArgumentException("缺少 refreshToken");
         }
 
-        if (token == null || !JwtUtil.validateToken(token)) {
-            throw new io.jsonwebtoken.JwtException("Token 无效");
-        }
-
-        String newToken = JwtUtil.refreshToken(token);
-        setTokenCookie(response, newToken);
-
-        log.info("Token 刷新成功");
+        JwtUtil.TokenPair pair = JwtUtil.refreshAccessToken(refreshToken.trim());
+        setTokenCookie(response, pair.getAccessToken());
 
         Map<String, Object> result = new HashMap<>();
-        result.put("token", newToken);
-        result.put("expiresIn", Constants.JWT.TOKEN_EXPIRE_TIME / 1000);
+        result.put("accessToken", pair.getAccessToken());
+        result.put("refreshToken", pair.getRefreshToken());
+        result.put("expiresIn", pair.getExpiresIn());
 
+        log.info("Token 刷新成功");
         return Result.success("Token 刷新成功", result);
     }
     

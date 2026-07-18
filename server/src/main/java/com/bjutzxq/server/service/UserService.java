@@ -14,6 +14,7 @@ import com.bjutzxq.server.util.JwtUtil;
 import com.bjutzxq.server.util.OssUtil;
 import com.bjutzxq.server.util.PasswordStrengthUtil;
 import com.bjutzxq.server.util.PasswordUtil;
+import com.bjutzxq.server.util.TokenVersionManager;
 
 import java.util.concurrent.TimeUnit;
 import com.github.pagehelper.PageHelper;
@@ -47,8 +48,10 @@ public class UserService {
     private OssUtil ossUtil;
     
     @Autowired
+    private TokenVersionManager tokenVersionManager;
+
+    @Autowired
     private org.springframework.data.redis.core.StringRedisTemplate redisTemplate;
-    
 
     /**
      * 用户注册
@@ -170,16 +173,13 @@ public class UserService {
         // 登录成功，清除失败计数
         redisTemplate.delete(lockKey);
 
-        // 生成 Token
-        String token = JwtUtil.generateToken(user.getId(), user.getUsername(), user.getAvatar());
-
-        // 清除用户的刷新计数（重新登录后重置）
-        JwtUtil.clearRefreshCount(user.getId());
+        // 生成 Token 对（Access Token + Refresh Token）
+        JwtUtil.TokenPair tokenPair = JwtUtil.generateTokenPair(user.getId());
 
         log.info("用户登录成功：{}, ID: {}", username, user.getId());
 
         // 使用工具类构建 LoginResponse DTO（包含 mustChangePassword 标记）
-        return DtoConverter.buildLoginResponse(user, token);
+        return DtoConverter.buildLoginResponse(user, tokenPair.getAccessToken(), tokenPair.getRefreshToken());
     }
 
     /**
@@ -300,6 +300,9 @@ public class UserService {
         user.setPassword(encodedNewPassword);
 
         userMapper.update(user);
+
+        // 递增 token 版本号，使所有旧 token 失效
+        tokenVersionManager.incrementVersion(userId);
 
         log.info("密码修改成功，ID：{}, 强度: {}", userId, strength.level().name());
     }

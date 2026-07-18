@@ -66,19 +66,21 @@ public class DtoConverter {
     /**
      * 构建 LoginVO
      */
-    public static LoginVO buildLoginResponse(User user, String token) {
+    public static LoginVO buildLoginResponse(User user, String accessToken, String refreshToken) {
         if (user == null) {
             return null;
         }
-        
+
         LoginVO vo = new LoginVO();
         vo.setId(user.getId());
         vo.setUsername(user.getUsername());
         vo.setEmail(user.getEmail());
         vo.setEmployeeId(user.getEmployeeId());
         vo.setRole(user.getRole() != null ? user.getRole().name() : "USER");
-        vo.setToken(token);
-        vo.setExpiresIn(com.bjutzxq.common.Constants.JWT.TOKEN_EXPIRE_TIME / 1000L);
+        vo.setAccessToken(accessToken);
+        vo.setRefreshToken(refreshToken);
+        vo.setExpiresIn(com.bjutzxq.common.Constants.JWT.ACCESS_TOKEN_EXPIRE / 1000L);
+        vo.setRefreshExpiresIn(com.bjutzxq.common.Constants.JWT.REFRESH_TOKEN_EXPIRE / 1000L);
         // 密码强度为 null 或 WEAK 时要求强制修改
         String strength = user.getPasswordStrength();
         vo.setMustChangePassword(strength == null || "WEAK".equals(strength));

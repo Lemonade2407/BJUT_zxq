@@ -118,16 +118,27 @@ public class Constants {
          * Token 前缀
          */
         public static final String TOKEN_PREFIX = "Bearer ";
-        
+
         /**
          * Token 请求头
          */
         public static final String TOKEN_HEADER = "Authorization";
-        
+
         /**
-         * Token 过期时间（2 小时）
+         * Token 过期时间（2 小时，已被 ACCESS_TOKEN_EXPIRE 替代）
          */
+        @Deprecated
         public static final long TOKEN_EXPIRE_TIME = 7200 * 1000;
+
+        /**
+         * Access Token 过期时间（15 分钟）
+         */
+        public static final long ACCESS_TOKEN_EXPIRE = 15 * 60 * 1000L;
+
+        /**
+         * Refresh Token 过期时间（7 天）
+         */
+        public static final long REFRESH_TOKEN_EXPIRE = 7 * 24 * 60 * 60 * 1000L;
         /**
          * Token 密钥（至少 32 字符/256 位，用于 HMAC-SHA256）
          * 优先从环境变量 JWT_SECRET 读取，生产环境必须设置此环境变量

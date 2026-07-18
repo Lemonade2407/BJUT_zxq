@@ -12,10 +12,12 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.Answers;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.MockedStatic;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -29,6 +31,9 @@ class UserServiceTest {
 
     @Mock
     private UserMapper userMapper;
+
+    @Mock(answer = Answers.RETURNS_DEEP_STUBS)
+    private StringRedisTemplate redisTemplate;
 
     @InjectMocks
     private UserService userService;
@@ -172,17 +177,15 @@ class UserServiceTest {
         when(userMapper.selectByUsername("testuser")).thenReturn(testUser);
 
         try (MockedStatic<JwtUtil> jwtUtilMock = mockStatic(JwtUtil.class)) {
-            jwtUtilMock.when(() -> JwtUtil.generateToken(anyInt(), anyString(), any()))
-                .thenReturn("mock-jwt-token");
-            jwtUtilMock.when(() -> JwtUtil.clearRefreshCount(anyInt()))
-                .then(invocation -> null); // void 方法不需要返回值
+            jwtUtilMock.when(() -> JwtUtil.generateTokenPair(anyInt()))
+                .thenReturn(new JwtUtil.TokenPair("mock-access-token", "mock-refresh-token", 900L));
 
             // Act
             LoginVO result = userService.login("testuser", "Test123456");
 
             // Assert
             assertNotNull(result);
-            assertNotNull(result.getToken());
+            assertNotNull(result.getAccessToken());
             assertEquals(1, result.getId());
             assertEquals("testuser", result.getUsername());
             verify(userMapper).selectByUsername("testuser");
@@ -200,17 +203,15 @@ class UserServiceTest {
         when(userMapper.selectByEmail("test@example.com")).thenReturn(testUser);
 
         try (MockedStatic<JwtUtil> jwtUtilMock = mockStatic(JwtUtil.class)) {
-            jwtUtilMock.when(() -> JwtUtil.generateToken(anyInt(), anyString(), any()))
-                .thenReturn("mock-jwt-token");
-            jwtUtilMock.when(() -> JwtUtil.clearRefreshCount(anyInt()))
-                .then(invocation -> null);
+            jwtUtilMock.when(() -> JwtUtil.generateTokenPair(anyInt()))
+                .thenReturn(new JwtUtil.TokenPair("mock-access-token", "mock-refresh-token", 900L));
 
             // Act
             LoginVO result = userService.login("test@example.com", "Test123456");
 
             // Assert
             assertNotNull(result);
-            assertNotNull(result.getToken());
+            assertNotNull(result.getAccessToken());
             verify(userMapper).selectByEmail("test@example.com");
         }
     }
@@ -227,17 +228,15 @@ class UserServiceTest {
         when(userMapper.selectByEmployeeId("20230101")).thenReturn(testUser);
 
         try (MockedStatic<JwtUtil> jwtUtilMock = mockStatic(JwtUtil.class)) {
-            jwtUtilMock.when(() -> JwtUtil.generateToken(anyInt(), anyString(), any()))
-                .thenReturn("mock-jwt-token");
-            jwtUtilMock.when(() -> JwtUtil.clearRefreshCount(anyInt()))
-                .then(invocation -> null);
+            jwtUtilMock.when(() -> JwtUtil.generateTokenPair(anyInt()))
+                .thenReturn(new JwtUtil.TokenPair("mock-access-token", "mock-refresh-token", 900L));
 
             // Act
             LoginVO result = userService.login("20230101", "Test123456");
 
             // Assert
             assertNotNull(result);
-            assertNotNull(result.getToken());
+            assertNotNull(result.getAccessToken());
             verify(userMapper).selectByEmployeeId("20230101");
         }
     }

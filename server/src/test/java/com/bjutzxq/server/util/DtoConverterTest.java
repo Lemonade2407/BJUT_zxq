@@ -96,7 +96,7 @@ class DtoConverterTest {
         user.setRole(Role.USER);
 
         // Act
-        LoginVO result = DtoConverter.buildLoginResponse(user, "token123");
+        LoginVO result = DtoConverter.buildLoginResponse(user, "access123", "refresh123");
 
         // Assert
         assertNotNull(result);
@@ -104,7 +104,7 @@ class DtoConverterTest {
         assertEquals("测试用户", result.getUsername());
         assertEquals("test@example.com", result.getEmail());
         assertEquals("USER", result.getRole());
-        assertEquals("token123", result.getToken());
+        assertEquals("access123", result.getAccessToken());
     }
 
     @Test
@@ -116,7 +116,7 @@ class DtoConverterTest {
         user.setUsername("test");
 
         // Act
-        LoginVO result = DtoConverter.buildLoginResponse(user, "token");
+        LoginVO result = DtoConverter.buildLoginResponse(user, "access", "refresh");
 
         // Assert
         assertEquals("USER", result.getRole());
@@ -126,7 +126,7 @@ class DtoConverterTest {
     @DisplayName("构建LoginVO - null user返回null")
     void buildLoginResponse_NullUser() {
         // Act
-        LoginVO result = DtoConverter.buildLoginResponse(null, "token");
+        LoginVO result = DtoConverter.buildLoginResponse(null, "access", "refresh");
 
         // Assert
         assertNull(result);

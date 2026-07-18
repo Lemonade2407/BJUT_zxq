@@ -10,8 +10,8 @@
 | 后端框架 | Java 21 + Spring Boot 3.5.14 |
 | ORM | MyBatis 3.0.3 + PageHelper |
 | 数据库 | MySQL 8.0 |
-| 缓存 | Caffeine |
-| 认证 | JWT (jjwt 0.12.3) + BCrypt |
+| 缓存 | Redis (Lettuce) + Caffeine |
+| 认证 | JWT 双 Token 模型 (jjwt 0.12.3) + BCrypt |
 | 文件存储 | 阿里云 OSS |
 | 前端框架 | Vue 3.5 + Vue Router 5 |
 | 构建工具 | Vite 7 |
@@ -79,12 +79,14 @@ BJUT_zxq/
 │       ├── controller/     # REST 控制器
 │       ├── service/        # 业务逻辑层
 │       ├── mapper/         # MyBatis Mapper 接口
-│       ├── config/         # 配置类（缓存、CORS、WebSocket）
+│       ├── config/         # 配置类（缓存、CORS、Redis、WebSocket）
 │       ├── handler/        # 全局异常处理、WebSocket
 │       ├── interceptor/    # JWT 拦截器
 │       ├── annotation/     # 自定义注解（@RequireRole）
-│       ├── aspect/         # AOP 权限校验
+│       ├── aspect/         # AOP（权限校验 + 统一日志）
 │       └── util/           # 工具类
+│   └── src/main/resources/
+│       └── redis/          # Lua 脚本
 ├── Vue/                    # Vue 3 前端
 │   └── src/
 │       ├── api/            # API 请求模块
@@ -111,10 +113,11 @@ BJUT_zxq/
 ## 功能列表
 
 ### 用户系统
-- 注册/登录/退出、JWT Token 认证
+- 注册/登录/退出、JWT 双 Token 认证（Access Token 15min + Refresh Token 7d）
+- Refresh Token 轮换与重放攻击检测
+- 单设备登出 / 全设备登出
 - 三种角色：学生(USER)、教师(TEACHER)、管理员(ADMIN)
-- 个人信息编辑、头像上传、密码修改
-- 个人统计看板（ECharts 图表）
+- 个人信息编辑、头像上传、密码修改（自动吊销所有 token）
 
 ### 项目管理
 - 创建项目（支持 5 种类型：课设、毕设、竞赛、个人、其他）
@@ -162,7 +165,7 @@ BJUT_zxq/
 
 | 模块 | 前缀 | 主要端点 |
 |------|------|---------|
-| 认证 | `/api/auth` | login, register, me, refresh |
+| 认证 | `/api/auth` | login, register, me, refresh(双Token轮换), logout-all |
 | 项目 | `/api/projects` | CRUD, search, trending, download |
 | 文件 | `/api/projects/{id}/files` | upload, download, document |
 | 评论 | `/api/projects/{id}/comments` | list, create, delete |

@@ -34,14 +34,24 @@ public class LoginVO {
     private String role;
     
     /**
-     * JWT Token
+     * Access Token（JWT，15 分钟过期）
      */
-    private String token;
-    
+    private String accessToken;
+
     /**
-     * Token 过期时间（秒）
+     * Refresh Token（不透明字符串，7 天过期）
+     */
+    private String refreshToken;
+
+    /**
+     * Access Token 过期时间（秒）
      */
     private Long expiresIn;
+
+    /**
+     * Refresh Token 过期时间（秒）
+     */
+    private Long refreshExpiresIn;
 
     /**
      * 是否需要强制修改密码（密码为弱密码或旧数据）

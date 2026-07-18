@@ -206,7 +206,7 @@ rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
         LoginVO loginVO = new LoginVO();
         loginVO.setId(1);
         loginVO.setUsername("testuser");
-        loginVO.setToken("mock-jwt-token");
+        loginVO.setAccessToken("mock-jwt-token");
 
         when(userService.login("testuser", "Test123456")).thenReturn(loginVO);
 
@@ -218,7 +218,7 @@ rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
         assertEquals(200, result.getCode());
         assertEquals("登录成功", result.getMessage());
         assertNotNull(result.getData());
-        assertEquals("mock-jwt-token", result.getData().getToken());
+        assertEquals("mock-jwt-token", result.getData().getAccessToken());
         verify(userService).login("testuser", "Test123456");
     }
 
@@ -290,7 +290,7 @@ rateLimiterMock.when(() -> RegistrationRateLimiter.checkEmailLimit(anyString()))
     @DisplayName("退出登录 - 成功")
     void testLogout_Success() {
         // Act
-        Result<Void> result = authController.logout(mockResponse);
+        Result<Void> result = authController.logout(null, mockResponse);
 
         // Assert
         assertNotNull(result);
