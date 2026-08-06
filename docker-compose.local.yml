@@ -1,0 +1,130 @@
+# ===========================================
+# 本地全栈容器部署（MySQL + Redis + 后端 + 前端）
+# 一条命令启动：docker compose -f docker-compose.local.yml up -d --build
+# 访问：http://localhost:8080
+#
+# name 必须与生产 docker-compose.yml 区分，否则共用项目名 bjut-zxq
+# 会导致服务互相冲突（本地起容器时把生产容器当孤儿重建）。
+# ===========================================
+name: bjut-zxq-local
+
+services:
+  # ===== MySQL =====
+  mysql:
+    image: mysql:8.0
+    container_name: bjut-zxq-mysql-local
+    restart: unless-stopped
+    networks:
+      - local-network
+    command:
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+      - --init-connect=SET NAMES utf8mb4
+      - --skip-character-set-client-handshake
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${DB_NAME:-bjut_zxq}
+      TZ: Asia/Shanghai
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data_local:/var/lib/mysql
+      - ./init-db:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===== Redis =====
+  redis:
+    image: redis:7-alpine
+    container_name: bjut-zxq-redis-local
+    restart: unless-stopped
+    networks:
+      - local-network
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data_local:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ===== 后端 =====
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: bjut-zxq-backend-local
+    restart: unless-stopped
+    networks:
+      - local-network
+    env_file:
+      - .env
+    environment:
+      # 容器内通过服务名访问 MySQL/Redis（覆盖 .env 里的 localhost）
+      DB_HOST: mysql
+      DB_PORT: 3306
+      DB_NAME: ${DB_NAME:-bjut_zxq}
+      DB_USERNAME: ${DB_USERNAME:-root}
+      DB_PASSWORD: ${DB_PASSWORD:?error}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_PASSWORD: ""
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:?error}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:?error}
+      JWT_SECRET: ${JWT_SECRET:?error}
+      TZ: Asia/Shanghai
+    volumes:
+      - ./logs:/app/logs
+      - maven_cache_local:/root/.m2
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/actuator/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+
+  # ===== 前端 (Nginx) =====
+  frontend:
+    build:
+      context: ./Vue
+      dockerfile: Dockerfile.frontend
+    container_name: bjut-zxq-frontend-local
+    restart: unless-stopped
+    networks:
+      - local-network
+    ports:
+      - "8080:80"
+    volumes:
+      - ./nginx.local.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  mysql_data_local:
+    driver: local
+  redis_data_local:
+    driver: local
+  maven_cache_local:
+    driver: local
+
+networks:
+  local-network:
+    driver: bridge

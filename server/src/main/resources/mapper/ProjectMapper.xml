@@ -349,4 +349,29 @@
     <select id="countByUserIdGroupByType" resultType="java.util.HashMap">SELECT project_type as type, COUNT(*) as cnt FROM project WHERE owner_id=#{userId} GROUP BY project_type</select>
     <select id="countByUserIdAndMonth" resultType="int">SELECT COUNT(*) FROM project WHERE owner_id=#{userId} AND DATE_FORMAT(created_at,'%Y-%m')=#{month}</select>
 
+    <!-- ===== AI 助手检索公开项目 ===== -->
+    <select id="searchForAi" resultMap="BaseResultMap">
+        SELECT <include refid="Base_Column_List"/>
+        FROM project
+        WHERE visibility = 1
+        <if test="keyword != null and keyword != ''">
+            AND (name LIKE CONCAT('%', #{keyword}, '%') OR description LIKE CONCAT('%', #{keyword}, '%'))
+        </if>
+        <if test="projectType != null and projectType != ''">
+            AND project_type = #{projectType}
+        </if>
+        <if test="courseName != null and courseName != ''">
+            AND course_name = #{courseName}
+        </if>
+        <if test="minStars != null">
+            AND star_count &gt;= #{minStars}
+        </if>
+        <choose>
+            <when test="sort == 'views'">ORDER BY view_count DESC</when>
+            <when test="sort == 'recent'">ORDER BY created_at DESC</when>
+            <otherwise>ORDER BY star_count DESC</otherwise>
+        </choose>
+        LIMIT #{limit}
+    </select>
+
 </mapper>

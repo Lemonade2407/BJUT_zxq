@@ -227,4 +227,16 @@ public interface ProjectMapper {
     int countByMonth(@Param("month") String month);
     java.util.List<java.util.Map<String, Object>> countByUserIdGroupByType(@Param("userId") Integer userId);
     int countByUserIdAndMonth(@Param("userId") Integer userId, @Param("month") String month);
+
+    /**
+     * AI 助手检索公开项目（动态条件 + 排序 + 限量）
+     */
+    List<Project> searchForAi(
+        @Param("keyword") String keyword,
+        @Param("projectType") String projectType,
+        @Param("courseName") String courseName,
+        @Param("minStars") Integer minStars,
+        @Param("sort") String sort,
+        @Param("limit") Integer limit
+    );
 }

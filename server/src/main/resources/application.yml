@@ -122,3 +122,18 @@ file:
   upload:
     max-size: 5368709120  # 5GB (5 * 1024 * 1024 * 1024)
     allowed-types: "*"  # 支持所有文件类型
+
+# AI 助手配置（DeepSeek 薄客户端）
+ai:
+  deepseek:
+    base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    api-key: ${DEEPSEEK_API_KEY:}
+    model: ${DEEPSEEK_MODEL:deepseek-chat}
+    # 上游 HTTP 读取超时（流式长连接）
+    timeout: 120s
+    # Agent 工具调用最大轮数，防止失控
+    max-tool-rounds: 6
+    # 加载历史消息上限（条）
+    history-limit: 40
+    # 工具结果单条截断字符数
+    tool-result-limit: 3000

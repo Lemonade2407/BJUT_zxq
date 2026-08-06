@@ -28,6 +28,7 @@ const menuItems = [
   { icon: '🏠', label: '主页', path: '/home' },
   { icon: '📁', label: '项目广场', path: '/projects' },
   { icon: '👥', label: '组队广场', path: '/team' },
+  { icon: '🤖', label: 'AI 助手', path: '/ai' },
 ]
 
 // 计算导航项的激活状态

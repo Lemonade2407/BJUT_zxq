@@ -70,6 +70,13 @@ const routes = [
   },
 
   {
+    path: '/ai',
+    name: 'AiChat',
+    component: () => import('@/components/ai/AiChat.vue'),
+    meta: { title: 'AI 助手', requiresAuth: true }
+  },
+
+  {
     path: '/settings',
     name: 'Settings',
     component: () => import('@/components/user/Settings.vue'),

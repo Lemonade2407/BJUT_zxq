@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//myBatis//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bjutzxq.server.mapper.AiConversationMapper">
+
+    <insert id="insert" parameterType="com.bjutzxq.pojo.entity.AiConversation" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_conversation (user_id, title, created_at, updated_at)
+        VALUES (#{userId}, #{title}, NOW(), NOW())
+    </insert>
+
+    <select id="selectById" resultType="com.bjutzxq.pojo.entity.AiConversation">
+        SELECT id, user_id, title, created_at, updated_at
+        FROM ai_conversation
+        WHERE id = #{id}
+    </select>
+
+    <select id="selectByUserId" resultType="com.bjutzxq.pojo.entity.AiConversation">
+        SELECT id, user_id, title, created_at, updated_at
+        FROM ai_conversation
+        WHERE user_id = #{userId}
+        ORDER BY updated_at DESC
+    </select>
+
+    <update id="updateTitle">
+        UPDATE ai_conversation SET title = #{title} WHERE id = #{id}
+    </update>
+
+    <delete id="deleteById">
+        DELETE FROM ai_conversation WHERE id = #{id}
+    </delete>
+
+    <select id="countByUserAndId" resultType="int">
+        SELECT COUNT(*) FROM ai_conversation WHERE user_id = #{userId} AND id = #{id}
+    </select>
+
+</mapper>

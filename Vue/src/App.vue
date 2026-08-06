@@ -14,6 +14,9 @@ const showMainLayout = computed(() => {
   return route.path !== '/login' && route.path !== '/register'
 })
 
+// AI 聊天页全屏沉浸，隐藏 Footer
+const isAiPage = computed(() => route.path === '/ai')
+
 // 检查登录状态（用于 Header 显示用户信息）
 const isLoggedIn = computed(() => {
   return tokenManager.isLoggedIn()
@@ -54,7 +57,7 @@ onUnmounted(() => {
       <div class="dashboard-container">
         <router-view />
       </div>
-      <Footer />
+      <Footer v-if="!isAiPage" />
     </template>
   </div>
 </template>
@@ -77,5 +80,12 @@ onUnmounted(() => {
   padding-top: 60px;
   flex: 1;
   overflow: hidden;
+}
+
+/* 路由页面作为 flex 子项默认不拉伸，宽度跟随内容收缩；
+   这里强制其撑满容器宽度（如 AI 聊天页需要占满屏幕） */
+.dashboard-container > * {
+  flex: 1;
+  min-width: 0;
 }
 </style>

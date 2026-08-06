@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//myBatis//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.bjutzxq.server.mapper.AiMessageMapper">
+
+    <insert id="insert" parameterType="com.bjutzxq.pojo.entity.AiMessage" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO ai_message (conversation_id, role, content, tool_calls, tool_call_id, created_at)
+        VALUES (#{conversationId}, #{role}, #{content}, #{toolCalls}, #{toolCallId}, NOW())
+    </insert>
+
+    <select id="selectByConversationId" resultType="com.bjutzxq.pojo.entity.AiMessage">
+        SELECT id, conversation_id, role, content, tool_calls, tool_call_id, created_at
+        FROM ai_message
+        WHERE conversation_id = #{conversationId}
+        ORDER BY id ASC
+    </select>
+
+    <delete id="deleteByConversationId">
+        DELETE FROM ai_message WHERE conversation_id = #{conversationId}
+    </delete>
+
+</mapper>

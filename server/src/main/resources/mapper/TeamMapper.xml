@@ -100,4 +100,20 @@
     </select>
 
   <select id="countByUserId" resultType="int">SELECT COUNT(*) FROM team WHERE user_id=#{userId}</select>
+
+  <!-- ===== AI 助手检索组队 ===== -->
+  <select id="searchForAi" resultType="com.bjutzxq.pojo.entity.Team">
+    SELECT <include refid="Base_Column_List"/>
+    FROM team
+    WHERE 1=1
+    <if test="keyword != null and keyword != ''">
+        AND (title LIKE CONCAT('%', #{keyword}, '%') OR description LIKE CONCAT('%', #{keyword}, '%'))
+    </if>
+    <if test="tag != null and tag != ''">AND tag = #{tag}</if>
+    <if test="courseName != null and courseName != ''">AND course_name = #{courseName}</if>
+    <if test="status != null">AND status = #{status}</if>
+    ORDER BY created_at DESC
+    LIMIT #{limit}
+  </select>
+
 </mapper>

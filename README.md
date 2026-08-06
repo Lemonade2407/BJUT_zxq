@@ -23,37 +23,33 @@
 
 ### 环境要求
 
-- **JDK** 21+
-- **Node.js** 20.19+ 或 22.12+
-- **MySQL** 8.0+
-- **Maven** 3.8+
-- **Docker** & **Docker Compose**（生产部署）
+- **JDK** 21+ / **Node.js** 20.19+ 或 22.12+ / **Maven** 3.8+
+- **Docker Desktop**（本地开发：仅用它跑 MySQL + Redis 容器；生产部署：完整容器化）
 
-### 本地开发
+### 本地开发（Windows / bash）
+
+默认**全栈 Docker 容器化**（MySQL + Redis + 后端 + 前端），一条命令搞定：
 
 ```bash
-# 1. 克隆项目
-git clone <repo-url>
-cd BJUT_zxq
+# 1. 启动 Docker Desktop
 
-# 2. 配置环境变量
+# 2. 配置环境变量（填数据库密码、OSS 密钥、JWT 密钥、DeepSeek Key）
 cp .env.example .env
-# 编辑 .env 填入数据库密码、OSS 密钥、JWT 密钥
+# 编辑 .env
 
-# 3. 初始化数据库
-mysql -u root -p < init-db/01-init.sql
+# 3. 一键启动全部容器（首次自动建表 + 构建镜像，约几分钟）
+./dev.ps1            # Windows PowerShell
+# 或 ./dev.sh        # bash / git-bash / WSL
 
-# 4. 启动后端（端口 8080）
-cd server
-mvn spring-boot:run
-
-# 5. 启动前端（端口 5173）
-cd Vue
-npm install
-npm run dev
+# 常用：
+./dev.ps1 rebuild    # 代码变更后重建镜像并启动
+./dev.ps1 down       # 停止全部
+./dev.ps1 logs       # 跟踪日志
 ```
 
-访问 `http://localhost:5173`，默认管理员账号 `admin` / `123456`。
+访问 `http://localhost:8080`，默认管理员账号 `admin` / `123456`。
+
+> 需要热更新的本地开发模式（不走容器）仍可用：`./dev.ps1 backend` / `./dev.ps1 frontend`（前后端分别在本机跑，前端 http://localhost:5173，Vite 代理 /api 到 8080）。
 
 ### Docker 部署
 
@@ -133,6 +129,11 @@ BJUT_zxq/
 - 入队通知（WebSocket 实时推送）
 - 我的组队管理
 
+### AI 助手（`/ai`）
+- 课设/竞赛/毕设选题推荐：结合用户画像（技能/兴趣标签）、课程字典、已有项目去重与灵感，输出含技术栈、难度、里程碑的选题方案
+- 组队匹配推荐：按技能画像对「招募中」队伍打分并给出匹配理由与缺口分析，可跳转一键申请
+- DeepSeek（`deepseek-chat`）接入，薄客户端 + Function Calling 工具检索，SSE 流式对话，会话历史持久化
+
 ### 管理后台
 - 数据概览（用户/项目/组队统计、角色分布饼图、月度趋势折线图、热门标签柱状图）
 - 用户管理（搜索、封禁、角色设置）
@@ -160,6 +161,8 @@ BJUT_zxq/
 | `course` | 课程字典 |
 | `team` | 组队 |
 | `team_application` | 组队申请 |
+| `ai_conversation` | AI 会话（选题/组队助手） |
+| `ai_message` | AI 会话消息（user/assistant/tool） |
 
 ## API 概览
 
@@ -190,6 +193,9 @@ BJUT_zxq/
 | `OSS_ACCESS_KEY_ID` | 阿里云 OSS Key | 是 |
 | `OSS_ACCESS_KEY_SECRET` | 阿里云 OSS Secret | 是 |
 | `JWT_SECRET` | JWT 签名密钥（≥32字符） | 是 |
+| `DEEPSEEK_API_KEY` | DeepSeek API Key（AI 助手，[申请地址](https://platform.deepseek.com)） | 否（AI 功能需要） |
+| `DEEPSEEK_BASE_URL` | DeepSeek 接口地址 | 否（默认 `https://api.deepseek.com`） |
+| `DEEPSEEK_MODEL` | AI 模型名 | 否（默认 `deepseek-chat`） |
 | `VITE_API_BASE_URL` | 前端 API 地址 | 否（默认 /api） |
 
 ## License
